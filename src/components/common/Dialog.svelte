@@ -62,33 +62,60 @@
   .overlay {
     position: fixed;
     inset: 0;
-    background: rgba(10, 14, 20, 0.45);
+    background: color-mix(in srgb, #0a0e14 55%, transparent);
     display: flex;
     align-items: flex-start;
     justify-content: center;
-    padding: 4vh 1rem;
+    padding: 5vh 1rem;
     z-index: 100;
+    animation: overlay-in .14s ease-out;
   }
   .dialog {
-    background: var(--surface);
+    background: var(--surface-elevated);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-lg);
     width: 100%;
     max-width: 34rem;
     max-height: 90vh;
     display: flex;
     flex-direction: column;
+    animation: dialog-in .16s cubic-bezier(.16, 1, .3, 1);
   }
   .dialog.wide { max-width: 52rem; }
   header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: .7rem 1rem;
-    border-bottom: 1px solid var(--border);
+    padding: .85rem 1.15rem .6rem;
   }
-  header h2 { margin: 0; font-size: 1.05rem; }
-  header button { border: none; background: none; font-size: 1rem; }
-  .body { padding: .8rem 1rem 1rem; overflow-y: auto; }
+  header h2 { margin: 0; font-size: 1.08rem; letter-spacing: -0.012em; }
+  header button {
+    border: none;
+    background: none;
+    box-shadow: none;
+    font-size: .9rem;
+    color: var(--text-muted);
+    width: 1.9rem;
+    height: 1.9rem;
+    min-height: 0;
+    padding: 0;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+  }
+  header button:hover { background: var(--surface-2); color: var(--text); }
+  .body { padding: .3rem 1.15rem 1.15rem; overflow-y: auto; }
+
+  @keyframes overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  @keyframes dialog-in {
+    from { opacity: 0; transform: translateY(10px) scale(.985); }
+    to { opacity: 1; transform: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .overlay, .dialog { animation: none; }
+  }
 </style>

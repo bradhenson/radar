@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.1.1 — 2026-07-04
+
+### Changed
+- Full visual redesign: refreshed design tokens (cool neutral palette, larger radii, layered
+  shadows, refined dark theme), modern data tables with row hover, gradient primary buttons,
+  accent-striped stat tiles, restyled empty states.
+- App shell: icon-based side navigation (bundled inline SVG, no external icon fonts), pill-style
+  save-status chip, quick light/dark theme toggle in the top bar, backup age moved to the
+  sidebar footer.
+- Board (building on the Planner-style pass): retained bucket colors, category label chips,
+  assignee avatars, inline per-column task add.
+- Dialogs and toasts: elevated surfaces, larger radii, subtle open animations (disabled under
+  reduced-motion preference).
+- Removed backdrop-filter frosted-glass effects in favor of solid surfaces for reliability on
+  managed enterprise browsers.
+
 ## 0.1.0 — 2026-07-04
 
 Initial implementation from the project plan (phases 0–6, plus a basic awards list).

@@ -7,6 +7,7 @@
   import TaskDetail from "../components/forms/TaskDetail.svelte";
   import PerformanceInputForm from "../components/forms/PerformanceInputForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import TodayPage from "../pages/TodayPage.svelte";
   import BoardPage from "../pages/BoardPage.svelte";
   import EmployeesPage from "../pages/EmployeesPage.svelte";
@@ -40,20 +41,31 @@
     return () => mq.removeEventListener("change", apply);
   });
 
-  const NAV: { page: string; label: string; section?: string }[] = [
-    { page: "today", label: "Today" },
-    { page: "board", label: "Board" },
-    { page: "employees", label: "Employees", section: "People" },
-    { page: "performance", label: "Performance" },
-    { page: "training", label: "Training" },
-    { page: "leave", label: "Leave" },
-    { page: "telework", label: "Telework" },
-    { page: "awards", label: "Awards" },
-    { page: "projects", label: "Projects", section: "Work" },
-    { page: "reports", label: "Reports" },
-    { page: "archive", label: "Archive" },
-    { page: "settings", label: "Settings", section: "System" }
+  const NAV: { page: string; label: string; icon: string; section?: string }[] = [
+    { page: "today", label: "Today", icon: "today" },
+    { page: "board", label: "Board", icon: "board" },
+    { page: "employees", label: "Employees", icon: "employees", section: "People" },
+    { page: "performance", label: "Performance", icon: "performance" },
+    { page: "training", label: "Training", icon: "training" },
+    { page: "leave", label: "Leave", icon: "leave" },
+    { page: "telework", label: "Telework", icon: "telework" },
+    { page: "awards", label: "Awards", icon: "awards" },
+    { page: "projects", label: "Projects", icon: "projects", section: "Work" },
+    { page: "reports", label: "Reports", icon: "reports" },
+    { page: "archive", label: "Archive", icon: "archive" },
+    { page: "settings", label: "Settings", icon: "settings", section: "System" }
   ];
+
+  let isDark = $derived(
+    app.settings.theme === "dark" ||
+      (app.settings.theme === "system" &&
+        typeof window !== "undefined" &&
+        window.matchMedia("(prefers-color-scheme: dark)").matches)
+  );
+
+  function toggleTheme() {
+    void app.saveSettings({ ...app.settings, theme: isDark ? "light" : "dark" });
+  }
 
   let detailTask = $derived(ui.detailTaskId ? app.tasks.find((t) => t.id === ui.detailTaskId) : undefined);
 
@@ -102,27 +114,39 @@
 {:else}
   <div class="shell">
     <header class="topbar">
-      <span class="brand">{app.settings.applicationName}</span>
-      <button type="button" class="primary" onclick={() => ui.openQuickAdd()} title="Shortcut: N">+ New Task</button>
+      <span class="brand">
+        <span class="brand-mark" aria-hidden="true">SA</span>
+        <span>{app.settings.applicationName}</span>
+      </span>
+      <button type="button" class="primary new-task-btn" onclick={() => ui.openQuickAdd()} title="Shortcut: N">
+        <Icon name="plus" size={15} />
+        New Task
+      </button>
       <span class="spacer"></span>
-      <span class="save-status small" data-status={app.saveStatus}>
+      <span class="chip save-status" data-status={app.saveStatus} title={backupAgeText}>
+        <span class="dot" aria-hidden="true"></span>
         {#if app.saveStatus === "saving"}Saving…{:else if app.saveStatus === "error"}Save failed{:else}Saved{/if}
       </span>
-      <span class="small muted">·</span>
-      <span class="small muted">{backupAgeText}</span>
       {#if app.storageKind === "memory"}
         <span class="badge overdue" title="IndexedDB is unavailable. Data will be lost when this tab closes unless you export a backup.">
           Memory-only storage
         </span>
       {/if}
+      <button type="button" class="icon-btn" onclick={toggleTheme} title="Toggle light/dark theme" aria-label="Toggle theme">
+        <Icon name={isDark ? "sun" : "moon"} size={17} />
+      </button>
     </header>
 
     <div class="body">
       <nav class="sidenav" aria-label="Main navigation">
         {#each NAV as item (item.page)}
           {#if item.section}<div class="section">{item.section}</div>{/if}
-          <a href={"#/" + item.page} class:active={router.current.page === item.page}>{item.label}</a>
+          <a href={"#/" + item.page} class:active={router.current.page === item.page}>
+            <span class="nav-icon"><Icon name={item.icon} size={17} /></span>
+            <span>{item.label}</span>
+          </a>
         {/each}
+        <div class="sidenav-footer small muted">{backupAgeText}</div>
       </nav>
 
       <main>
@@ -210,62 +234,186 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
+    background:
+      radial-gradient(80rem 22rem at 18% -6rem, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent),
+      var(--bg);
   }
   .topbar {
     display: flex;
     align-items: center;
     gap: .7rem;
-    padding: .5rem 1rem;
+    min-height: var(--topbar-h);
+    padding: .5rem 1.1rem;
     background: var(--surface);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 50;
+    box-shadow: var(--shadow-xs);
   }
-  .brand { font-weight: 700; font-size: 1.05rem; }
+  .brand {
+    display: inline-flex;
+    align-items: center;
+    gap: .6rem;
+    font-weight: 750;
+    font-size: 1.02rem;
+    letter-spacing: -0.01em;
+    min-width: 0;
+    margin-right: .4rem;
+  }
+  .brand-mark {
+    display: inline-grid;
+    place-items: center;
+    width: 1.9rem;
+    height: 1.9rem;
+    border-radius: 9px;
+    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 800;
+    letter-spacing: .02em;
+    flex: 0 0 auto;
+    box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .new-task-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    border-radius: 999px;
+    padding-inline: .95rem;
+  }
   .spacer { flex: 1; }
-  .save-status[data-status="error"] { color: var(--danger); font-weight: 700; }
-  .save-status[data-status="saving"] { color: var(--warning); }
-  .body { display: flex; flex: 1; min-height: 0; }
-  .sidenav {
-    width: 11rem;
-    flex-shrink: 0;
-    padding: .8rem .5rem 2rem;
-    border-right: 1px solid var(--border);
+
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    min-height: 1.85rem;
+    padding: .2rem .7rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
     background: var(--surface);
+    color: var(--text-muted);
+    font-size: .78rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .chip .dot {
+    width: .5rem;
+    height: .5rem;
+    border-radius: 999px;
+    background: var(--success);
+    flex: 0 0 auto;
+  }
+  .save-status[data-status="saving"] .dot { background: var(--warning); }
+  .save-status[data-status="error"] { color: var(--danger); border-color: var(--danger); }
+  .save-status[data-status="error"] .dot { background: var(--danger); }
+
+  .icon-btn {
+    display: inline-grid;
+    place-items: center;
+    width: 2.1rem;
+    height: 2.1rem;
+    padding: 0;
+    border-radius: 999px;
+    color: var(--text-muted);
+  }
+  .icon-btn:hover { color: var(--text); }
+
+  .body { display: flex; flex: 1; min-height: 0; }
+
+  .sidenav {
+    width: 13.5rem;
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    padding: 1rem .7rem 2.6rem;
+    border-right: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+    position: sticky;
+    top: var(--topbar-h);
+    align-self: flex-start;
+    height: calc(100vh - var(--topbar-h));
+    overflow-y: auto;
   }
   .sidenav a {
-    display: block;
-    padding: .35rem .7rem;
-    border-radius: var(--radius);
-    color: var(--text);
-    text-decoration: none;
-    margin-bottom: 1px;
-  }
-  .sidenav a:hover { background: var(--surface-2); }
-  .sidenav a.active { background: var(--accent); color: var(--accent-text); }
-  .sidenav .section {
-    font-size: .7rem;
-    text-transform: uppercase;
-    letter-spacing: .06em;
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+    min-height: 2.15rem;
+    padding: .3rem .7rem;
+    border-radius: 9px;
     color: var(--text-muted);
-    margin: .9rem .7rem .2rem;
+    text-decoration: none;
+    margin-bottom: 2px;
+    font-weight: 600;
+    transition: background-color .12s ease, color .12s ease;
   }
+  .sidenav a:hover { background: color-mix(in srgb, var(--surface-2) 80%, transparent); color: var(--text); text-decoration: none; }
+  .sidenav a.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+  }
+  .nav-icon {
+    display: inline-grid;
+    place-items: center;
+    width: 1.35rem;
+    flex: 0 0 auto;
+    opacity: .85;
+  }
+  .sidenav a.active .nav-icon { opacity: 1; }
+  .sidenav .section {
+    font-size: .66rem;
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    color: var(--text-muted);
+    margin: 1.05rem .7rem .3rem;
+    font-weight: 750;
+    opacity: .8;
+  }
+  .sidenav-footer {
+    margin-top: auto;
+    padding: 1rem .7rem 0;
+    font-size: .72rem;
+  }
+
   main { flex: 1; min-width: 0; overflow-x: auto; }
+
   .notice {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    background: var(--surface-2);
+    background: var(--surface);
     border-top: 1px solid var(--border);
     color: var(--text-muted);
-    font-size: .72rem;
-    padding: .25rem 1rem;
+    font-size: .7rem;
+    padding: .28rem 1rem;
     text-align: center;
     z-index: 60;
   }
+
   @media (max-width: 900px) {
-    .sidenav { width: 8.5rem; }
+    .sidenav { width: 10.5rem; }
+  }
+  @media (max-width: 700px) {
+    .topbar { flex-wrap: wrap; }
+    .brand { flex: 1 1 100%; }
+    .body { flex-direction: column; }
+    .sidenav {
+      display: flex;
+      flex-direction: row;
+      gap: .25rem;
+      width: 100%;
+      height: auto;
+      position: static;
+      overflow-x: auto;
+      padding: .45rem .55rem;
+      border-right: none;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidenav .section, .sidenav-footer { display: none; }
+    .sidenav a { flex: 0 0 auto; margin: 0; white-space: nowrap; }
   }
 </style>
