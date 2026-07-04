@@ -198,13 +198,14 @@ class AppStore {
   ): Promise<void> {
     this.saveStatus = "saving";
     try {
-      await this.store.put(name, record);
+      const persisted = $state.snapshot(record) as CollectionTypes[K];
+      await this.store.put(name, persisted);
       const list = this.stateList(name);
-      const idx = list.findIndex((r) => r.id === record.id);
-      if (idx >= 0) list[idx] = record;
-      else list.push(record);
+      const idx = list.findIndex((r) => r.id === persisted.id);
+      if (idx >= 0) list[idx] = persisted;
+      else list.push(persisted);
       if (activity) {
-        await this.recordActivity(activity.entityType ?? name, record.id, activity.actionType, activity.summary);
+        await this.recordActivity(activity.entityType ?? name, persisted.id, activity.actionType, activity.summary);
       }
       await this.bumpChangeCount(activity?.actionType);
       this.saveStatus = "saved";

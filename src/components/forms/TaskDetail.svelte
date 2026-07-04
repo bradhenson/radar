@@ -23,6 +23,7 @@
   let newNote = $state("");
   let newChecklistItem = $state("");
   let error = $state("");
+  let saving = $state(false);
 
   let notes = $derived(
     app.taskNotes.filter((n) => n.taskId === task.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
@@ -37,43 +38,28 @@
       .slice(0, 15)
   );
 
+  type EditableTaskFields = ReturnType<typeof editableFieldsFromDraft>;
+  type EditableTaskField = keyof EditableTaskFields;
+
   function close() {
     ui.detailTaskId = undefined;
   }
 
-  async function save() {
-    const title = draft.title.trim();
-    if (!title) {
-      error = "Title is required.";
-      return;
-    }
-    for (const [label, v] of [
-      ["Due date", draft.dueDate],
-      ["Start date", draft.startDate],
-      ["Reminder date", draft.reminderDate],
-      ["Follow-up date", draft.followUpDate]
-    ] as const) {
-      if (v && !isValidIsoDate(v)) {
-        error = `${label} is not a valid date.`;
-        return;
-      }
-    }
-    if (draft.startDate && draft.dueDate && draft.dueDate < draft.startDate) {
-      error = "Due date must be on or after the start date.";
-      return;
-    }
-    const tags = tagsText
+  function normalizedTags(): string[] {
+    return tagsText
       .split(",")
       .map((t) => t.trim())
       .filter(Boolean)
       .slice(0, 20);
+  }
 
-    const statusChanged = draft.status !== task.status;
-    const updated: Task = {
-      ...draft,
-      title,
-      tags,
+  function editableFieldsFromDraft() {
+    return {
+      title: draft.title.trim(),
       description: draft.description?.trim() || undefined,
+      status: draft.status,
+      priority: draft.priority,
+      category: draft.category,
       employeeId: draft.employeeId || undefined,
       projectId: draft.projectId || undefined,
       dueDate: draft.dueDate || undefined,
@@ -83,7 +69,132 @@
       sourceSystem: draft.sourceSystem === "None" ? undefined : draft.sourceSystem,
       sourceReference: draft.sourceReference?.trim() || undefined,
       waitingReason: draft.waitingReason?.trim() || undefined,
-      waitingOn: draft.waitingOn?.trim() || undefined
+      waitingOn: draft.waitingOn?.trim() || undefined,
+      tags: normalizedTags()
+    };
+  }
+
+  function editableFieldsFromTask(t: Task) {
+    return {
+      title: t.title.trim(),
+      description: t.description?.trim() || undefined,
+      status: t.status,
+      priority: t.priority,
+      category: t.category,
+      employeeId: t.employeeId || undefined,
+      projectId: t.projectId || undefined,
+      dueDate: t.dueDate || undefined,
+      startDate: t.startDate || undefined,
+      reminderDate: t.reminderDate || undefined,
+      followUpDate: t.followUpDate || undefined,
+      sourceSystem: t.sourceSystem === "None" ? undefined : t.sourceSystem,
+      sourceReference: t.sourceReference?.trim() || undefined,
+      waitingReason: t.waitingReason?.trim() || undefined,
+      waitingOn: t.waitingOn?.trim() || undefined,
+      tags: [...t.tags]
+    };
+  }
+
+  let hasUnsavedChanges = $derived(
+    JSON.stringify(editableFieldsFromDraft()) !== JSON.stringify(editableFieldsFromTask(task))
+  );
+
+  function validateDraft(fields: ReturnType<typeof editableFieldsFromDraft>): boolean {
+    if (!fields.title) {
+      error = "Title is required.";
+      return false;
+    }
+    for (const [label, v] of [
+      ["Due date", fields.dueDate],
+      ["Start date", fields.startDate],
+      ["Reminder date", fields.reminderDate],
+      ["Follow-up date", fields.followUpDate]
+    ] as const) {
+      if (v && !isValidIsoDate(v)) {
+        error = `${label} is not a valid date.`;
+        return false;
+      }
+    }
+    if (fields.startDate && fields.dueDate && fields.dueDate < fields.startDate) {
+      error = "Due date must be on or after the start date.";
+      return false;
+    }
+    error = "";
+    return true;
+  }
+
+  function fieldChanged(a: EditableTaskFields[EditableTaskField], b: EditableTaskFields[EditableTaskField]): boolean {
+    return Array.isArray(a) && Array.isArray(b) ? a.join("\u0000") !== b.join("\u0000") : a !== b;
+  }
+
+  const FIELD_LABELS: Record<EditableTaskField, string> = {
+    title: "title",
+    description: "description",
+    status: "status",
+    priority: "priority",
+    category: "category",
+    employeeId: "employee",
+    projectId: "project",
+    dueDate: "due date",
+    startDate: "start date",
+    reminderDate: "reminder date",
+    followUpDate: "follow-up date",
+    sourceSystem: "source system",
+    sourceReference: "source reference",
+    waitingReason: "waiting reason",
+    waitingOn: "waiting on",
+    tags: "tags"
+  };
+
+  function listFieldLabels(fields: EditableTaskField[]): string {
+    const labels = fields.map((field) => FIELD_LABELS[field]);
+    if (labels.length === 0) return "";
+    if (labels.length === 1) return labels[0]!;
+    if (labels.length === 2) return `${labels[0]} and ${labels[1]}`;
+    return `${labels.slice(0, -1).join(", ")}, and ${labels[labels.length - 1]}`;
+  }
+
+  function changedFieldsSummary(fields: EditableTaskField[]): string {
+    if (fields.length === 0) return "fields changed";
+    if (fields.length <= 4) return `${listFieldLabels(fields)} changed`;
+    const visibleFields = fields.slice(0, 3);
+    const hiddenCount = fields.length - visibleFields.length;
+    return `${fields.length} fields changed (${listFieldLabels(visibleFields)}, plus ${hiddenCount} more)`;
+  }
+
+  function updatedFieldsSummary(fields: EditableTaskField[]): string {
+    if (fields.length === 0) return "fields";
+    if (fields.length <= 4) return listFieldLabels(fields);
+    const visibleFields = fields.slice(0, 3);
+    const hiddenCount = fields.length - visibleFields.length;
+    return `${fields.length} fields (${listFieldLabels(visibleFields)}, plus ${hiddenCount} more)`;
+  }
+
+  function taskChangeSummary(fields: EditableTaskFields, statusChanged: boolean): string {
+    const beforeFields = editableFieldsFromTask(task);
+    const changedFields = (Object.keys(fields) as EditableTaskField[]).filter(
+      (field) => fieldChanged(beforeFields[field], fields[field]) && !(statusChanged && field === "status")
+    );
+    if (statusChanged) {
+      const base = `Moved "${fields.title}" from ${statusLabel(task.status)} to ${statusLabel(fields.status)}`;
+      return changedFields.length ? `${base}; also updated ${updatedFieldsSummary(changedFields)}` : base;
+    }
+    return `Updated task "${fields.title}": ${changedFieldsSummary(changedFields)}`;
+  }
+
+  async function save(closeAfter = true): Promise<boolean> {
+    if (saving) return false;
+    const fields = editableFieldsFromDraft();
+    if (!validateDraft(fields)) return false;
+    if (!hasUnsavedChanges) {
+      if (closeAfter) close();
+      return true;
+    }
+
+    const statusChanged = fields.status !== task.status;
+    const updated: Task = {
+      ...task,
+      ...fields
     };
     if (statusChanged) {
       updated.boardOrder = orderForAppend(
@@ -93,14 +204,36 @@
       if (updated.status === "complete" && task.status !== "complete") updated.completedDate = app.today;
       if (updated.status !== "complete") updated.completedDate = undefined;
     }
-    await app.updateTask(
-      updated,
-      statusChanged ? `Moved "${title}" from ${statusLabel(task.status)} to ${statusLabel(updated.status)}` : undefined,
-      statusChanged ? "status_changed" : "updated"
-    );
-    if (statusChanged && updated.status === "complete" && updated.employeeId && !updated.performanceInputCreated) {
-      ui.performancePromptTask = updated;
+    saving = true;
+    try {
+      await app.updateTask(
+        updated,
+        taskChangeSummary(fields, statusChanged),
+        statusChanged ? "status_changed" : "updated"
+      );
+      if (statusChanged && updated.status === "complete" && updated.employeeId && !updated.performanceInputCreated) {
+        ui.performancePromptTask = updated;
+      }
+      if (closeAfter) close();
+      return true;
+    } catch (e) {
+      error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
+      return false;
+    } finally {
+      saving = false;
     }
+  }
+
+  async function autosaveAndClose() {
+    if (saving) return;
+    if (!hasUnsavedChanges) {
+      close();
+      return;
+    }
+    await save(true);
+  }
+
+  function discardAndClose() {
     close();
   }
 
@@ -153,7 +286,7 @@
   }
 </script>
 
-<Dialog title="Task" wide onclose={close}>
+<Dialog title="Task" wide onclose={() => void autosaveAndClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -243,7 +376,7 @@
     </div>
 
     <div style="display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap;">
-      <button type="submit" class="primary">Save</button>
+      <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
       {#if task.status !== "complete"}
         <button type="button" onclick={() => void completeNow()}>Complete</button>
       {/if}
@@ -251,7 +384,7 @@
         <button type="button" onclick={() => void archive()}>Archive</button>
       {/if}
       <span class="spacer" style="flex:1"></span>
-      <button type="button" onclick={close}>Cancel</button>
+      <button type="button" onclick={discardAndClose} title="Close without saving changes">Cancel</button>
     </div>
   </form>
 
