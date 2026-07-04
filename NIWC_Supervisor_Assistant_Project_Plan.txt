@@ -1,0 +1,4480 @@
+SUPERVISOR ASSISTANT
+DETAILED PRODUCT, ARCHITECTURE, AND IMPLEMENTATION PLAN
+
+Document purpose:
+This document is intended to be used as the primary starting specification for building a local-first supervisory productivity application in Visual Studio Code with assistance from Codex, Claude Code, or another coding agent.
+
+Working title:
+Supervisor Assistant
+
+Document version:
+0.1
+
+Prepared:
+July 4, 2026
+
+Intended user:
+A single supervisor managing approximately 40 employees across competencies 55140 and 55230 at Naval Information Warfare Center Atlantic.
+
+IMPORTANT BOUNDARY:
+This document is a software design and development plan, not an authorization to store government information in an unapproved application. Before real employee data is entered, the user must determine what information may be stored locally on an NMCI computer and where backup files may be saved. Initial development and testing should use invented or sanitized data.
+
+======================================================================
+TABLE OF CONTENTS
+======================================================================
+
+1. Executive Summary
+2. Problem Statement
+3. Product Vision
+4. Product Principles
+5. Scope and Non-Goals
+6. Operational and Security Boundaries
+7. Core User Workflows
+8. Recommended Technical Architecture
+9. NMCI Compatibility Spike
+10. Data Storage Strategy
+11. Application Information Architecture
+12. Detailed Screen Specifications
+13. Kanban Board Specification
+14. Task and Work Item Model
+15. Employee Management
+16. Project Management
+17. Performance Input Tracking
+18. Training Tracking
+19. Leave Tracking
+20. Telework Request Tracking
+21. Award Tracking
+22. Reminder and Attention Engine
+23. Recurring Task Engine
+24. Search, Filtering, and Saved Views
+25. Activity History and Audit Trail
+26. Import, Export, Backup, and Recovery
+27. Data Model
+28. Data Validation Rules
+29. User Experience and Accessibility
+30. Keyboard Shortcuts
+31. Application Settings
+32. Reporting and Review Views
+33. Error Handling and Resilience
+34. Testing Strategy
+35. Repository and Code Organization
+36. Implementation Phases
+37. Acceptance Criteria
+38. Coding Agent Working Rules
+39. Suggested Coding Agent Prompts
+40. Future Enhancements
+41. Risks and Mitigations
+42. Open Decisions
+43. Definition of Done
+44. Sample Seed Data
+45. Glossary
+46. Reference Notes
+
+======================================================================
+1. EXECUTIVE SUMMARY
+======================================================================
+
+Supervisor Assistant will be a single-user, local-first web application designed to help a supervisor organize day-to-day work involving approximately 40 employees.
+
+The application will focus on:
+
+- A kanban-style task board as the primary working interface.
+- A Today or Attention dashboard that identifies items needing action.
+- Employee profiles that aggregate tasks, training, leave, telework, performance inputs, awards, and supervisory follow-ups.
+- Fast capture of tasks and performance observations.
+- Recurring reminders for routine supervisory responsibilities.
+- Local data storage with explicit export, backup, and recovery.
+- No required server, cloud account, external API, or software installation on the operational NMCI computer.
+- No runtime internet dependency.
+- A production build that can be opened in an approved browser using local files, if NMCI browser policy permits.
+
+The software will be developed on a personal or approved development computer using modern development tools. Only the compiled, self-contained production files will be moved to the NMCI environment through an authorized process.
+
+The first development activity will not be the full application. It will be a small compatibility test that verifies what the NMCI browser allows when opening a local web application. This test will determine:
+
+- Whether bundled JavaScript executes from a local file.
+- Whether IndexedDB is available and persists between browser sessions.
+- Whether download-based backup export works.
+- Whether file import works.
+- Whether drag-and-drop interactions work.
+- Whether browser permissions or enterprise policies block required features.
+
+The data architecture will be designed behind an abstraction layer so the storage implementation can be changed without rewriting the entire application.
+
+======================================================================
+2. PROBLEM STATEMENT
+======================================================================
+
+The supervisor currently manages work across multiple disconnected systems, including:
+
+- Microsoft Planner for task tracking.
+- Microsoft Excel for data tracking.
+- ERP for timekeeping and leave.
+- SWAT for command-specific workflows and information.
+- Email, meetings, informal notes, and memory for follow-ups.
+- Other systems that do not provide one consolidated supervisory view.
+
+The authoritative data remains distributed across those systems. The supervisor repeatedly performs manual reconciliation and creates personal tracking mechanisms to remember:
+
+- What needs to be done.
+- Who is responsible.
+- What is overdue.
+- What is waiting on another person.
+- Which employees need follow-up.
+- Which training or telework items are approaching expiration.
+- What employee accomplishments should be remembered during evaluations.
+- Whether recurring supervisory actions have been completed.
+
+The main problem is not the absence of source systems. The problem is the absence of a personal supervisory workspace that combines reminders, tasks, employee context, and structured notes in one place.
+
+The application should therefore not attempt to replace ERP, SWAT, Planner, or official personnel systems. It should act as a supervisory cockpit that references and reconciles information from those systems.
+
+======================================================================
+3. PRODUCT VISION
+======================================================================
+
+Product vision statement:
+
+Supervisor Assistant is a private, local-first supervisory cockpit that helps one supervisor capture, organize, review, and complete work associated with employees, projects, requirements, and recurring responsibilities.
+
+The application should make it easy to answer:
+
+- What requires my attention today?
+- What is overdue?
+- What is due soon?
+- What am I waiting on?
+- Which employees have open actions?
+- Which employee has not received recent supervisory attention?
+- Which tasks have become stale?
+- What training is approaching its due date?
+- What telework agreements or requests require action?
+- What leave may affect project staffing?
+- What accomplishments should be captured for performance evaluations?
+- What routine supervisory action should recur next?
+- When did I last verify information against the authoritative system?
+
+The long-term measure of success is simple:
+
+The application becomes the first page opened at the beginning of the workday and the final page reviewed before ending the workday.
+
+======================================================================
+4. PRODUCT PRINCIPLES
+======================================================================
+
+4.1 Local first
+
+The application must remain useful without network access. Data entry, search, filtering, task movement, reporting, and reminders must work locally.
+
+4.2 No runtime dependencies
+
+The operational build must not download scripts, fonts, icons, styles, telemetry, or other resources from the internet.
+
+4.3 Fast capture
+
+The user must be able to create a basic task in less than 15 seconds.
+
+Minimum quick task flow:
+
+1. Press New Task or a keyboard shortcut.
+2. Enter a title.
+3. Optionally select an employee.
+4. Optionally select a due date.
+5. Save.
+
+4.4 Progressive detail
+
+A task can begin with only a title. More information can be added later.
+
+4.5 One underlying work model
+
+Training actions, telework follow-ups, performance inputs, awards, and normal project tasks should share common work-item behavior where practical.
+
+4.6 Source awareness
+
+Records derived from another system should identify:
+
+- Source system.
+- Source reference.
+- Date last verified.
+- Verification status.
+
+4.7 Action over documentation
+
+The application should emphasize what needs attention rather than becoming a passive archive.
+
+4.8 Explainable reminders
+
+Every item in the Attention view should clearly state why it appears.
+
+Examples:
+
+- Overdue by 4 days.
+- Due within 7 days.
+- Waiting for 18 days.
+- No activity for 30 days.
+- Training expires in 21 days.
+- No performance input recorded in 90 days.
+
+4.9 Data portability
+
+The user must be able to export all data in a documented, human-readable format.
+
+4.10 Minimal sensitive data
+
+Store only information necessary for legitimate supervisory organization.
+
+4.11 Recoverability
+
+A mistake, browser failure, corrupted database, or machine replacement must not permanently destroy the data if backups have been performed.
+
+4.12 Desktop first
+
+The primary target is a Windows desktop browser. Mobile support is not required for the initial version.
+
+======================================================================
+5. SCOPE AND NON-GOALS
+======================================================================
+
+5.1 Initial scope
+
+The initial product will include:
+
+- Local startup page.
+- Today or Attention dashboard.
+- Kanban board.
+- Task creation, editing, movement, completion, and archiving.
+- Employee directory.
+- Employee profile view.
+- Project directory.
+- Competency filters for 55140 and 55230.
+- Categories for project work, personnel actions, training, leave, telework, performance, awards, and general follow-up.
+- Due dates.
+- Reminder dates.
+- Priorities.
+- Tags.
+- Checklists.
+- Notes.
+- Activity history.
+- Recurring task templates.
+- Performance input capture.
+- Training tracking.
+- Basic leave and telework tracking.
+- Search.
+- Saved filters and views.
+- JSON backup export.
+- JSON backup import.
+- CSV exports for selected data.
+- Data validation.
+- Sample data mode.
+- Application settings.
+- Automated tests.
+- Offline operation.
+
+5.2 Non-goals for the initial version
+
+The initial version will not:
+
+- Replace ERP.
+- Replace SWAT.
+- Replace official timekeeping.
+- Replace official leave approval.
+- Replace official telework approval.
+- Replace official performance evaluation records.
+- Replace Planner for team collaboration.
+- Synchronize directly with Navy systems.
+- Scrape browser pages.
+- Store passwords.
+- Store CAC credentials.
+- Require administrator rights.
+- Require a local service.
+- Require Node.js on NMCI.
+- Require Java on NMCI.
+- Require Python on NMCI.
+- Require a database server.
+- Require internet access.
+- Send email automatically.
+- generate background Windows notifications while closed.
+- Host multiple users.
+- Provide employee access.
+- Store classified information.
+- Intentionally store Controlled Unclassified Information unless an authorized determination and environment support it.
+- Use generative AI in the operational version.
+- Upload data to an external AI service.
+- Store attachments in the first release.
+
+5.3 Possible later scope
+
+Potential later features are documented in Section 40.
+
+======================================================================
+6. OPERATIONAL AND SECURITY BOUNDARIES
+======================================================================
+
+6.1 Development environment
+
+Development should occur on a machine where the developer can use:
+
+- Visual Studio Code.
+- Git.
+- Node.js.
+- npm or another approved package manager.
+- Codex, Claude Code, or another coding agent.
+- Automated tests.
+- Browser developer tools.
+
+6.2 Operational environment
+
+The target operational environment is an NMCI government computer with a managed browser, likely Microsoft Edge.
+
+Assume:
+
+- No administrator rights.
+- No application installation.
+- No local server.
+- No command-line runtime.
+- No internet dependency.
+- Enterprise browser policies may disable storage or file features.
+- The application may be opened through a file path.
+- The browser may clear site data under some circumstances.
+- Download locations and removable media may be restricted.
+- Moving files to the NMCI computer must follow an approved process.
+
+6.3 Information minimization
+
+Do not store:
+
+- Social Security numbers.
+- DoD ID numbers unless specifically authorized and necessary.
+- Home addresses.
+- Personal phone numbers.
+- Medical details.
+- Family details.
+- Leave medical explanations.
+- Security clearance details.
+- Passwords.
+- Account credentials.
+- Classified information.
+- Sensitive operational details unrelated to supervisory tracking.
+- Copies of official documents unless specifically authorized.
+- Full personnel files.
+
+Potentially reasonable fields include:
+
+- Employee display name.
+- Competency.
+- Work role.
+- Work email if permitted.
+- Projects.
+- Task assignments.
+- Due dates.
+- Broad training status.
+- Broad leave dates required for workload awareness.
+- Telework action status.
+- Objective performance observations.
+- Accomplishments.
+- Award nomination status.
+- Source-system reference information.
+- Verification dates.
+
+6.4 Neutral and objective notes
+
+All notes should be:
+
+- Work related.
+- Objective.
+- Dated.
+- Concise.
+- Attributable to a legitimate supervisory purpose.
+- Written with the assumption that they may eventually be reviewed.
+
+The application should not encourage unstructured personal judgments.
+
+6.5 Data classification notice
+
+Display a persistent footer or About notice:
+
+“Use only for information authorized for local supervisory tracking. Do not enter classified information, credentials, medical details, Social Security numbers, or unnecessary personal information.”
+
+6.6 No telemetry
+
+The application must not include:
+
+- Analytics.
+- Crash reporting to an external server.
+- Usage tracking.
+- Remote logging.
+- CDN requests.
+- External fonts.
+- External icons.
+- Update checking.
+- Advertising.
+- Third-party scripts.
+
+6.7 Content Security Policy
+
+Where compatible with local execution, include a restrictive Content Security Policy that blocks external connections.
+
+Target policy intent:
+
+- Default deny external resources.
+- Allow only bundled local scripts and styles.
+- Disallow network connections.
+- Disallow framing.
+- Disallow plugins and object embedding.
+
+Because local-file browser behavior varies, this policy must be tested during the compatibility spike.
+
+======================================================================
+7. CORE USER WORKFLOWS
+======================================================================
+
+7.1 Morning startup
+
+1. Open the application.
+2. See the Today or Attention dashboard.
+3. Review overdue items.
+4. Review items due soon.
+5. Review stale waiting items.
+6. Review upcoming leave and training.
+7. Select the highest-priority work.
+8. Move selected work to In Progress.
+
+7.2 Quick task capture
+
+1. Press the New Task button or keyboard shortcut.
+2. Enter a title.
+3. Select category.
+4. Select employee, project, or both if relevant.
+5. Select due date if known.
+6. Save.
+7. The card appears in Inbox by default.
+
+7.3 Process Inbox
+
+1. Open the Inbox column or Inbox view.
+2. For each card:
+   - Assign category.
+   - Assign employee or project.
+   - Set priority.
+   - Set due date.
+   - Move to Planned, In Progress, Waiting, or another status.
+3. Leave unresolved cards in Inbox.
+
+7.4 Update a task
+
+1. Open a card.
+2. Add note, checklist item, due date, or source reference.
+3. Change status.
+4. Save.
+5. The system adds an activity entry.
+
+7.5 Complete a task
+
+1. Move the card to Complete or press Complete.
+2. Record completion date automatically.
+3. Optionally add a completion note.
+4. If associated with an employee, ask:
+   “Create a performance input from this completed work?”
+5. If recurring, calculate or generate the next occurrence.
+6. Keep completed card visible for a configurable period before archive.
+
+7.6 Add a performance observation
+
+1. Select Quick Add Performance Input.
+2. Select employee.
+3. Select date.
+4. Select performance category or element.
+5. Enter action or accomplishment.
+6. Enter result.
+7. Enter impact.
+8. Link to project or completed task when applicable.
+9. Save.
+
+7.7 Employee review
+
+1. Open Employee Directory.
+2. Select an employee.
+3. Review:
+   - Open work.
+   - Overdue work.
+   - Recent accomplishments.
+   - Upcoming leave.
+   - Training.
+   - Telework.
+   - Awards.
+   - Recent interactions.
+4. Add follow-up task or performance input.
+
+7.8 Training reconciliation
+
+1. Open Training view.
+2. Filter by due soon, overdue, or unverified.
+3. Compare against SWAT or another authoritative system.
+4. Update completion or verification date.
+5. Add a follow-up task if information is missing.
+
+7.9 Leave awareness
+
+1. Open leave calendar or list.
+2. Review planned absences.
+3. Confirm project conflicts.
+4. Add supervisory action tasks if needed.
+5. Mark the record as verified against ERP.
+
+7.10 End-of-day review
+
+1. Review In Progress.
+2. Move blocked work to Waiting.
+3. Add next actions.
+4. Complete finished cards.
+5. Review tomorrow’s due items.
+6. Export a backup if the backup reminder is active.
+
+7.11 Weekly review
+
+1. Review all Inbox items.
+2. Review Waiting items older than a threshold.
+3. Review stale tasks.
+4. Review employees with no recent contact or performance input.
+5. Review training due in the next 30 or 60 days.
+6. Review upcoming leave and telework.
+7. Review backup status.
+8. Archive completed items older than the configured retention period.
+
+======================================================================
+8. RECOMMENDED TECHNICAL ARCHITECTURE
+======================================================================
+
+8.1 Architecture summary
+
+Recommended development stack:
+
+- Svelte for user interface components.
+- TypeScript for type safety.
+- Vite for development and production builds.
+- IndexedDB for structured local persistence when supported.
+- A lightweight IndexedDB wrapper such as Dexie, bundled into the build.
+- Vitest or equivalent for unit tests.
+- Playwright or equivalent for browser-level tests on the development computer.
+- CSS variables and plain CSS for styling.
+- Bundled SVG icons or locally defined icon components.
+- No runtime CDN dependencies.
+
+8.2 Why Svelte
+
+Svelte is suitable because:
+
+- The application is highly interactive.
+- Components can remain compact.
+- TypeScript support is strong.
+- The production runtime can be small.
+- It works well with forms, dialogs, dashboards, and state-driven interfaces.
+- It can be compiled into static browser files.
+
+React is also acceptable, but Svelte is the preferred starting recommendation.
+
+Plain TypeScript is possible, but the application has enough screens, dialogs, forms, filters, and state transitions that a component framework will likely reduce maintenance effort.
+
+8.3 Production artifact
+
+Preferred production output:
+
+supervisor-assistant/
+    index.html
+    assets/
+        app.js
+        app.css
+        icons.svg
+    README-RUN.txt
+
+Optional production output:
+
+supervisor-assistant.html
+
+The single-file build is desirable for portability, but it must not become a hard requirement if it introduces unreliable storage or browser behavior. A small self-contained folder is acceptable.
+
+8.4 No web server assumption
+
+The production build should be designed to open directly from a local path.
+
+Avoid features that require:
+
+- Server-side routes.
+- Server-side rendering.
+- API endpoints.
+- Service workers.
+- WebAssembly.
+- Cross-origin requests.
+- Dynamic module loading.
+- Absolute asset paths.
+- Runtime environment variables.
+
+8.5 Relative build paths
+
+All production assets must use relative paths.
+
+8.6 Storage abstraction
+
+The rest of the application must not call IndexedDB directly.
+
+Create a storage interface such as:
+
+interface DataStore {
+    initialize(): Promise<void>;
+    getAllEmployees(): Promise<Employee[]>;
+    saveEmployee(employee: Employee): Promise<void>;
+    deleteEmployee(id: string): Promise<void>;
+    getAllTasks(): Promise<Task[]>;
+    saveTask(task: Task): Promise<void>;
+    deleteTask(id: string): Promise<void>;
+    exportDatabase(): Promise<BackupPackage>;
+    importDatabase(data: BackupPackage): Promise<ImportResult>;
+}
+
+Possible implementations:
+
+- IndexedDbDataStore
+- InMemoryDataStore
+- JsonFileDataStore, if a dependable file workflow becomes possible
+- MockDataStore for testing
+
+This separation is critical because NMCI policy may require a different storage strategy than the development computer.
+
+8.7 Application state
+
+Use a predictable state architecture:
+
+- Persistent entities live in the DataStore.
+- Derived views are computed from entities.
+- UI-only state remains in component state or dedicated stores.
+- Avoid duplicating persistent records in multiple state locations.
+- All mutations pass through a service layer.
+- Mutations produce activity-history entries.
+
+8.8 Date handling
+
+Store calendar dates as ISO date strings:
+
+YYYY-MM-DD
+
+Store timestamps as UTC ISO timestamps:
+
+YYYY-MM-DDTHH:mm:ss.sssZ
+
+Display dates in the user’s local format.
+
+Avoid treating date-only values as midnight timestamps when possible. Leave dates, due dates, and training dates are calendar dates, not moments in time.
+
+8.9 Identifiers
+
+Use locally generated UUID-style identifiers.
+
+Do not use array positions as identifiers.
+
+8.10 Browser support target
+
+Primary browser target:
+
+- Current enterprise-managed Microsoft Edge available on the NMCI computer.
+
+Secondary development targets:
+
+- Current Microsoft Edge.
+- Current Google Chrome.
+
+The application does not need to support Internet Explorer.
+
+======================================================================
+9. NMCI COMPATIBILITY SPIKE
+======================================================================
+
+9.1 Purpose
+
+Before building the full application, create a tiny test application named:
+
+Supervisor Assistant Environment Test
+
+9.2 Test page features
+
+The test page should contain:
+
+1. JavaScript execution test.
+2. CSS test.
+3. Relative asset-loading test.
+4. IndexedDB create test.
+5. IndexedDB write test.
+6. IndexedDB read test.
+7. IndexedDB persistence test after browser restart.
+8. JSON download test.
+9. JSON import using file input.
+10. Drag-and-drop test.
+11. Clipboard copy test.
+12. Browser notification capability display, without requiring it.
+13. File System Access API capability display, without requiring it.
+14. Storage quota estimate if available.
+15. Browser user-agent and capability report.
+16. Exportable diagnostic report.
+
+9.3 Test procedure
+
+Development computer:
+
+1. Build the environment test.
+2. Open through a local file path.
+3. Run all tests.
+4. Close browser.
+5. Reopen.
+6. Confirm persisted test data.
+7. Export diagnostic report.
+
+NMCI computer:
+
+1. Transfer using an authorized process.
+2. Open index.html.
+3. Run all tests.
+4. Record pass or fail.
+5. Close browser completely.
+6. Reopen the page.
+7. Confirm persistence.
+8. Export the diagnostic report if allowed.
+
+9.4 Required result
+
+Do not begin full persistence implementation until the following are known:
+
+- Can the app execute?
+- Can it load bundled assets?
+- Can it persist structured data?
+- Does persistence survive browser restart?
+- Can data be exported?
+- Can data be imported?
+- Are local downloads permitted?
+- Does moving the application folder affect stored data?
+- Does changing the file path create a separate storage origin?
+- Does the browser clear local data automatically?
+
+9.5 Decision outcomes
+
+Outcome A:
+IndexedDB works reliably.
+
+Proceed with IndexedDB as the primary working database and JSON as the backup format.
+
+Outcome B:
+IndexedDB works but persistence is unreliable.
+
+Use IndexedDB only as a working cache. Require open/import at startup and export/save at shutdown.
+
+Outcome C:
+IndexedDB is blocked.
+
+Use an explicit document workflow where the user opens a JSON data file, works in memory, and downloads a replacement JSON file when saving.
+
+Outcome D:
+JavaScript or local files are blocked.
+
+The planned architecture is not viable in that environment. Reassess approved alternatives such as a static page hosted in an authorized location or a Navy-provided platform.
+
+======================================================================
+10. DATA STORAGE STRATEGY
+======================================================================
+
+10.1 Preferred strategy
+
+Primary working storage:
+
+- IndexedDB.
+
+Canonical portable backup:
+
+- JSON backup package.
+
+10.2 Why IndexedDB
+
+The data is structured and relational enough to benefit from:
+
+- Indexed searches.
+- Transactions.
+- More capacity than basic key-value storage.
+- Asynchronous operation.
+- Offline availability.
+
+10.3 Why JSON backup remains mandatory
+
+Browser storage can be:
+
+- Cleared.
+- Disabled.
+- Partitioned by origin.
+- Affected by enterprise policy.
+- Lost during browser profile replacement.
+- Lost during machine replacement.
+- Separated if the application file is moved.
+
+Therefore, the application must treat exported backups as essential.
+
+10.4 Backup package format
+
+Suggested file name:
+
+SupervisorAssistant_Backup_2026-07-04_0830.json
+
+Top-level structure:
+
+{
+  "format": "SupervisorAssistantBackup",
+  "formatVersion": 1,
+  "applicationVersion": "0.1.0",
+  "exportedAt": "2026-07-04T12:30:00.000Z",
+  "databaseId": "uuid",
+  "data": {
+    "employees": [],
+    "competencies": [],
+    "projects": [],
+    "tasks": [],
+    "taskNotes": [],
+    "taskChecklistItems": [],
+    "performanceInputs": [],
+    "trainingRequirements": [],
+    "employeeTrainingRecords": [],
+    "leaveRecords": [],
+    "teleworkRecords": [],
+    "awardRecords": [],
+    "recurrenceTemplates": [],
+    "savedViews": [],
+    "activityEntries": [],
+    "settings": {}
+  },
+  "integrity": {
+    "recordCounts": {},
+    "checksum": null
+  }
+}
+
+10.5 Save-state indicator
+
+The header should show:
+
+- Data status: Saved.
+- Data status: Saving.
+- Data status: Save failed.
+- Last local save time.
+- Last external backup time.
+- Backup recommended indicator.
+
+10.6 Backup reminder policy
+
+Default recommendation:
+
+- Remind after 7 days without a backup.
+- Remind after 50 changes without a backup.
+- Remind before a database migration.
+- Remind after a large import.
+- Remind on application version change.
+
+10.7 Import behavior
+
+Import must never silently overwrite data.
+
+Import workflow:
+
+1. User selects backup.
+2. Application validates format.
+3. Application displays:
+   - Backup date.
+   - Application version.
+   - Record counts.
+   - Database ID.
+4. User selects:
+   - Replace current database.
+   - Merge into current database.
+   - Cancel.
+5. Before Replace:
+   - Offer to export current backup.
+6. Perform transaction.
+7. Display import report.
+8. Record import activity.
+
+10.8 Merge rules
+
+Merge must use IDs.
+
+When IDs conflict:
+
+- If records are identical, skip.
+- If incoming record is newer, show conflict.
+- If current record is newer, show conflict.
+- Do not silently choose unless a documented rule is selected.
+- Allow export of conflict report.
+
+10.9 Schema migrations
+
+Every database version change must include:
+
+- Migration number.
+- Migration function.
+- Pre-migration backup recommendation.
+- Automated migration tests.
+- Failure rollback where possible.
+
+======================================================================
+11. APPLICATION INFORMATION ARCHITECTURE
+======================================================================
+
+Primary navigation:
+
+1. Today
+2. Board
+3. Employees
+4. Projects
+5. Performance
+6. Training
+7. Leave and Availability
+8. Telework
+9. Awards
+10. Reports
+11. Archive
+12. Settings
+
+Global controls:
+
+- Quick Add.
+- Global search.
+- Backup status.
+- Current date.
+- Application menu.
+- Help.
+
+Recommended left navigation:
+
+TODAY
+BOARD
+
+PEOPLE
+- Employees
+- Performance
+- Training
+- Leave
+- Telework
+- Awards
+
+WORK
+- Projects
+- Reports
+- Archive
+
+SYSTEM
+- Settings
+- Backup and Restore
+- Help and About
+
+On a smaller window, collapse the left navigation.
+
+======================================================================
+12. DETAILED SCREEN SPECIFICATIONS
+======================================================================
+
+12.1 Today screen
+
+Purpose:
+Provide one prioritized view of items requiring attention.
+
+Sections:
+
+A. Summary bar
+
+- Overdue count.
+- Due today count.
+- Due this week count.
+- Waiting too long count.
+- Training due soon count.
+- Backup status.
+
+B. Attention queue
+
+Each row should show:
+
+- Reason badge.
+- Task title.
+- Employee.
+- Project.
+- Due date.
+- Priority.
+- Status.
+- Quick actions.
+
+Attention reasons include:
+
+- Overdue.
+- Due today.
+- Due soon.
+- Reminder date reached.
+- Waiting too long.
+- Stale.
+- Training due.
+- Telework due.
+- Leave begins soon.
+- Performance follow-up.
+- Recurring action due.
+- Backup due.
+
+C. Upcoming calendar strip
+
+Show the next 14 or 30 days:
+
+- Due dates.
+- Leave.
+- Training expirations.
+- Telework dates.
+- Evaluation milestones.
+
+D. Employee attention
+
+Show employees matching configurable rules:
+
+- No recent supervisory note.
+- No performance input within threshold.
+- Multiple overdue tasks.
+- Training due soon.
+- Upcoming leave.
+- New employee review window.
+
+E. Quick capture
+
+Buttons:
+
+- New Task.
+- New Performance Input.
+- New Employee Follow-up.
+- Record Training Completion.
+- Add Leave.
+- Add Telework Item.
+
+F. Recently completed
+
+Show the most recent completed tasks with an option to create performance inputs.
+
+12.2 Board screen
+
+Purpose:
+Primary daily work interface.
+
+Default columns:
+
+- Inbox.
+- Planned.
+- In Progress.
+- Waiting.
+- Needs Review.
+- Complete.
+
+Board toolbar:
+
+- Search.
+- Employee filter.
+- Competency filter.
+- Project filter.
+- Category filter.
+- Priority filter.
+- Due-date filter.
+- Tag filter.
+- Hide completed.
+- Group or swimlane selector.
+- Saved view selector.
+- New Task.
+
+Card display:
+
+- Title.
+- Priority indicator.
+- Due-state indicator.
+- Employee name.
+- Project.
+- Category.
+- Checklist progress.
+- Reminder indicator.
+- Waiting age.
+- Tags.
+- Source-system indicator.
+- Subtask count if added later.
+
+Card interactions:
+
+- Click to open.
+- Drag to another column.
+- Keyboard move.
+- Context menu.
+- Quick complete.
+- Quick snooze.
+- Quick assign.
+- Quick due date.
+
+12.3 Employee directory
+
+Columns:
+
+- Name.
+- Competency.
+- Role.
+- Active status.
+- Open task count.
+- Overdue task count.
+- Training due count.
+- Upcoming leave.
+- Last performance input date.
+- Last supervisory interaction date.
+
+Controls:
+
+- Search.
+- Competency filter.
+- Active/inactive filter.
+- Sort.
+- Add employee.
+- Export CSV.
+
+12.4 Employee profile
+
+Header:
+
+- Name.
+- Competency.
+- Work role.
+- Active status.
+- Optional work email.
+- Quick actions.
+
+Summary cards:
+
+- Open tasks.
+- Overdue tasks.
+- Due soon.
+- Training due.
+- Upcoming leave.
+- Telework status.
+- Performance inputs this cycle.
+- Awards in process.
+
+Tabs:
+
+- Overview.
+- Tasks.
+- Performance.
+- Training.
+- Leave.
+- Telework.
+- Awards.
+- Activity.
+
+Overview sections:
+
+- Current work.
+- Current projects.
+- Upcoming deadlines.
+- Recent accomplishments.
+- Current supervisory follow-ups.
+- Recent activity.
+
+Quick actions:
+
+- Add task.
+- Add performance input.
+- Add training record.
+- Add leave.
+- Add telework item.
+- Add award.
+- Record check-in.
+
+12.5 Projects screen
+
+Project list fields:
+
+- Project name.
+- Project code or short name.
+- Status.
+- Start date.
+- Target end date.
+- Lead.
+- Assigned employees.
+- Open tasks.
+- Overdue tasks.
+- Notes.
+
+Project detail:
+
+- Summary.
+- Board filtered to project.
+- Employees.
+- Milestones.
+- Performance inputs.
+- Activity.
+
+12.6 Performance screen
+
+Views:
+
+- All inputs.
+- By employee.
+- By evaluation cycle.
+- By performance element.
+- Unused inputs.
+- Inputs needing impact details.
+- Midyear review preparation.
+- Annual review preparation.
+
+Filters:
+
+- Employee.
+- Competency.
+- Date range.
+- Performance element.
+- Project.
+- Input status.
+- Review cycle.
+
+12.7 Training screen
+
+Views:
+
+- Due soon.
+- Overdue.
+- Complete.
+- Expiring.
+- Unverified.
+- By requirement.
+- By employee.
+
+Matrix view:
+
+Rows:
+Employees.
+
+Columns:
+Training requirements.
+
+Cells:
+- Complete.
+- Due soon.
+- Overdue.
+- Not applicable.
+- Unknown.
+
+12.8 Leave and availability screen
+
+Views:
+
+- Calendar.
+- List.
+- By employee.
+- By competency.
+- Upcoming 30 days.
+- Unverified.
+
+Do not require detailed leave explanations.
+
+12.9 Telework screen
+
+Views:
+
+- Active.
+- Pending.
+- Expiring soon.
+- Needs review.
+- Historical.
+
+12.10 Awards screen
+
+Views:
+
+- Ideas.
+- Preparing.
+- Submitted.
+- Approved.
+- Not selected.
+- Complete.
+
+12.11 Reports screen
+
+Initial reports:
+
+- Overdue tasks by employee.
+- Open tasks by competency.
+- Tasks by category.
+- Training due in 30, 60, and 90 days.
+- Upcoming leave.
+- Telework actions due.
+- Performance inputs by employee and cycle.
+- Completed task history.
+- Stale and waiting tasks.
+- Data verification report.
+
+12.12 Archive screen
+
+Contains:
+
+- Completed tasks older than threshold.
+- Inactive employees.
+- Closed projects.
+- Historical training records.
+- Historical leave.
+- Historical telework.
+- Historical awards.
+
+Archived records remain searchable.
+
+12.13 Settings screen
+
+Sections:
+
+- General.
+- Board.
+- Reminder rules.
+- Recurrence.
+- Categories.
+- Tags.
+- Competencies.
+- Performance elements.
+- Training requirements.
+- Backup and restore.
+- Data maintenance.
+- Appearance.
+- Help and About.
+
+======================================================================
+13. KANBAN BOARD SPECIFICATION
+======================================================================
+
+13.1 Default statuses
+
+INBOX
+
+Definition:
+Captured but not fully processed.
+
+Entry rules:
+Any new task without an explicitly selected status enters Inbox.
+
+PLANNED
+
+Definition:
+Defined work that is not currently active.
+
+IN PROGRESS
+
+Definition:
+Work currently being performed.
+
+WAITING
+
+Definition:
+Work blocked by another person, event, approval, system, or dependency.
+
+Required field:
+Waiting reason should be encouraged.
+
+Optional fields:
+- Waiting on.
+- Follow-up date.
+
+NEEDS REVIEW
+
+Definition:
+Work believed complete or ready but requiring review, verification, or approval.
+
+COMPLETE
+
+Definition:
+Work has been completed.
+
+Completion behavior:
+- Set completion date.
+- Offer performance input creation.
+- Generate next recurrence if applicable.
+- Keep visible for configured number of days.
+
+13.2 Optional statuses
+
+Later configuration may allow:
+
+- Deferred.
+- Cancelled.
+- On Hold.
+- Delegated.
+
+Avoid fully customizable workflow in the first release. Too much configurability will complicate board logic.
+
+13.3 Column limits
+
+Optional work-in-progress limits:
+
+- In Progress limit.
+- Needs Review limit.
+
+Initial implementation may only display warnings rather than block movement.
+
+13.4 Drag-and-drop behavior
+
+Requirements:
+
+- Desktop mouse support.
+- Visual drop target.
+- Card placeholder.
+- Cancel movement with Escape.
+- Persist only after a valid drop.
+- Activity entry records status change.
+- Maintain keyboard-accessible movement alternative.
+- Avoid losing edits during drag.
+
+13.5 Card ordering
+
+Each card has:
+
+- status.
+- boardOrder.
+
+Use fractional or gap-based ordering to reduce mass updates.
+
+Example:
+
+1000, 2000, 3000.
+
+When inserting between 1000 and 2000, use 1500.
+
+Renormalize a column when gaps become too small.
+
+13.6 Swimlanes
+
+Optional board grouping:
+
+- None.
+- Employee.
+- Competency.
+- Project.
+- Priority.
+- Category.
+
+Initial release can support only None and Employee if complexity is high.
+
+13.7 Card color
+
+Do not rely solely on color.
+
+Use:
+
+- Text labels.
+- Icons.
+- Borders.
+- Badges.
+- Accessible contrast.
+
+Potential card indicators:
+
+- Red overdue badge.
+- Amber due-soon badge.
+- Waiting clock icon.
+- Training category label.
+- Employee initials.
+
+Colors should remain theme variables rather than hard-coded throughout components.
+
+13.8 Completed-card behavior
+
+Default:
+
+- Remain in Complete column for 7 days.
+- Then disappear from active board.
+- Remain in archive and reports.
+
+13.9 Bulk actions
+
+Later MVP phase:
+
+- Select multiple cards.
+- Change status.
+- Assign project.
+- Assign employee.
+- Set due date.
+- Add tag.
+- Archive.
+
+Bulk delete should be avoided or require strong confirmation.
+
+======================================================================
+14. TASK AND WORK ITEM MODEL
+======================================================================
+
+14.1 Task categories
+
+Default categories:
+
+- Project Work.
+- Personnel Action.
+- Performance.
+- Training.
+- Leave.
+- Telework.
+- Award.
+- Timekeeping.
+- Meeting Follow-up.
+- Administrative.
+- General.
+
+14.2 Required task fields
+
+- id.
+- title.
+- status.
+- priority.
+- category.
+- createdAt.
+- updatedAt.
+- boardOrder.
+- isArchived.
+
+14.3 Optional task fields
+
+- description.
+- employeeId.
+- projectId.
+- competencyId.
+- startDate.
+- dueDate.
+- reminderDate.
+- completedDate.
+- sourceSystem.
+- sourceReference.
+- sourceUrl.
+- lastVerifiedDate.
+- waitingReason.
+- waitingOn.
+- followUpDate.
+- recurrenceTemplateId.
+- performanceInputCreated.
+- tags.
+- estimatedEffort.
+- actualEffort.
+- createdBy.
+- updatedBy.
+
+Because this is single-user, createdBy and updatedBy can default to “Local User,” but the fields can support future expansion.
+
+14.4 Priority values
+
+- Low.
+- Normal.
+- High.
+- Critical.
+
+Default:
+Normal.
+
+14.5 Due states
+
+Computed, not stored:
+
+- No due date.
+- Future.
+- Due soon.
+- Due today.
+- Overdue.
+- Complete.
+
+14.6 Task notes
+
+A task may have multiple notes.
+
+Each note:
+
+- id.
+- taskId.
+- body.
+- createdAt.
+- updatedAt.
+- noteType.
+
+Note types:
+
+- General.
+- Status update.
+- Decision.
+- Completion.
+- Verification.
+
+14.7 Checklists
+
+Each checklist item:
+
+- id.
+- taskId.
+- title.
+- isComplete.
+- completedAt.
+- order.
+
+Card shows:
+
+2 of 5 complete.
+
+14.8 Task links
+
+Support internal relationships:
+
+- Related task.
+- Blocks.
+- Blocked by.
+- Duplicate of.
+- Follow-up to.
+
+This can be deferred until after the basic board works.
+
+14.9 Source systems
+
+Default values:
+
+- None.
+- Planner.
+- ERP.
+- SWAT.
+- Email.
+- Meeting.
+- Supervisor.
+- Employee.
+- Other.
+
+14.10 Verification
+
+Records derived from another system should support:
+
+- lastVerifiedDate.
+- verificationStatus.
+- sourceReference.
+
+Verification statuses:
+
+- Not required.
+- Unverified.
+- Verified.
+- Needs recheck.
+
+======================================================================
+15. EMPLOYEE MANAGEMENT
+======================================================================
+
+15.1 Employee fields
+
+Required:
+
+- id.
+- displayName.
+- competencyId.
+- activeStatus.
+- createdAt.
+- updatedAt.
+
+Optional:
+
+- preferredName.
+- workEmail.
+- positionTitle.
+- role.
+- team.
+- startDate.
+- evaluationCycleId.
+- supervisorNotesSummary.
+- lastCheckInDate.
+- lastPerformanceInputDate.
+- sortName.
+- tags.
+
+15.2 Active status
+
+Values:
+
+- Active.
+- Temporarily inactive.
+- Departed.
+- Archived.
+
+15.3 Competencies
+
+Initial competencies:
+
+- 55140.
+- 55230.
+
+Competency is stored as a reference rather than free text.
+
+15.4 Employee deletion
+
+Do not permanently delete employees with related records.
+
+Use archive or inactive status.
+
+If deletion is allowed for test records:
+
+- Require confirmation.
+- Display related-record count.
+- Offer to archive instead.
+
+15.5 Employee merge
+
+Provide a future maintenance tool to merge duplicate employee records.
+
+15.6 Check-in tracking
+
+A check-in can be represented as:
+
+- A completed task.
+- An activity entry.
+- A performance input.
+- A dedicated employee interaction record.
+
+Recommendation:
+Create an EmployeeInteraction entity to support:
+
+- Date.
+- Employee.
+- Interaction type.
+- Summary.
+- Follow-up required.
+- Related task.
+
+Interaction types:
+
+- One-on-one.
+- Informal check-in.
+- Counseling.
+- Career discussion.
+- Project discussion.
+- Training discussion.
+- Recognition.
+- Other.
+
+Store only objective work-related summaries.
+
+======================================================================
+16. PROJECT MANAGEMENT
+======================================================================
+
+16.1 Project fields
+
+- id.
+- name.
+- shortName.
+- description.
+- status.
+- startDate.
+- targetEndDate.
+- leadEmployeeId.
+- competencyId.
+- sourceSystem.
+- sourceReference.
+- lastVerifiedDate.
+- tags.
+- createdAt.
+- updatedAt.
+- isArchived.
+
+16.2 Project statuses
+
+- Proposed.
+- Active.
+- On Hold.
+- Complete.
+- Cancelled.
+- Archived.
+
+16.3 Project membership
+
+Use a linking entity:
+
+ProjectMember
+
+Fields:
+
+- id.
+- projectId.
+- employeeId.
+- role.
+- startDate.
+- endDate.
+- allocationNote.
+
+Do not attempt detailed workforce allocation in the first release.
+
+16.4 Project board
+
+The project detail screen should reuse the main board with an automatic project filter.
+
+16.5 Milestones
+
+Initial milestones can be tasks with a milestone flag.
+
+Do not create a separate milestone entity unless needed.
+
+======================================================================
+17. PERFORMANCE INPUT TRACKING
+======================================================================
+
+17.1 Purpose
+
+Capture employee accomplishments and supervisor observations throughout the year so evaluations do not depend on memory.
+
+17.2 Performance input fields
+
+Required:
+
+- id.
+- employeeId.
+- inputDate.
+- actionOrAccomplishment.
+- createdAt.
+- updatedAt.
+
+Recommended:
+
+- situationOrContext.
+- actionOrAccomplishment.
+- result.
+- impact.
+- performanceElementId.
+- projectId.
+- relatedTaskId.
+- source.
+- evaluationCycleId.
+- inputStatus.
+- recognitionPotential.
+- notes.
+- tags.
+
+17.3 Input status
+
+- Draft.
+- Ready.
+- Used at Midyear.
+- Used at Annual.
+- Archived.
+
+17.4 Structured prompt
+
+The input form should use:
+
+CONTEXT
+What was happening or what problem existed?
+
+ACTION
+What did the employee do?
+
+RESULT
+What happened because of the action?
+
+IMPACT
+Why did the result matter to the project, organization, customer, cost, schedule, quality, readiness, or workforce?
+
+17.5 Completion conversion
+
+When a task is completed and has an employee:
+
+Prompt:
+
+“Create a performance input from this work?”
+
+Prefill:
+
+- employeeId.
+- inputDate = completion date.
+- actionOrAccomplishment = task title and completion note.
+- projectId.
+- relatedTaskId.
+- category.
+- source = Completed Task.
+
+17.6 Performance coverage indicator
+
+For each active employee, calculate:
+
+- Inputs this cycle.
+- Date of most recent input.
+- Number of elements represented.
+- Inputs missing result.
+- Inputs missing impact.
+
+Do not rank employees against one another.
+
+17.7 Evaluation preparation
+
+Provide a review page that groups inputs by:
+
+- Employee.
+- Performance element.
+- Date.
+- Project.
+
+Allow copying selected inputs to clipboard or exporting a text report.
+
+Do not automatically generate official evaluation language in the initial version.
+
+======================================================================
+18. TRAINING TRACKING
+======================================================================
+
+18.1 Training requirement entity
+
+Fields:
+
+- id.
+- name.
+- description.
+- category.
+- recurrenceType.
+- recurrenceInterval.
+- warningDays.
+- sourceSystem.
+- sourceReference.
+- active.
+- applicabilityRule.
+- createdAt.
+- updatedAt.
+
+18.2 Employee training record
+
+Fields:
+
+- id.
+- employeeId.
+- trainingRequirementId.
+- assignedDate.
+- dueDate.
+- completedDate.
+- expirationDate.
+- status.
+- evidenceReference.
+- sourceSystem.
+- sourceReference.
+- lastVerifiedDate.
+- notes.
+- createdAt.
+- updatedAt.
+
+18.3 Training statuses
+
+Computed or selected:
+
+- Not assigned.
+- Assigned.
+- Due soon.
+- Overdue.
+- Complete.
+- Expiring soon.
+- Not applicable.
+- Waived.
+- Unknown.
+
+18.4 Requirement assignment
+
+MVP:
+
+- Manually assign a requirement to selected employees.
+- Bulk assign to all active employees.
+- Bulk assign by competency.
+
+Later:
+
+- Applicability rules.
+
+18.5 Training reminders
+
+Default:
+
+- Warning at 30 days.
+- Warning at 14 days.
+- Warning at 7 days.
+- Overdue immediately after due date.
+
+Each requirement can override the defaults.
+
+18.6 Training completion
+
+On completion:
+
+- Set completedDate.
+- Calculate expirationDate if recurrence is defined.
+- Calculate next due date where appropriate.
+- Mark verification status.
+- Add activity entry.
+- Close related follow-up task if selected.
+
+======================================================================
+19. LEAVE TRACKING
+======================================================================
+
+19.1 Purpose
+
+Track availability and supervisory follow-ups, not official leave accounting.
+
+19.2 Leave fields
+
+- id.
+- employeeId.
+- leaveType.
+- startDate.
+- endDate.
+- partialDay.
+- status.
+- sourceSystem.
+- sourceReference.
+- lastVerifiedDate.
+- workloadImpactNote.
+- relatedTaskId.
+- createdAt.
+- updatedAt.
+
+19.3 Leave types
+
+Keep broad:
+
+- Annual.
+- Sick.
+- Comp Time.
+- Credit Hours.
+- Administrative.
+- Other.
+- Not specified.
+
+Do not require the leave type if unnecessary.
+
+19.4 Leave statuses
+
+- Planned.
+- Requested.
+- Approved.
+- Changed.
+- Cancelled.
+- Complete.
+- Unknown.
+
+19.5 Leave privacy
+
+Do not capture:
+
+- Diagnosis.
+- Medical procedure.
+- Family medical details.
+- Reason beyond what is needed for scheduling.
+
+19.6 Leave overlap
+
+The application should warn when:
+
+- Multiple employees on the same project overlap.
+- A project milestone occurs during leave.
+- A task is due during the employee’s leave.
+
+These are advisory warnings only.
+
+======================================================================
+20. TELEWORK REQUEST TRACKING
+======================================================================
+
+20.1 Telework fields
+
+- id.
+- employeeId.
+- recordType.
+- requestDate.
+- effectiveDate.
+- expirationDate.
+- status.
+- scheduleSummary.
+- sourceSystem.
+- sourceReference.
+- lastVerifiedDate.
+- relatedTaskId.
+- notes.
+- createdAt.
+- updatedAt.
+
+20.2 Record types
+
+- Agreement.
+- Routine request.
+- Situational request.
+- Renewal.
+- Modification.
+- Other.
+
+20.3 Statuses
+
+- Draft.
+- Pending employee.
+- Pending supervisor.
+- Pending approval.
+- Approved.
+- Active.
+- Expiring soon.
+- Expired.
+- Denied.
+- Cancelled.
+
+20.4 Telework reminders
+
+- Renewal warning.
+- Expiration warning.
+- Pending action warning.
+- Verification warning.
+
+======================================================================
+21. AWARD TRACKING
+======================================================================
+
+21.1 Award fields
+
+- id.
+- employeeId.
+- awardType.
+- title.
+- accomplishmentPeriodStart.
+- accomplishmentPeriodEnd.
+- nominationDueDate.
+- submittedDate.
+- decisionDate.
+- status.
+- citationDraft.
+- supportingNotes.
+- projectId.
+- relatedPerformanceInputIds.
+- sourceReference.
+- createdAt.
+- updatedAt.
+
+21.2 Award statuses
+
+- Idea.
+- Gathering input.
+- Drafting.
+- Ready for review.
+- Submitted.
+- Approved.
+- Not selected.
+- Complete.
+- Cancelled.
+
+21.3 Initial priority
+
+Award tracking is optional for the first MVP.
+
+The data model can be reserved, but implementation can follow after the core board, performance, training, and backup features.
+
+======================================================================
+22. REMINDER AND ATTENTION ENGINE
+======================================================================
+
+22.1 Important limitation
+
+A local browser application cannot be assumed to execute while closed.
+
+The primary reminder mechanism is therefore:
+
+- Calculate attention items when the application opens.
+- Recalculate periodically while open.
+- Display visible counters and banners.
+- Allow optional calendar export later.
+
+22.2 Attention rule model
+
+Each attention item should contain:
+
+- entityType.
+- entityId.
+- reasonCode.
+- reasonText.
+- severity.
+- effectiveDate.
+- sortScore.
+- suggestedAction.
+
+22.3 Default task rules
+
+OVERDUE
+
+Condition:
+Task is incomplete and dueDate is before today.
+
+DUE TODAY
+
+Condition:
+Task is incomplete and dueDate equals today.
+
+DUE SOON
+
+Condition:
+Task is incomplete and dueDate is within configured threshold.
+
+REMINDER REACHED
+
+Condition:
+Task is incomplete and reminderDate is today or earlier.
+
+WAITING TOO LONG
+
+Condition:
+Task status is Waiting and last meaningful activity exceeds threshold.
+
+STALE TASK
+
+Condition:
+Task is incomplete and updatedAt exceeds threshold.
+
+FOLLOW-UP DATE REACHED
+
+Condition:
+Task has followUpDate today or earlier.
+
+22.4 Default personnel rules
+
+NO RECENT PERFORMANCE INPUT
+
+Condition:
+Active employee has no performance input within threshold.
+
+NO RECENT CHECK-IN
+
+Condition:
+Active employee has no interaction within threshold.
+
+MULTIPLE OVERDUE ITEMS
+
+Condition:
+Employee has more than configurable number of overdue tasks.
+
+22.5 Default training rules
+
+- Training overdue.
+- Training due within 30 days.
+- Training due within 14 days.
+- Training due within 7 days.
+- Training unverified beyond threshold.
+
+22.6 Default leave rules
+
+- Leave begins within configured number of days.
+- Leave overlaps major project milestone.
+- Leave record is unverified.
+
+22.7 Default telework rules
+
+- Request pending supervisor action.
+- Agreement expires within configured threshold.
+- Agreement expired.
+- Record unverified.
+
+22.8 Backup rules
+
+- No backup within 7 days.
+- More than 50 changes since last backup.
+- Import completed without subsequent backup.
+- Version migration completed without subsequent backup.
+
+22.9 Attention severity
+
+- Information.
+- Low.
+- Medium.
+- High.
+- Critical.
+
+Critical should be used sparingly.
+
+22.10 Sort scoring
+
+Possible score inputs:
+
+- Severity.
+- Days overdue.
+- Due today.
+- Priority.
+- Waiting age.
+- Reminder date.
+- Employee impact.
+- Manually pinned.
+
+Use deterministic scoring and allow manual sorting.
+
+22.11 Snooze
+
+Attention items may be snoozed without changing the underlying due date.
+
+Snooze fields:
+
+- snoozedUntil.
+- snoozeReason.
+
+Snooze options:
+
+- Later today.
+- Tomorrow.
+- Next week.
+- Custom date.
+
+Do not allow snooze to hide critical overdue items indefinitely without a visible indicator.
+
+======================================================================
+23. RECURRING TASK ENGINE
+======================================================================
+
+23.1 Recurrence template fields
+
+- id.
+- titleTemplate.
+- descriptionTemplate.
+- category.
+- priority.
+- defaultStatus.
+- employeeScope.
+- projectId.
+- recurrenceRule.
+- advanceCreateDays.
+- defaultDueOffsetDays.
+- reminderOffsetDays.
+- active.
+- lastGeneratedDate.
+- nextGenerationDate.
+- createdAt.
+- updatedAt.
+
+23.2 Initial recurrence patterns
+
+Support only simple patterns first:
+
+- Daily.
+- Weekly.
+- Every N weeks.
+- Monthly on a day number.
+- Monthly on first, second, third, fourth, or last weekday.
+- Quarterly.
+- Annually.
+- Every pay period, only if manually defined dates are available.
+- After completion by N days or months.
+
+23.3 Generation strategy
+
+When the app opens:
+
+1. Check active recurrence templates.
+2. Generate missing occurrences through today plus advanceCreateDays.
+3. Prevent duplicates using a recurrence instance key.
+4. Update nextGenerationDate.
+5. Add activity entries.
+
+23.4 Recurrence instance key
+
+Example:
+
+templateId + scheduledDate + employeeId
+
+This prevents duplicate creation.
+
+23.5 Per-employee recurrence
+
+A recurrence template can apply to:
+
+- No employee.
+- One employee.
+- Selected employees.
+- All active employees.
+- All active employees in a competency.
+
+Use caution:
+Generating one card per employee may create too much clutter. Support a single supervisory task with an internal checklist as an alternative.
+
+23.6 Completion-based recurrence
+
+Example:
+
+“Conduct employee check-in every 60 days after completion.”
+
+After completion, calculate the next scheduled date from completedDate.
+
+======================================================================
+24. SEARCH, FILTERING, AND SAVED VIEWS
+======================================================================
+
+24.1 Global search
+
+Search fields:
+
+- Task title.
+- Task description.
+- Notes.
+- Employee name.
+- Project name.
+- Tags.
+- Source reference.
+- Performance input text.
+- Training name.
+
+24.2 Search behavior
+
+- Debounced input.
+- Case-insensitive.
+- Highlight matching text where practical.
+- Search archived records only when selected.
+- Provide result type labels.
+
+24.3 Board filters
+
+- Status.
+- Employee.
+- Competency.
+- Project.
+- Category.
+- Priority.
+- Due state.
+- Reminder state.
+- Tag.
+- Source system.
+- Verified state.
+- Archived state.
+
+24.4 Saved views
+
+Saved view fields:
+
+- id.
+- name.
+- page.
+- filters.
+- sort.
+- grouping.
+- showCompleted.
+- createdAt.
+- updatedAt.
+
+Default saved views:
+
+- My Today.
+- All Open Work.
+- 55140.
+- 55230.
+- Waiting.
+- Training Actions.
+- Personnel Actions.
+- Performance Follow-ups.
+- Due This Week.
+
+24.5 URL state
+
+Because local-file URL behavior may be limited, do not depend on complex route query strings for saved filters.
+
+Persist saved-view state in application storage.
+
+======================================================================
+25. ACTIVITY HISTORY AND AUDIT TRAIL
+======================================================================
+
+25.1 Purpose
+
+Provide local traceability and undo support.
+
+25.2 Activity entry fields
+
+- id.
+- entityType.
+- entityId.
+- actionType.
+- timestamp.
+- summary.
+- beforeSnapshot.
+- afterSnapshot.
+- sessionId.
+
+25.3 Tracked actions
+
+- Created.
+- Updated.
+- Status changed.
+- Due date changed.
+- Employee changed.
+- Project changed.
+- Completed.
+- Reopened.
+- Archived.
+- Restored.
+- Imported.
+- Exported.
+- Recurrence generated.
+- Bulk updated.
+
+25.4 Snapshot size
+
+Do not store full snapshots forever without limits.
+
+Options:
+
+- Store changed fields only.
+- Retain detailed history for 180 days.
+- Retain summary history indefinitely.
+- Allow compaction during maintenance.
+
+25.5 Undo
+
+Initial undo:
+
+- Show a short-lived Undo toast after common actions.
+- Keep previous record state in memory until timeout.
+- Persist the corrected record if Undo is selected.
+
+Future:
+
+- Restore from activity history.
+
+======================================================================
+26. IMPORT, EXPORT, BACKUP, AND RECOVERY
+======================================================================
+
+26.1 Full backup
+
+Export every persistent record and settings.
+
+26.2 Task CSV export
+
+Columns:
+
+- Task ID.
+- Title.
+- Status.
+- Priority.
+- Category.
+- Employee.
+- Competency.
+- Project.
+- Created date.
+- Due date.
+- Completed date.
+- Source system.
+- Last verified date.
+- Tags.
+
+26.3 Employee CSV export
+
+Columns:
+
+- Employee.
+- Competency.
+- Role.
+- Active status.
+- Open tasks.
+- Overdue tasks.
+- Training due.
+- Last performance input.
+- Last check-in.
+
+26.4 Performance text export
+
+Generate a structured text file by employee and performance element.
+
+26.5 Backup validation
+
+Before import:
+
+- Parse JSON safely.
+- Confirm format name.
+- Confirm supported format version.
+- Validate every collection.
+- Reject executable content.
+- Treat all text as text.
+- Report validation errors with record locations.
+
+26.6 Corruption recovery
+
+Provide a maintenance screen:
+
+- Database health check.
+- Orphan record count.
+- Duplicate ID count.
+- Missing required field count.
+- Invalid date count.
+- Export problem report.
+- Attempt repair only after backup.
+
+26.7 Soft delete
+
+Use isArchived or deletedAt rather than immediate permanent deletion for important entities.
+
+26.8 Restore defaults
+
+Allow resetting categories, statuses, and settings without deleting user data.
+
+26.9 Reset all data
+
+Require:
+
+- Typed confirmation phrase.
+- Offer backup first.
+- Clear warning.
+- Separate action from normal settings.
+
+======================================================================
+27. DATA MODEL
+======================================================================
+
+The following TypeScript-style definitions describe the intended model. The coding agent may refine them while preserving the concepts.
+
+type Id = string;
+type IsoDate = string;
+type IsoTimestamp = string;
+
+interface Competency {
+  id: Id;
+  code: string;
+  name?: string;
+  active: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface Employee {
+  id: Id;
+  displayName: string;
+  preferredName?: string;
+  sortName?: string;
+  competencyId: Id;
+  workEmail?: string;
+  positionTitle?: string;
+  role?: string;
+  team?: string;
+  startDate?: IsoDate;
+  evaluationCycleId?: Id;
+  activeStatus: "active" | "temporary_inactive" | "departed" | "archived";
+  lastCheckInDate?: IsoDate;
+  tags: string[];
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
+interface Project {
+  id: Id;
+  name: string;
+  shortName?: string;
+  description?: string;
+  status: "proposed" | "active" | "on_hold" | "complete" | "cancelled" | "archived";
+  startDate?: IsoDate;
+  targetEndDate?: IsoDate;
+  leadEmployeeId?: Id;
+  competencyId?: Id;
+  sourceSystem?: string;
+  sourceReference?: string;
+  lastVerifiedDate?: IsoDate;
+  tags: string[];
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
+interface ProjectMember {
+  id: Id;
+  projectId: Id;
+  employeeId: Id;
+  role?: string;
+  startDate?: IsoDate;
+  endDate?: IsoDate;
+  allocationNote?: string;
+}
+
+type TaskStatus =
+  | "inbox"
+  | "planned"
+  | "in_progress"
+  | "waiting"
+  | "needs_review"
+  | "complete"
+  | "cancelled";
+
+type TaskPriority = "low" | "normal" | "high" | "critical";
+
+type TaskCategory =
+  | "project"
+  | "personnel"
+  | "performance"
+  | "training"
+  | "leave"
+  | "telework"
+  | "award"
+  | "timekeeping"
+  | "meeting"
+  | "administrative"
+  | "general";
+
+interface Task {
+  id: Id;
+  title: string;
+  description?: string;
+  status: TaskStatus;
+  priority: TaskPriority;
+  category: TaskCategory;
+  employeeId?: Id;
+  projectId?: Id;
+  competencyId?: Id;
+  startDate?: IsoDate;
+  dueDate?: IsoDate;
+  reminderDate?: IsoDate;
+  followUpDate?: IsoDate;
+  completedDate?: IsoDate;
+  sourceSystem?: string;
+  sourceReference?: string;
+  sourceUrl?: string;
+  lastVerifiedDate?: IsoDate;
+  verificationStatus?: "not_required" | "unverified" | "verified" | "needs_recheck";
+  waitingReason?: string;
+  waitingOn?: string;
+  recurrenceTemplateId?: Id;
+  recurrenceInstanceKey?: string;
+  performanceInputCreated: boolean;
+  tags: string[];
+  boardOrder: number;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
+interface TaskNote {
+  id: Id;
+  taskId: Id;
+  body: string;
+  noteType: "general" | "status" | "decision" | "completion" | "verification";
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface ChecklistItem {
+  id: Id;
+  taskId: Id;
+  title: string;
+  isComplete: boolean;
+  completedAt?: IsoTimestamp;
+  order: number;
+}
+
+interface PerformanceElement {
+  id: Id;
+  name: string;
+  description?: string;
+  active: boolean;
+}
+
+interface EvaluationCycle {
+  id: Id;
+  name: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  midyearDate?: IsoDate;
+  active: boolean;
+}
+
+interface PerformanceInput {
+  id: Id;
+  employeeId: Id;
+  inputDate: IsoDate;
+  situationOrContext?: string;
+  actionOrAccomplishment: string;
+  result?: string;
+  impact?: string;
+  performanceElementId?: Id;
+  projectId?: Id;
+  relatedTaskId?: Id;
+  evaluationCycleId?: Id;
+  source?: string;
+  inputStatus: "draft" | "ready" | "used_midyear" | "used_annual" | "archived";
+  recognitionPotential: boolean;
+  notes?: string;
+  tags: string[];
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
+interface TrainingRequirement {
+  id: Id;
+  name: string;
+  description?: string;
+  category?: string;
+  recurrenceType?: "none" | "days" | "months" | "annual";
+  recurrenceInterval?: number;
+  warningDays: number[];
+  sourceSystem?: string;
+  sourceReference?: string;
+  active: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface EmployeeTrainingRecord {
+  id: Id;
+  employeeId: Id;
+  trainingRequirementId: Id;
+  assignedDate?: IsoDate;
+  dueDate?: IsoDate;
+  completedDate?: IsoDate;
+  expirationDate?: IsoDate;
+  status: "assigned" | "complete" | "not_applicable" | "waived" | "unknown";
+  evidenceReference?: string;
+  sourceSystem?: string;
+  sourceReference?: string;
+  lastVerifiedDate?: IsoDate;
+  notes?: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface LeaveRecord {
+  id: Id;
+  employeeId: Id;
+  leaveType?: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  partialDay?: string;
+  status: "planned" | "requested" | "approved" | "changed" | "cancelled" | "complete" | "unknown";
+  sourceSystem?: string;
+  sourceReference?: string;
+  lastVerifiedDate?: IsoDate;
+  workloadImpactNote?: string;
+  relatedTaskId?: Id;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface TeleworkRecord {
+  id: Id;
+  employeeId: Id;
+  recordType: string;
+  requestDate?: IsoDate;
+  effectiveDate?: IsoDate;
+  expirationDate?: IsoDate;
+  status: string;
+  scheduleSummary?: string;
+  sourceSystem?: string;
+  sourceReference?: string;
+  lastVerifiedDate?: IsoDate;
+  relatedTaskId?: Id;
+  notes?: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface AwardRecord {
+  id: Id;
+  employeeId: Id;
+  awardType?: string;
+  title: string;
+  accomplishmentPeriodStart?: IsoDate;
+  accomplishmentPeriodEnd?: IsoDate;
+  nominationDueDate?: IsoDate;
+  submittedDate?: IsoDate;
+  decisionDate?: IsoDate;
+  status: string;
+  citationDraft?: string;
+  supportingNotes?: string;
+  projectId?: Id;
+  relatedPerformanceInputIds: Id[];
+  sourceReference?: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface EmployeeInteraction {
+  id: Id;
+  employeeId: Id;
+  interactionDate: IsoDate;
+  interactionType: string;
+  summary?: string;
+  followUpRequired: boolean;
+  relatedTaskId?: Id;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface RecurrenceTemplate {
+  id: Id;
+  titleTemplate: string;
+  descriptionTemplate?: string;
+  category: TaskCategory;
+  priority: TaskPriority;
+  defaultStatus: TaskStatus;
+  employeeScope: unknown;
+  projectId?: Id;
+  recurrenceRule: unknown;
+  advanceCreateDays: number;
+  defaultDueOffsetDays?: number;
+  reminderOffsetDays?: number;
+  active: boolean;
+  lastGeneratedDate?: IsoDate;
+  nextGenerationDate?: IsoDate;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface SavedView {
+  id: Id;
+  name: string;
+  page: string;
+  filters: Record<string, unknown>;
+  sort?: Record<string, unknown>;
+  grouping?: string;
+  showCompleted?: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+interface ActivityEntry {
+  id: Id;
+  entityType: string;
+  entityId: Id;
+  actionType: string;
+  timestamp: IsoTimestamp;
+  summary: string;
+  changedFields?: Record<string, unknown>;
+  sessionId: string;
+}
+
+interface AppSettings {
+  schemaVersion: number;
+  applicationName: string;
+  userDisplayName?: string;
+  dueSoonDays: number;
+  waitingStaleDays: number;
+  taskStaleDays: number;
+  performanceInputReminderDays: number;
+  checkInReminderDays: number;
+  completedVisibleDays: number;
+  backupReminderDays: number;
+  backupChangeThreshold: number;
+  dateFormat: string;
+  theme: "light" | "dark" | "system";
+}
+
+======================================================================
+28. DATA VALIDATION RULES
+======================================================================
+
+28.1 General
+
+- Trim leading and trailing whitespace.
+- Reject empty required strings.
+- Limit field lengths.
+- Reject invalid dates.
+- Prevent impossible date ranges.
+- Escape and render all user text safely.
+- Never interpret user-entered text as HTML.
+
+28.2 Suggested limits
+
+- Task title: 200 characters.
+- Task description: 10,000 characters.
+- Note: 10,000 characters.
+- Employee name: 200 characters.
+- Project name: 200 characters.
+- Tags: 50 characters each.
+- Maximum tags per record: 20.
+- Performance fields: 10,000 characters each.
+- Source reference: 500 characters.
+
+28.3 Date rules
+
+- endDate must be on or after startDate.
+- completedDate should not be before created date unless imported historical data is explicitly allowed.
+- expirationDate should not be before completedDate.
+- dueDate can be historical for imported data.
+- Calendar-date comparisons must use local date logic.
+
+28.4 Referential integrity
+
+- Task employeeId must reference an existing employee or be undefined.
+- Task projectId must reference an existing project or be undefined.
+- Related records must not reference permanently deleted entities.
+- Archive parent entities rather than orphan children.
+
+28.5 Duplicate detection
+
+Warn on:
+
+- Employee with same normalized name.
+- Project with same normalized name.
+- Training requirement with same normalized name.
+- Duplicate recurrence instance key.
+
+Warnings should not always block creation.
+
+======================================================================
+29. USER EXPERIENCE AND ACCESSIBILITY
+======================================================================
+
+29.1 General layout
+
+- Desktop-first.
+- Clear left navigation.
+- Sticky top bar.
+- Content area uses available width.
+- Avoid excessive modal nesting.
+- Preserve scroll position where practical.
+
+29.2 Forms
+
+- Labels above fields.
+- Required fields clearly indicated.
+- Validation near the field.
+- Save and Cancel always visible.
+- Unsaved-change warning.
+- Keyboard-friendly tab order.
+- Date fields support typing and picker.
+
+29.3 Dialogs
+
+Use dialogs for:
+
+- Quick add.
+- Confirm delete.
+- Import.
+- Backup.
+- Small edits.
+
+Use full pages or side panels for complex task details.
+
+29.4 Accessibility
+
+- Semantic HTML.
+- Proper button elements.
+- Keyboard navigation.
+- Visible focus states.
+- Sufficient contrast.
+- ARIA labels only where semantic HTML is insufficient.
+- Status is never communicated by color alone.
+- Dialog focus trap.
+- Escape closes dismissible dialogs.
+- Drag-and-drop has keyboard alternative.
+
+29.5 Empty states
+
+Every screen should explain what to do next.
+
+Example Board empty state:
+
+“No tasks match this view. Create a task or clear one or more filters.”
+
+29.6 Loading states
+
+Local operations should be fast, but display:
+
+- Initializing data.
+- Importing backup.
+- Exporting backup.
+- Running health check.
+- Migrating database.
+
+29.7 Confirmation philosophy
+
+Require confirmation for:
+
+- Permanent deletion.
+- Database replacement.
+- Reset all data.
+- Destructive merge.
+- Archive employee with open work.
+
+Do not require confirmation for:
+
+- Normal status move.
+- Normal edit.
+- Task completion, provided Undo is available.
+
+======================================================================
+30. KEYBOARD SHORTCUTS
+======================================================================
+
+Suggested shortcuts:
+
+N
+New task.
+
+P
+New performance input.
+
+/
+Focus global search.
+
+B
+Open Board.
+
+T
+Open Today.
+
+E
+Open Employees.
+
+Escape
+Close dialog or cancel drag.
+
+Ctrl+S
+Save the open form. Prevent browser save-page behavior when appropriate.
+
+Ctrl+Enter
+Save and close form.
+
+C
+Complete selected task.
+
+R
+Set reminder for selected task.
+
+D
+Set due date for selected task.
+
+M
+Move selected task.
+
+?
+Open shortcut help.
+
+Shortcuts must not activate while typing in text fields unless they use Ctrl or Alt.
+
+======================================================================
+31. APPLICATION SETTINGS
+======================================================================
+
+31.1 General
+
+- Application display name.
+- User display name.
+- Default start page.
+- Date format.
+- Week start day.
+
+31.2 Board
+
+- Visible columns.
+- Completed-card display days.
+- Default saved view.
+- Card density.
+- Show project.
+- Show employee.
+- Show tags.
+- Show checklist.
+
+31.3 Attention rules
+
+- Due soon threshold.
+- Waiting stale threshold.
+- Task stale threshold.
+- No performance input threshold.
+- No check-in threshold.
+- Training warning thresholds.
+- Backup threshold.
+
+31.4 Categories and tags
+
+Allow:
+
+- Add.
+- Rename.
+- Reorder.
+- Deactivate.
+
+Do not allow deletion of a category still in use without reassignment.
+
+31.5 Data
+
+- Export backup.
+- Import backup.
+- Export CSV.
+- Run health check.
+- Compact activity history.
+- Reset sample data.
+- Reset all data.
+
+31.6 Appearance
+
+- Light.
+- Dark.
+- System.
+
+Use system fonts to avoid external font files.
+
+======================================================================
+32. REPORTING AND REVIEW VIEWS
+======================================================================
+
+32.1 Report philosophy
+
+Reports are interactive views, not complex document-generation systems.
+
+32.2 Initial reports
+
+A. Supervisor workload
+
+- Open tasks by status.
+- Open tasks by category.
+- Overdue tasks.
+- Waiting tasks.
+- Due in next 7, 14, 30 days.
+
+B. Employee workload
+
+- Open task count.
+- Overdue task count.
+- Project count.
+- Training due.
+- Performance input recency.
+
+C. Performance coverage
+
+- Inputs per employee.
+- Inputs by performance element.
+- Inputs missing result.
+- Inputs missing impact.
+- Employees with no recent input.
+
+D. Compliance awareness
+
+- Training overdue.
+- Training due.
+- Telework expiring.
+- Records not recently verified.
+
+E. Availability
+
+- Upcoming leave.
+- Leave by week.
+- Project overlap warnings.
+
+32.3 Export
+
+Reports can export:
+
+- CSV.
+- Plain text.
+- Print-friendly HTML.
+
+Do not make PDF generation an MVP requirement.
+
+======================================================================
+33. ERROR HANDLING AND RESILIENCE
+======================================================================
+
+33.1 Global error boundary
+
+Catch unhandled UI errors and display:
+
+- Plain-language error.
+- Action attempted.
+- Safe recovery option.
+- Copy diagnostic details.
+- Reload application.
+- Export emergency backup if storage remains accessible.
+
+33.2 Data-store errors
+
+Handle:
+
+- Initialization failure.
+- Permission denied.
+- Quota exceeded.
+- Transaction aborted.
+- Corrupt data.
+- Unsupported schema.
+- Import failure.
+- Export failure.
+
+33.3 Safe mutation pattern
+
+For important writes:
+
+1. Validate.
+2. Begin transaction.
+3. Save entity.
+4. Save activity entry.
+5. Commit.
+6. Update UI.
+7. On failure, show error and preserve form data.
+
+33.4 Emergency export
+
+If the normal UI fails after storage initialization, provide a simple emergency export function.
+
+33.5 No silent failures
+
+Never show Saved unless the persistence call succeeded.
+
+======================================================================
+34. TESTING STRATEGY
+======================================================================
+
+34.1 Unit tests
+
+Test:
+
+- Due-state calculation.
+- Attention rules.
+- Recurrence generation.
+- Date calculations.
+- Board ordering.
+- Filters.
+- Search normalization.
+- Backup validation.
+- Merge conflict detection.
+- Schema migrations.
+- Employee attention calculations.
+- Training expiration calculation.
+
+34.2 Component tests
+
+Test:
+
+- Quick task form.
+- Task detail form.
+- Employee form.
+- Board card.
+- Board column.
+- Filter toolbar.
+- Today attention row.
+- Backup dialog.
+- Import preview.
+- Confirmation dialogs.
+
+34.3 Integration tests
+
+Test:
+
+- Create task and see it on board.
+- Move task between columns.
+- Complete task.
+- Create performance input from completed task.
+- Create recurring task.
+- Import backup.
+- Export and re-import backup.
+- Archive and restore.
+- Employee profile aggregation.
+- Training due warning.
+- Leave overlap warning.
+
+34.4 End-to-end tests
+
+Critical path:
+
+1. Start with empty database.
+2. Add employee.
+3. Add project.
+4. Add task.
+5. Move task.
+6. Add checklist.
+7. Complete task.
+8. Create performance input.
+9. Export backup.
+10. Reset data.
+11. Import backup.
+12. Confirm restored records.
+
+34.5 Manual NMCI tests
+
+After each release candidate:
+
+- Open from actual intended local path.
+- Confirm no network requests.
+- Confirm storage persists.
+- Confirm import/export.
+- Confirm drag-and-drop.
+- Confirm keyboard support.
+- Confirm backup file can be placed in approved location.
+- Confirm performance with realistic data volume.
+
+34.6 Performance target
+
+With:
+
+- 50 employees.
+- 100 projects.
+- 5,000 tasks.
+- 5,000 notes.
+- 2,000 performance inputs.
+- 2,000 training records.
+
+Targets on a normal desktop:
+
+- Initial load under 3 seconds.
+- Board filter response under 200 milliseconds.
+- Search response under 300 milliseconds.
+- Normal save under 250 milliseconds.
+- Export under 5 seconds.
+
+These are design targets, not contractual requirements.
+
+34.7 Test data
+
+Use generated fictitious employees and projects.
+
+Never include real personnel data in the source repository.
+
+======================================================================
+35. REPOSITORY AND CODE ORGANIZATION
+======================================================================
+
+Suggested structure:
+
+supervisor-assistant/
+    README.md
+    PRODUCT_PLAN.txt
+    CHANGELOG.md
+    package.json
+    package-lock.json
+    vite.config.ts
+    tsconfig.json
+    index.html
+    src/
+        app/
+            App.svelte
+            routes.ts
+        components/
+            board/
+                Board.svelte
+                BoardColumn.svelte
+                TaskCard.svelte
+                BoardToolbar.svelte
+            dialogs/
+                ConfirmDialog.svelte
+                ImportDialog.svelte
+                BackupDialog.svelte
+            forms/
+                TaskForm.svelte
+                EmployeeForm.svelte
+                PerformanceInputForm.svelte
+                TrainingRecordForm.svelte
+            layout/
+                AppHeader.svelte
+                SideNavigation.svelte
+                StatusBar.svelte
+            common/
+                Badge.svelte
+                EmptyState.svelte
+                SearchBox.svelte
+                DateField.svelte
+                Toasts.svelte
+        pages/
+            TodayPage.svelte
+            BoardPage.svelte
+            EmployeesPage.svelte
+            EmployeeDetailPage.svelte
+            ProjectsPage.svelte
+            ProjectDetailPage.svelte
+            PerformancePage.svelte
+            TrainingPage.svelte
+            LeavePage.svelte
+            TeleworkPage.svelte
+            AwardsPage.svelte
+            ReportsPage.svelte
+            ArchivePage.svelte
+            SettingsPage.svelte
+        data/
+            DataStore.ts
+            IndexedDbDataStore.ts
+            InMemoryDataStore.ts
+            migrations/
+            backup/
+                backupTypes.ts
+                backupExport.ts
+                backupImport.ts
+                backupValidation.ts
+        domain/
+            models/
+            services/
+                taskService.ts
+                employeeService.ts
+                attentionService.ts
+                recurrenceService.ts
+                reportService.ts
+            rules/
+                taskRules.ts
+                trainingRules.ts
+                employeeRules.ts
+            validation/
+        stores/
+            appState.ts
+            uiState.ts
+            filterState.ts
+        utils/
+            dates.ts
+            ids.ts
+            text.ts
+            csv.ts
+            download.ts
+            capabilityDetection.ts
+        styles/
+            variables.css
+            base.css
+            components.css
+        test/
+            fixtures/
+            factories/
+    environment-test/
+        index.html
+        src/
+    public/
+        README-RUN.txt
+    tests/
+        unit/
+        integration/
+        e2e/
+    scripts/
+        build-single-file.mjs
+        verify-no-network.mjs
+        generate-test-data.mjs
+    dist/
+
+35.1 Repository rules
+
+- Commit source, tests, and documentation.
+- Do not commit real data.
+- Add backup files to .gitignore.
+- Add exported CSV files to .gitignore.
+- Pin dependency versions.
+- Document every dependency.
+- Prefer fewer dependencies.
+- Run security and license review before adding dependencies.
+
+35.2 Branching
+
+For a single developer:
+
+- main: stable.
+- feature branches for larger work.
+- Tag releases.
+
+Example tags:
+
+v0.1.0
+v0.2.0
+
+======================================================================
+36. IMPLEMENTATION PHASES
+======================================================================
+
+PHASE 0: ENVIRONMENT COMPATIBILITY TEST
+
+Goal:
+Determine whether the planned local browser approach works on NMCI.
+
+Deliverables:
+
+- Environment test app.
+- Capability report.
+- NMCI test notes.
+- Architecture decision record.
+
+Acceptance:
+
+- JavaScript runs.
+- Local assets load.
+- Import works.
+- Export works.
+- Storage outcome is documented.
+- Final storage strategy is selected.
+
+PHASE 1: PROJECT FOUNDATION
+
+Goal:
+Create maintainable application skeleton.
+
+Deliverables:
+
+- Svelte and TypeScript project.
+- Vite build.
+- Routing or view switching.
+- Base layout.
+- Theme variables.
+- DataStore interface.
+- In-memory test store.
+- IndexedDB store.
+- Unit test framework.
+- No-network verification script.
+- README.
+
+Acceptance:
+
+- App opens.
+- Navigation works.
+- Tests run.
+- Production build uses relative local assets.
+- No external network resources exist.
+
+PHASE 2: EMPLOYEES AND CORE TASKS
+
+Goal:
+Create the minimum usable organizer.
+
+Deliverables:
+
+- Employee CRUD.
+- Project CRUD.
+- Task CRUD.
+- Quick Add.
+- Board columns.
+- Task movement.
+- Due dates.
+- Priorities.
+- Categories.
+- Basic filters.
+- Persistence.
+
+Acceptance:
+
+- Create employee.
+- Create task.
+- Assign employee and project.
+- Move card.
+- Close and reopen.
+- Data persists under selected storage strategy.
+
+PHASE 3: TODAY DASHBOARD AND REMINDERS
+
+Goal:
+Make the app proactively identify work.
+
+Deliverables:
+
+- Attention engine.
+- Overdue.
+- Due today.
+- Due soon.
+- Waiting too long.
+- Stale tasks.
+- Reminder date.
+- Today dashboard.
+- Snooze.
+
+Acceptance:
+
+- Every attention item explains why it appears.
+- Rule settings are configurable.
+- Tests cover date boundaries.
+
+PHASE 4: BACKUP AND RECOVERY
+
+Goal:
+Make operational data recoverable.
+
+Deliverables:
+
+- Full JSON export.
+- Import preview.
+- Replace database.
+- Merge framework.
+- Backup reminders.
+- Database health check.
+- Emergency export.
+- Migration framework.
+
+Acceptance:
+
+- Full round-trip export/import preserves all records.
+- Invalid backup is rejected safely.
+- Replace requires confirmation.
+- Current data can be backed up before replacement.
+
+PHASE 5: PERFORMANCE INPUTS
+
+Goal:
+Capture year-round employee accomplishments.
+
+Deliverables:
+
+- Performance input CRUD.
+- Employee performance tab.
+- Completion-to-performance conversion.
+- Evaluation cycles.
+- Performance coverage view.
+- Text export.
+
+Acceptance:
+
+- Complete a task.
+- Create a prefilled performance input.
+- View by employee and element.
+- Export readable summary.
+
+PHASE 6: TRAINING, LEAVE, AND TELEWORK
+
+Goal:
+Add major personnel-related tracking areas.
+
+Deliverables:
+
+- Training requirement definitions.
+- Employee training records.
+- Training matrix.
+- Training reminders.
+- Leave records and calendar/list.
+- Telework records and reminders.
+- Verification fields.
+
+Acceptance:
+
+- Training due warnings work.
+- Leave appears on employee profile.
+- Telework expiration appears in Today.
+- Data remains linked to source systems.
+
+PHASE 7: RECURRING WORK AND REVIEW
+
+Goal:
+Reduce repeated manual creation.
+
+Deliverables:
+
+- Recurrence templates.
+- Instance generation.
+- Duplicate prevention.
+- Weekly review saved view.
+- Check-in reminders.
+- Employee interaction records.
+
+Acceptance:
+
+- Recurring task generates once.
+- Reopening the app does not duplicate it.
+- Completion-based recurrence schedules correctly.
+
+PHASE 8: POLISH AND RELEASE
+
+Goal:
+Prepare dependable daily-use release.
+
+Deliverables:
+
+- Keyboard shortcuts.
+- Accessibility review.
+- Performance improvements.
+- Bulk actions.
+- Archive.
+- Reports.
+- Print views.
+- Error boundary.
+- Help documentation.
+- Version display.
+- Release package.
+- NMCI regression test.
+
+Acceptance:
+
+- Critical end-to-end flow passes.
+- Build contains no network dependencies.
+- Backup and restore tested.
+- No real data in repository.
+- User can operate core features without developer tools.
+
+PHASE 9: OPTIONAL AWARDS MODULE
+
+Goal:
+Add recognition workflow after the core system proves useful.
+
+Deliverables:
+
+- Award records.
+- Award status board or list.
+- Link performance inputs.
+- Deadline reminders.
+- Export support.
+
+======================================================================
+37. ACCEPTANCE CRITERIA
+======================================================================
+
+37.1 Core application
+
+- The app opens without installation.
+- The app does not require internet access.
+- The app makes no external network requests.
+- The app can be used with a mouse and keyboard.
+- The app supports at least 50 employees.
+- The app supports at least 5,000 tasks.
+
+37.2 Board
+
+- User can create a task in less than 15 seconds.
+- User can move a task between statuses.
+- Movement persists.
+- User can filter by employee, competency, project, category, and priority.
+- Completed tasks can be archived.
+- Board remains responsive at realistic data volume.
+
+37.3 Today
+
+- Overdue tasks display.
+- Due-today tasks display.
+- Due-soon tasks display.
+- Waiting and stale tasks display.
+- Training and telework warnings display.
+- Backup reminder displays.
+- Every row states its reason.
+
+37.4 Employees
+
+- User can create and edit employees.
+- Employee profile aggregates related records.
+- Inactive employees do not appear in normal assignment lists.
+- Historical records remain accessible.
+
+37.5 Backup
+
+- Full export downloads a valid file.
+- Full import validates the file.
+- Round trip preserves records.
+- Import cannot silently destroy current data.
+- Backup age is visible.
+
+37.6 Performance
+
+- User can create structured input.
+- Input can link to employee, project, and task.
+- Completed task can prefill input.
+- Inputs can be grouped for review.
+- Inputs can export to text.
+
+37.7 Training
+
+- Requirement can be defined.
+- Requirement can be assigned.
+- Completion can be recorded.
+- Due state is calculated.
+- Due items appear in Today.
+
+37.8 Security
+
+- No external scripts.
+- No external fonts.
+- No telemetry.
+- User content is rendered as text.
+- No credentials are stored.
+- Security notice is visible.
+- Test data contains no real employee information.
+
+======================================================================
+38. CODING AGENT WORKING RULES
+======================================================================
+
+These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent repository instruction file.
+
+1. Read PRODUCT_PLAN.txt before making architectural changes.
+
+2. Do not add any runtime network dependency.
+
+3. Do not add telemetry, analytics, remote logging, or update checks.
+
+4. Do not load scripts, styles, fonts, icons, or images from a CDN.
+
+5. Do not add a backend server.
+
+6. Do not require Node.js in the production environment.
+
+7. Keep production assets usable from relative paths.
+
+8. Do not use real employee names or real government information in tests, fixtures, screenshots, or documentation.
+
+9. All persistent access must go through the DataStore interface.
+
+10. Do not directly call IndexedDB from UI components.
+
+11. Use TypeScript strict mode.
+
+12. Add tests for new domain rules.
+
+13. Treat all imported data as untrusted.
+
+14. Never render user text as raw HTML.
+
+15. Keep dependencies minimal and pinned.
+
+16. Explain any new dependency before adding it.
+
+17. Preserve data through schema migrations.
+
+18. Do not silently delete or overwrite records.
+
+19. Include an Undo path or confirmation for destructive actions.
+
+20. Maintain keyboard accessibility.
+
+21. Do not make color the only status indicator.
+
+22. Use date-only logic for date-only fields.
+
+23. Maintain an activity entry for important mutations.
+
+24. Run:
+   - type checking,
+   - unit tests,
+   - build,
+   - no-network verification,
+   before considering a task complete.
+
+25. Update CHANGELOG.md for user-visible changes.
+
+26. Update this plan only when an architectural decision changes.
+
+27. Prefer small, reviewable commits.
+
+28. Do not rewrite working modules solely for style.
+
+29. When uncertain about NMCI compatibility, implement feature detection and a fallback.
+
+30. Backup and restore are first-class features, not optional utilities.
+
+======================================================================
+39. SUGGESTED CODING AGENT PROMPTS
+======================================================================
+
+PROMPT 1: CREATE ENVIRONMENT TEST
+
+Read PRODUCT_PLAN.txt, especially Sections 8 through 10. Create the smallest possible static browser application that tests local execution on an enterprise-managed Microsoft Edge browser. It must run without a server and without internet access. Test JavaScript execution, relative assets, IndexedDB create/write/read/persistence, JSON download, JSON import, drag-and-drop, clipboard availability, storage estimate availability, and File System Access API feature detection. Provide an on-screen results table and an Export Diagnostic Report button. Do not begin the main Supervisor Assistant application yet. Add instructions for testing persistence after a complete browser restart.
+
+PROMPT 2: INITIALIZE APPLICATION
+
+Read PRODUCT_PLAN.txt and the environment-test result. Initialize a Svelte, TypeScript, and Vite application using strict TypeScript. Create the layout, navigation shell, theme variables, DataStore interface, InMemoryDataStore, and IndexedDbDataStore. Configure a production build with relative assets and no external resources. Add unit-test setup and a script that scans the production output for external URLs. Do not build feature modules yet.
+
+PROMPT 3: IMPLEMENT EMPLOYEES
+
+Implement the Employee entity and employee management screens from PRODUCT_PLAN.txt. Include list, add, edit, archive, validation, competency selection, search, and test fixtures. Route all persistence through DataStore. Do not permanently delete employees with related data. Add unit and component tests.
+
+PROMPT 4: IMPLEMENT CORE TASKS
+
+Implement Task, TaskNote, and ChecklistItem entities. Build Quick Add and Task Detail forms. New tasks should require only a title and default to Inbox, Normal priority, and General category. Add validation and activity history. Include tests.
+
+PROMPT 5: IMPLEMENT KANBAN
+
+Implement the Board page with Inbox, Planned, In Progress, Waiting, Needs Review, and Complete columns. Support drag-and-drop plus keyboard movement. Persist status and board order. Add filters for employee, competency, project, category, and priority. Do not use external network resources. Add tests for movement and ordering.
+
+PROMPT 6: IMPLEMENT ATTENTION ENGINE
+
+Implement the pure domain rules for overdue, due today, due soon, reminder reached, waiting too long, and stale tasks. Build the Today page using those rules. Every attention result must contain a reason code, human-readable explanation, severity, and suggested action. Use date-only comparison and test boundary dates thoroughly.
+
+PROMPT 7: IMPLEMENT BACKUP
+
+Implement full JSON export and import using the documented backup package. Validate all input. Add import preview, record counts, replace confirmation, and automatic offer to export current data before replacement. Add complete round-trip tests. Never silently overwrite current data.
+
+PROMPT 8: IMPLEMENT PERFORMANCE INPUTS
+
+Implement PerformanceInput, PerformanceElement, and EvaluationCycle. Build structured Context, Action, Result, Impact capture. Add the employee Performance tab and a review page grouped by employee and element. When completing a task linked to an employee, offer to create a prefilled performance input.
+
+PROMPT 9: IMPLEMENT TRAINING
+
+Implement TrainingRequirement and EmployeeTrainingRecord. Add requirement management, bulk assignment, employee completion entry, due-state calculation, warning thresholds, employee profile display, training list, and matrix. Add Today warnings and tests.
+
+PROMPT 10: IMPLEMENT RECURRING TASKS
+
+Implement recurrence templates with simple daily, weekly, monthly, annual, and completion-relative rules. Generate missing instances when the application initializes. Prevent duplicates using an instance key. Add tests for repeated app startup, date boundaries, and completion-relative generation.
+
+PROMPT 11: RELEASE REVIEW
+
+Review the entire repository against PRODUCT_PLAN.txt. Identify missing acceptance criteria, architecture violations, direct IndexedDB calls from UI, external network dependencies, unsafe HTML rendering, missing tests, inaccessible interactions, and destructive actions without recovery. Fix high-priority findings. Build a release folder and write README-RUN.txt for the operational user.
+
+======================================================================
+40. FUTURE ENHANCEMENTS
+======================================================================
+
+Only consider these after daily use proves the core application valuable.
+
+40.1 Planner import
+
+Allow user to import a Planner export or manually pasted list.
+
+Do not implement browser scraping.
+
+40.2 ERP or SWAT reconciliation import
+
+Support sanitized CSV import if an authorized export exists.
+
+Use preview and field mapping.
+
+40.3 Outlook calendar export
+
+Generate .ics files for selected reminders or leave events.
+
+This is safer than attempting live Outlook integration.
+
+40.4 Daily digest
+
+Generate a plain-text daily summary that can be copied.
+
+40.5 Weekly review wizard
+
+Guide the user through:
+
+- Inbox.
+- Waiting.
+- Stale tasks.
+- Employee attention.
+- Training.
+- Upcoming leave.
+- Backup.
+
+40.6 Workload visualization
+
+Show open work by employee and project without implying employee performance ranking.
+
+40.7 Attachments
+
+Avoid unless authorized and clearly needed.
+
+A safer alternative is storing a file path or document reference.
+
+40.8 Local encryption
+
+Potentially encrypt exported backups using browser cryptography.
+
+Risks:
+
+- Forgotten password means lost data.
+- Enterprise policy may affect capability.
+- Encryption does not authorize storage.
+
+Only add after careful design.
+
+40.9 AI assistance
+
+Potential future development-only uses:
+
+- Suggest task categorization.
+- Convert rough notes into structured Context, Action, Result, Impact.
+- Summarize completed work.
+- Suggest weekly review questions.
+
+Operational boundary:
+
+- Do not send government or employee data to an external AI service.
+- AI should not be a dependency.
+- The application must remain fully functional without AI.
+- Any future local AI feature would require separate approval and technical feasibility.
+
+40.10 Multiple supervisors
+
+Not planned.
+
+Moving to multiple users would fundamentally change:
+
+- Authentication.
+- Authorization.
+- Hosting.
+- Data ownership.
+- Conflict resolution.
+- Governance.
+
+That would be a different product.
+
+======================================================================
+41. RISKS AND MITIGATIONS
+======================================================================
+
+RISK 1:
+NMCI blocks local JavaScript or storage.
+
+Mitigation:
+Run Phase 0 before full development. Preserve storage abstraction. Be prepared to use explicit JSON open/save workflow.
+
+RISK 2:
+Browser data is cleared.
+
+Mitigation:
+Mandatory backup feature, visible backup age, change-count reminder, emergency export.
+
+RISK 3:
+Manual entry burden becomes too high.
+
+Mitigation:
+Fast Quick Add, progressive detail, recurring templates, task-to-performance conversion, bulk updates, import options later.
+
+RISK 4:
+The application becomes another disconnected system.
+
+Mitigation:
+Always store source-system references and verification dates. Focus on actions and reminders rather than duplicating full authoritative records.
+
+RISK 5:
+Scope grows too quickly.
+
+Mitigation:
+Build phases in order. Do not add awards, attachments, integrations, or AI until core board and backup are used successfully.
+
+RISK 6:
+Sensitive information is entered.
+
+Mitigation:
+Persistent notice, field minimization, no unrestricted diary fields, no attachments, objective note guidance, sanitized test data.
+
+RISK 7:
+Single-file bundling becomes fragile.
+
+Mitigation:
+Support a small static folder as the primary fallback. Portability is more important than forcing one HTML file.
+
+RISK 8:
+Drag-and-drop is inaccessible or unreliable.
+
+Mitigation:
+Provide buttons and keyboard actions for all status changes.
+
+RISK 9:
+Date calculations are incorrect.
+
+Mitigation:
+Use date-only utilities, extensive boundary tests, avoid midnight conversions.
+
+RISK 10:
+Coding agents introduce unnecessary dependencies or architecture changes.
+
+Mitigation:
+Repository rules, pinned dependencies, small commits, plan review, automated no-network check.
+
+RISK 11:
+Generated code works only in development server mode.
+
+Mitigation:
+Test production output through local file path throughout development, not only at release.
+
+RISK 12:
+Data migrations corrupt existing records.
+
+Mitigation:
+Versioned migrations, pre-migration backup prompt, migration tests, rollback where possible.
+
+RISK 13:
+The application is useful only when open.
+
+Mitigation:
+Make startup review valuable. Consider calendar export later. Do not depend on background notifications.
+
+RISK 14:
+Performance notes become subjective or inappropriate.
+
+Mitigation:
+Structured Context, Action, Result, Impact fields and objective guidance.
+
+RISK 15:
+The project is abandoned before becoming useful.
+
+Mitigation:
+Phase 2 must deliver a usable employee list and kanban board before building specialized modules.
+
+======================================================================
+42. OPEN DECISIONS
+======================================================================
+
+These decisions should be made after the environment test or early use.
+
+1. Does IndexedDB persist reliably on the actual NMCI browser?
+
+2. Can the application be opened from a local folder, approved network folder, or both?
+
+3. Should the production package be one HTML file or a folder?
+
+4. Is Svelte acceptable, or would plain TypeScript reduce build complexity enough to justify more manual UI work?
+
+5. Which fields are authorized for local storage?
+
+6. Where may backups be stored?
+
+7. Should employee work email be stored?
+
+8. Should leave type be stored, or only availability dates?
+
+9. What official performance elements should be configured?
+
+10. What default employee check-in interval is useful?
+
+11. What threshold defines a stale task?
+
+12. What threshold defines Waiting too long?
+
+13. Should Complete remain on the board for 7, 14, or 30 days?
+
+14. Should recurring employee check-ins generate one task per employee or one checklist task?
+
+15. Are award records useful enough for the first operational release?
+
+16. Are telework requests individual events, standing agreements, or both?
+
+17. Is a leave calendar necessary, or is a sorted list sufficient?
+
+18. Is importing Planner or Excel data allowed and useful?
+
+19. Is calendar-file export allowed?
+
+20. Is encryption of backup files needed and technically supportable?
+
+======================================================================
+43. DEFINITION OF DONE
+======================================================================
+
+A feature is done when:
+
+- It matches the relevant product requirement.
+- It has clear acceptance criteria.
+- TypeScript compiles with no errors.
+- Unit tests pass.
+- Relevant component or integration tests pass.
+- Production build succeeds.
+- Production build opens through the intended local-file method.
+- No external network resource is added.
+- Persistent data goes through DataStore.
+- Error states are handled.
+- Keyboard interaction is supported.
+- User text is safely rendered.
+- Documentation is updated.
+- No real personnel data appears in code or tests.
+- The change is recorded in CHANGELOG.md.
+
+The first operational release is done when:
+
+- The NMCI compatibility test passes.
+- Core employees, tasks, board, Today dashboard, and backup work.
+- Data survives browser restart.
+- Full backup round-trip is proven.
+- No external network calls occur.
+- The user can complete a morning review and end-of-day review using the app.
+- The app has been tested with realistic synthetic data.
+- Security and data-use boundaries have been reviewed locally before real data entry.
+
+======================================================================
+44. SAMPLE SEED DATA
+======================================================================
+
+All sample data must be fictional.
+
+Competencies:
+
+- 55140
+- 55230
+
+Employees:
+
+- Alex Morgan, 55140, Systems Engineer
+- Jordan Lee, 55140, Test Engineer
+- Casey Smith, 55230, Software Engineer
+- Taylor Brown, 55230, Project Analyst
+
+Projects:
+
+- Project Lighthouse
+- Project Harbor
+- Internal Training Improvement
+- Competency Workforce Planning
+
+Tasks:
+
+1.
+Title:
+Review Project Lighthouse test schedule
+
+Status:
+Planned
+
+Priority:
+High
+
+Category:
+Project Work
+
+Employee:
+Alex Morgan
+
+Due:
+Seven days from seed date
+
+2.
+Title:
+Verify annual cybersecurity training
+
+Status:
+Waiting
+
+Priority:
+Normal
+
+Category:
+Training
+
+Employee:
+Jordan Lee
+
+Waiting on:
+Updated SWAT record
+
+3.
+Title:
+Prepare telework renewal follow-up
+
+Status:
+Inbox
+
+Priority:
+Normal
+
+Category:
+Telework
+
+Employee:
+Casey Smith
+
+4.
+Title:
+Capture Project Harbor customer recognition
+
+Status:
+Needs Review
+
+Priority:
+Normal
+
+Category:
+Performance
+
+Employee:
+Taylor Brown
+
+5.
+Title:
+Weekly timekeeping review
+
+Status:
+Planned
+
+Priority:
+Normal
+
+Category:
+Timekeeping
+
+Recurrence:
+Weekly
+
+Performance input:
+
+Employee:
+Taylor Brown
+
+Context:
+Project Harbor required a revised delivery approach after a schedule change.
+
+Action:
+Coordinated the revised task sequence and maintained communication with project stakeholders.
+
+Result:
+The team completed the revised deliverables without missing the adjusted milestone.
+
+Impact:
+Reduced schedule risk and preserved customer confidence.
+
+Training requirement:
+
+Name:
+Annual Cybersecurity Awareness
+
+Recurrence:
+Annual
+
+Warning days:
+30, 14, 7
+
+======================================================================
+45. GLOSSARY
+======================================================================
+
+Attention item:
+A computed indication that a record may require action.
+
+Authoritative source:
+The official system where a record is maintained.
+
+Backup package:
+A complete portable export of application data.
+
+Board order:
+A numeric value controlling card order within a kanban column.
+
+Capability detection:
+Runtime checks that determine whether a browser feature is available.
+
+Competency:
+An organizational grouping such as 55140 or 55230.
+
+DataStore:
+The application interface that isolates persistence technology from business logic and UI.
+
+Due state:
+A computed status such as Future, Due Soon, Due Today, or Overdue.
+
+Employee 360:
+A profile page aggregating records associated with one employee.
+
+IndexedDB:
+A browser-provided structured local database.
+
+Local first:
+An architecture where the application works primarily on the local computer without a network service.
+
+NMCI compatibility spike:
+A small test application used to validate the operating environment before full implementation.
+
+Performance input:
+A structured record of employee action, result, and impact for possible use in performance review preparation.
+
+Recurrence instance:
+A task generated from a recurring template for one scheduled occurrence.
+
+Saved view:
+A named set of filters, sorting, grouping, and display preferences.
+
+Source reference:
+A non-sensitive identifier or note that helps locate the authoritative record.
+
+Stale task:
+An incomplete task with no update for a configured time.
+
+Verification date:
+The date a local record was compared with its authoritative source.
+
+Waiting age:
+The amount of time a task has remained in Waiting status.
+
+======================================================================
+46. REFERENCE NOTES
+======================================================================
+
+These references support the technical direction. They should not be treated as approval for use on NMCI.
+
+IndexedDB API:
+https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API
+
+Using IndexedDB:
+https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API/Using_IndexedDB
+
+Browser storage quotas and eviction:
+https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
+
+Same-origin policy:
+https://developer.mozilla.org/en-US/docs/Web/Security/Defenses/Same-origin_policy
+
+Local storage and file-scheme caution:
+https://developer.mozilla.org/en-US/docs/Web/API/Window/localStorage
+
+Vite production build:
+https://vite.dev/guide/build
+
+Vite build options:
+https://vite.dev/config/build-options
+
+File System API security and availability:
+https://developer.mozilla.org/en-US/docs/Web/API/File_System_API
+
+File System Access API:
+https://developer.chrome.com/docs/capabilities/web-apis/file-system-access
+
+======================================================================
+END OF DOCUMENT
+======================================================================
