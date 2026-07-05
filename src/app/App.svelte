@@ -56,8 +56,8 @@
     { page: "awards", label: "Awards", icon: "awards" },
     { page: "meetings", label: "Meetings", icon: "meetings", section: "Work" },
     { page: "projects", label: "Projects", icon: "projects" },
-    { page: "archive", label: "Archive", icon: "archive" },
-    { page: "settings", label: "Settings", icon: "settings", section: "System" }
+    { page: "archive", label: "Archive", icon: "archive", section: "System" },
+    { page: "settings", label: "Settings", icon: "settings" }
   ];
 
   let isDark = $derived(
