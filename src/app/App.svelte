@@ -122,7 +122,15 @@
   <div class="shell">
     <header class="topbar">
       <span class="brand">
-        <span class="brand-mark" aria-hidden="true">R</span>
+        <span class="brand-mark" aria-hidden="true">
+          <svg class="brand-icon" viewBox="0 0 24 24" focusable="false">
+            <path d="M4.8 18.7A10 10 0 1 1 19.2 18.7" />
+            <path d="M8.1 15.5A5.6 5.6 0 1 1 15.9 15.5" />
+            <path d="M12 12l6.2-6.2" />
+            <circle class="radar-fill" cx="12" cy="12" r="1.7" />
+            <circle class="radar-fill" cx="18.2" cy="5.8" r="1.35" />
+          </svg>
+        </span>
         <span>{app.settings.applicationName}</span>
       </span>
       <span class="spacer"></span>
@@ -275,11 +283,23 @@
     border-radius: 9px;
     background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
     color: #fff;
-    font-size: .72rem;
-    font-weight: 800;
-    letter-spacing: .02em;
     flex: 0 0 auto;
     box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+  }
+  .brand-icon {
+    width: 1.28rem;
+    height: 1.28rem;
+    overflow: visible;
+  }
+  .brand-icon path {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.7;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  .brand-icon .radar-fill {
+    fill: currentColor;
   }
   .spacer { flex: 1; }
 
