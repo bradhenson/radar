@@ -59,10 +59,12 @@ Plan phases 0–6 plus a simple awards list:
 - **Today**: explainable attention items (overdue / due today / due soon / reminder / waiting too
   long / stale / training / telework / leave / backup), snooze, 14-day lookahead, recently
   completed with one-click performance-input conversion.
-- **Board**: Inbox / Planned / In Progress / Waiting / Needs Review / Complete, drag-and-drop plus
-  keyboard movement (`[`, `]`, `C`, `Enter`), filters, gap-based ordering.
-- **Tasks**: quick add (title-only), full detail with notes, checklists, tags, source-system
-  references, waiting metadata, activity history, archive/restore.
+- **Board**: editable visual columns, drag-and-drop card movement, draggable column reordering,
+  keyboard card movement (`[`, `]`, `C`, `Enter`), filters, gap-based ordering. Board columns
+  organize cards visually; task progress is tracked separately by each task's status.
+- **Tasks**: detailed creation/edit dialog from the start, auto-save on close, status and board
+  column fields, editable categories, notes, checklists, tags, waiting metadata, activity history
+  with concise changed-field summaries, archive/restore.
 - **Employees**: directory with workload columns, CSV export, 360° profile (tasks, performance,
   training, leave, telework, awards, activity), check-in recording.
 - **Performance**: Context/Action/Result/Impact capture, completion-to-input conversion prompt,
@@ -71,7 +73,8 @@ Plan phases 0–6 plus a simple awards list:
   completion with expiration calculation, due warnings.
 - **Leave / Telework**: broad availability records with verification dates, overlap warnings,
   expiration/pending-action attention.
-- **Reports**, **Archive**, **Settings** (thresholds, theme, health check, sample data).
+- **Reports**, **Archive**, **Settings** (thresholds, theme, editable board columns, editable task
+  categories, health check, sample data).
 
 Not yet implemented (later phases): recurring-task templates (Phase 7), saved views, global
 search, bulk actions, merge-on-import, print views. See `CHANGELOG.md`.
