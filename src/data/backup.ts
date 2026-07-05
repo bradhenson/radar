@@ -71,7 +71,12 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   teleworkRecords: ["id", "employeeId", "recordType", "status"],
   awardRecords: ["id", "employeeId", "title", "status"],
   employeeInteractions: ["id", "employeeId", "interactionDate", "interactionType"],
+  meetingNotes: ["id", "meetingDate", "title", "meetingType"],
   activityEntries: ["id", "entityType", "entityId", "actionType", "timestamp"]
+};
+
+const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = {
+  meetingNotes: ["attendeeEmployeeIds"]
 };
 
 const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
@@ -81,7 +86,8 @@ const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employeeTrainingRecords: ["assignedDate", "dueDate", "completedDate", "expirationDate", "lastVerifiedDate"],
   leaveRecords: ["startDate", "endDate", "lastVerifiedDate"],
   teleworkRecords: ["requestDate", "effectiveDate", "expirationDate", "lastVerifiedDate"],
-  awardRecords: ["accomplishmentPeriodStart", "accomplishmentPeriodEnd", "nominationDueDate", "submittedDate", "decisionDate"]
+  awardRecords: ["accomplishmentPeriodStart", "accomplishmentPeriodEnd", "nominationDueDate", "submittedDate", "decisionDate"],
+  meetingNotes: ["meetingDate"]
 };
 
 export function parseAndValidateBackup(jsonText: string): BackupValidationResult {
@@ -146,6 +152,14 @@ export function parseAndValidateBackup(jsonText: string): BackupValidationResult
           result.errors.push(`${name}[${i}] is missing required field "${field}".`);
         }
       }
+      for (const field of REQUIRED_STRING_ARRAY_FIELDS[name] ?? []) {
+        const v = rec[field];
+        if (!Array.isArray(v)) {
+          result.errors.push(`${name}[${i}] is missing required array field "${field}".`);
+        } else if (v.some((item) => typeof item !== "string")) {
+          result.errors.push(`${name}[${i}].${field} must contain only strings.`);
+        }
+      }
       const id = rec.id;
       if (typeof id === "string") {
         if (ids.has(id)) result.errors.push(`${name}[${i}] has duplicate id "${id}".`);
@@ -162,12 +176,29 @@ export function parseAndValidateBackup(jsonText: string): BackupValidationResult
 
   // Referential integrity warnings (non-blocking; plan 28.4).
   const empIds = seenIds.get("employees") ?? new Set();
+  const projIds = seenIds.get("projects") ?? new Set();
   const taskArr = Array.isArray(data.tasks) ? (data.tasks as Record<string, unknown>[]) : [];
   let orphanTasks = 0;
   for (const t of taskArr) {
     if (typeof t.employeeId === "string" && t.employeeId && !empIds.has(t.employeeId)) orphanTasks++;
   }
   if (orphanTasks > 0) result.warnings.push(`${orphanTasks} task(s) reference an employee not present in the backup.`);
+
+  const meetingArr = Array.isArray(data.meetingNotes) ? (data.meetingNotes as Record<string, unknown>[]) : [];
+  let orphanMeetingEmployees = 0;
+  let orphanMeetingProjects = 0;
+  for (const note of meetingArr) {
+    if (Array.isArray(note.attendeeEmployeeIds)) {
+      orphanMeetingEmployees += note.attendeeEmployeeIds.filter((id) => typeof id === "string" && !empIds.has(id)).length;
+    }
+    if (typeof note.projectId === "string" && note.projectId && !projIds.has(note.projectId)) orphanMeetingProjects++;
+  }
+  if (orphanMeetingEmployees > 0) {
+    result.warnings.push(`${orphanMeetingEmployees} meeting attendee link(s) reference an employee not present in the backup.`);
+  }
+  if (orphanMeetingProjects > 0) {
+    result.warnings.push(`${orphanMeetingProjects} meeting note(s) reference a project not present in the backup.`);
+  }
 
   if (result.errors.length > 0) return result;
 

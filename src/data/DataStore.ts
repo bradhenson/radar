@@ -16,6 +16,7 @@ import type {
   EmployeeTrainingRecord,
   EvaluationCycle,
   LeaveRecord,
+  MeetingNote,
   PerformanceElement,
   PerformanceInput,
   Project,
@@ -44,6 +45,7 @@ export interface CollectionTypes {
   teleworkRecords: TeleworkRecord;
   awardRecords: AwardRecord;
   employeeInteractions: EmployeeInteraction;
+  meetingNotes: MeetingNote;
   activityEntries: ActivityEntry;
   attentionSnoozes: AttentionSnooze;
 }
@@ -68,6 +70,7 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "teleworkRecords",
   "awardRecords",
   "employeeInteractions",
+  "meetingNotes",
   "activityEntries",
   "attentionSnoozes"
 ];

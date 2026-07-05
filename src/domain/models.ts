@@ -299,6 +299,20 @@ export interface EmployeeInteraction {
   updatedAt: IsoTimestamp;
 }
 
+export interface MeetingNote {
+  id: Id;
+  meetingDate: IsoDate;
+  title: string;
+  meetingType: string;
+  projectId?: Id;
+  attendeeEmployeeIds: Id[];
+  notes?: string;
+  actionItems?: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
 export interface ActivityEntry {
   id: Id;
   entityType: string;
@@ -335,7 +349,7 @@ export interface AppSettings {
 
 export const DEFAULT_SETTINGS: AppSettings = {
   schemaVersion: 1,
-  applicationName: "Supervisor Assistant",
+  applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
   taskStaleDays: 30,
@@ -399,6 +413,8 @@ export const INTERACTION_TYPES = [
   "Recognition",
   "Other"
 ];
+
+export const MEETING_TYPES = ["Product team", "Project", "Staff", "Customer", "One-on-one", "Other"];
 
 export const LEAVE_TYPES = ["Annual", "Sick", "Comp Time", "Credit Hours", "Administrative", "Other", "Not specified"];
 

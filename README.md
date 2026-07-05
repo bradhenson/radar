@@ -1,8 +1,9 @@
-# Supervisor Assistant
+# RADAR
 
-A single-user, **local-first** supervisory cockpit: kanban board, attention dashboard, employee
-profiles, performance-input capture, and training/leave/telework tracking — with **no server, no
-telemetry, and no runtime network access**. Built from the specification in
+**Reporting, Administration, Delegation, Analytics & Review**: a single-user, **local-first**
+supervisory cockpit with a kanban board, attention dashboard, employee profiles,
+performance-input capture, meeting notes, and training/leave/telework tracking — with **no server,
+no telemetry, and no runtime network access**. Built from the specification in
 `NIWC_Supervisor_Assistant_Project_Plan.txt`.
 
 > **Boundary:** this is a software project, not an authorization to store government information in
@@ -23,11 +24,12 @@ npm run build      # production build + single-file inline + no-network scan
 `npm run build` produces, in `dist/`:
 
 - `index.html` — **self-contained** (all JS/CSS inlined). Opens directly from a local file path
-  with no server. `supervisor-assistant.html` is an identical copy with a friendlier name.
+  with no server. `radar.html` is an identical copy with a friendlier name; the build also keeps
+  a legacy `supervisor-assistant.html` copy for compatibility.
 - The build fails if any external network reference is detected (`scripts/verify-no-network.mjs`).
 
-To deploy to the operational machine, transfer `dist/supervisor-assistant.html` through an
-authorized process and open it in the managed browser.
+To deploy to the operational machine, transfer `dist/radar.html` through an authorized process and
+open it in the managed browser.
 
 ## Phase 0 — environment test (run this on NMCI first)
 
@@ -66,13 +68,15 @@ Plan phases 0–6 plus a simple awards list:
   column fields, editable categories, notes, checklists, tags, waiting metadata, activity history
   with concise changed-field summaries, archive/restore.
 - **Employees**: directory with workload columns, CSV export, 360° profile (tasks, performance,
-  training, leave, telework, awards, activity), check-in recording.
+  meeting notes, training, leave, telework, awards, activity), check-in recording.
 - **Performance**: Context/Action/Result/Impact capture, completion-to-input conversion prompt,
   coverage table, text export for evaluation preparation.
+- **Meetings**: product-team meeting note capture with linked employees/projects, discussion
+  notes, action items, CSV export, archive/restore, and follow-up task creation.
 - **Training**: requirements, bulk assignment (all/by competency), employee × requirement matrix,
   completion with expiration calculation, due warnings.
-- **Leave / Telework**: broad availability records with verification dates, overlap warnings,
-  expiration/pending-action attention.
+- **Leave / Telework**: leave availability records plus situational telework request tracking,
+  request calendar, email-reference fields, CSV export, and pending-action attention.
 - **Reports**, **Archive**, **Settings** (thresholds, theme, editable board columns, editable task
   categories, health check, sample data).
 
@@ -81,7 +85,7 @@ search, bulk actions, merge-on-import, print views. See `CHANGELOG.md`.
 
 ## Keyboard shortcuts
 
-`N` new task · `P` new performance input · `T` Today · `B` Board · `E` Employees ·
+`N` new task · `P` new performance input · `T` Today · `B` Board · `E` Employees · `M` Meetings ·
 on a focused card: `[`/`]` move, `C` complete, `Enter` open · `Esc` closes dialogs.
 
 ## Repository rules

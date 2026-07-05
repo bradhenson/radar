@@ -3,7 +3,7 @@
 //
 // Why: browsers refuse to fetch <script type="module" src="..."> over
 // file:// (CORS on opaque origins), but an *inline* module script executes
-// fine. Inlining makes both dist/index.html and the copied single file work
+// fine. Inlining makes both dist/index.html and the copied single files work
 // when opened with no server.
 
 import { readFileSync, writeFileSync, existsSync, copyFileSync } from "node:fs";
@@ -40,7 +40,8 @@ html = html.replace(/<link rel="stylesheet"[^>]*href="\.\/(assets\/[^"]+\.css)"[
 html = html.replace(/<link rel="modulepreload"[^>]*>/g, "");
 
 writeFileSync(indexPath, html);
+copyFileSync(indexPath, join(dist, "radar.html"));
 copyFileSync(indexPath, join(dist, "supervisor-assistant.html"));
 
 const kb = Math.round(Buffer.byteLength(html, "utf8") / 1024);
-console.log(`build-single-file: OK. dist/index.html and dist/supervisor-assistant.html are self-contained (${kb} KB).`);
+console.log(`build-single-file: OK. dist/index.html, dist/radar.html, and legacy dist/supervisor-assistant.html are self-contained (${kb} KB).`);

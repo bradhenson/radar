@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+- Restore from backup ("Replace Database") failed with "Import failed: Failed to execute 'put'
+  on 'IDBObjectStore': #<Object> could not be cloned". The parsed backup was held in Svelte
+  `$state` (a Proxy), which IndexedDB's structured clone rejects; the package is now unwrapped
+  with `$state.snapshot` before being written, matching every other persistence path.
+
 ## 0.1.2 — 2026-07-04
 
 ### Changed

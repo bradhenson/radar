@@ -1,11 +1,11 @@
-SUPERVISOR ASSISTANT - HOW TO RUN
-=================================
+RADAR - HOW TO RUN
+==================
 
 This folder contains a self-contained web application. It needs no
 installation, no administrator rights, no internet access, and no server.
 
 TO START
-1. Double-click supervisor-assistant.html (or index.html), or open it
+1. Double-click radar.html (or index.html), or open it
    with Microsoft Edge via File > Open.
 2. The application stores its data inside the browser (IndexedDB) for
    this file location. Moving or renaming the file/folder may present a

@@ -13,6 +13,7 @@
   import EmployeeDetailPage from "../pages/EmployeeDetailPage.svelte";
   import ProjectsPage from "../pages/ProjectsPage.svelte";
   import PerformancePage from "../pages/PerformancePage.svelte";
+  import MeetingsPage from "../pages/MeetingsPage.svelte";
   import TrainingPage from "../pages/TrainingPage.svelte";
   import LeavePage from "../pages/LeavePage.svelte";
   import TeleworkPage from "../pages/TeleworkPage.svelte";
@@ -49,7 +50,8 @@
     { page: "leave", label: "Leave", icon: "leave" },
     { page: "telework", label: "Telework", icon: "telework" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "projects", label: "Projects", icon: "projects", section: "Work" },
+    { page: "meetings", label: "Meetings", icon: "meetings", section: "Work" },
+    { page: "projects", label: "Projects", icon: "projects" },
     { page: "reports", label: "Reports", icon: "reports" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings", section: "System" }
@@ -91,6 +93,9 @@
       case "e":
         router.go("employees");
         break;
+      case "m":
+        router.go("meetings");
+        break;
     }
   }
 
@@ -103,7 +108,7 @@
 
 {#if app.initError}
   <div class="page">
-    <h1>Supervisor Assistant could not start</h1>
+    <h1>RADAR could not start</h1>
     <p class="field-error">{app.initError}</p>
     <p>Local storage may be blocked in this browser. Reload to try again, or run the environment test page.</p>
     <button type="button" onclick={() => location.reload()}>Reload</button>
@@ -114,7 +119,7 @@
   <div class="shell">
     <header class="topbar">
       <span class="brand">
-        <span class="brand-mark" aria-hidden="true">SA</span>
+        <span class="brand-mark" aria-hidden="true">R</span>
         <span>{app.settings.applicationName}</span>
       </span>
       <button type="button" class="primary new-task-btn" onclick={() => ui.openNewTask()} title="Shortcut: N">
@@ -159,6 +164,8 @@
           <EmployeesPage />
         {:else if router.current.page === "projects"}
           <ProjectsPage />
+        {:else if router.current.page === "meetings"}
+          <MeetingsPage />
         {:else if router.current.page === "performance"}
           <PerformancePage />
         {:else if router.current.page === "training"}
@@ -256,7 +263,7 @@
     gap: .6rem;
     font-weight: 750;
     font-size: 1.02rem;
-    letter-spacing: -0.01em;
+    letter-spacing: 0;
     min-width: 0;
     margin-right: .4rem;
   }

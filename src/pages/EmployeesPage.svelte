@@ -58,7 +58,7 @@
         r.e.lastCheckInDate
       ])
     );
-    downloadText(backupFilename("SupervisorAssistant_Employees", "csv"), csv, "text/csv");
+    downloadText(backupFilename("RADAR_Employees", "csv"), csv, "text/csv");
   }
 </script>
 

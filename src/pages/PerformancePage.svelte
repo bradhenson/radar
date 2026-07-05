@@ -54,7 +54,7 @@
   );
 
   function exportText() {
-    const lines: string[] = ["SUPERVISOR ASSISTANT — PERFORMANCE INPUT EXPORT", `Generated: ${formatDate(app.today)}`, ""];
+    const lines: string[] = ["RADAR - PERFORMANCE INPUT EXPORT", `Generated: ${formatDate(app.today)}`, ""];
     for (const group of byEmployee) {
       lines.push("=".repeat(60), group.name.toUpperCase(), "=".repeat(60), "");
       for (const p of group.list) {
@@ -67,7 +67,7 @@
         lines.push(`Status: ${p.inputStatus}`, "");
       }
     }
-    downloadText(backupFilename("SupervisorAssistant_Performance", "txt"), lines.join("\r\n"), "text/plain");
+    downloadText(backupFilename("RADAR_Performance", "txt"), lines.join("\r\n"), "text/plain");
   }
 
   async function setStatus(id: string, inputStatus: string) {

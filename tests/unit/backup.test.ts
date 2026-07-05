@@ -34,6 +34,7 @@ describe("backup round trip", () => {
     const pkg = createBackupPackage(snapshot);
     expect(pkg.integrity.recordCounts.employees).toBe(4);
     expect(pkg.integrity.recordCounts.tasks).toBe(5);
+    expect(pkg.integrity.recordCounts.meetingNotes).toBe(1);
     expect(pkg.format).toBe(BACKUP_FORMAT);
   });
 });

@@ -186,6 +186,19 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     ...stamp
   });
 
+  c.meetingNotes.push({
+    id: newId(),
+    meetingDate: today,
+    title: "Product team backlog review",
+    meetingType: "Product team",
+    projectId: harbor.id,
+    attendeeEmployeeIds: [alex.id, casey.id, taylor.id],
+    notes: "Reviewed priority changes, upcoming customer demos, and cross-team blockers.",
+    actionItems: "Confirm demo data readiness; identify schedule risk for the reporting workstream.",
+    isArchived: false,
+    ...stamp
+  });
+
   const cyberReq = {
     id: newId(),
     name: "Annual Cybersecurity Awareness",
@@ -221,11 +234,14 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   c.teleworkRecords.push({
     id: newId(),
     employeeId: casey.id,
-    recordType: "Agreement",
-    effectiveDate: addDays(today, -300),
-    expirationDate: addDays(today, 21),
-    status: "active",
-    scheduleSummary: "Situational, 2 days per week",
+    recordType: "Situational request",
+    requestDate: today,
+    effectiveDate: addDays(today, 7),
+    expirationDate: addDays(today, 7),
+    status: "pending_supervisor",
+    scheduleSummary: "Full day remote work for focused analysis",
+    sourceSystem: "Email",
+    sourceReference: "Saved email: Casey telework request",
     ...stamp
   });
 

@@ -370,7 +370,7 @@ export function teleworkAttention(
       });
     }
 
-    if ((tw.status === "active" || tw.status === "approved") && tw.expirationDate) {
+    if (isTeleworkAgreementRecord(tw.recordType) && (tw.status === "active" || tw.status === "approved") && tw.expirationDate) {
       const diff = daysBetween(today, tw.expirationDate);
       if (diff < 0) {
         items.push({
@@ -396,6 +396,11 @@ export function teleworkAttention(
     }
   }
   return items;
+}
+
+function isTeleworkAgreementRecord(recordType: string): boolean {
+  const normalized = recordType.toLowerCase();
+  return normalized.includes("agreement") || normalized.includes("renewal") || normalized.includes("modification");
 }
 
 // ---------------------------------------------------------------------------

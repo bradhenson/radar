@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:;">
-<title>Supervisor Assistant Environment Test</title>
+<title>RADAR Environment Test</title>
 <style>
   :root { color-scheme: light dark; }
   body { font-family: "Segoe UI", system-ui, sans-serif; max-width: 60rem; margin: 0 auto; padding: 1rem 1.5rem 4rem; line-height: 1.5; }
@@ -25,7 +25,7 @@
 </style>
 </head>
 <body>
-<h1>Supervisor Assistant &mdash; Environment Test</h1>
+<h1>RADAR &mdash; Environment Test</h1>
 <p>This page verifies what this browser permits when a local web application is opened from a file path.
 No data leaves this computer. No network requests are made.</p>
 
@@ -196,7 +196,7 @@ No data leaves this computer. No network requests are made.</p>
   // ---- Download -----------------------------------------------------------
   function runDownloadTest() {
     try {
-      var payload = { test: "SupervisorAssistantEnvironmentTest", exportedAt: new Date().toISOString() };
+      var payload = { test: "RADAREnvironmentTest", exportedAt: new Date().toISOString() };
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
@@ -255,7 +255,7 @@ No data leaves this computer. No network requests are made.</p>
   document.getElementById("clipBtn").addEventListener("click", function () {
     var out = document.getElementById("clipResult");
     if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText("Supervisor Assistant clipboard test " + new Date().toISOString())
+      navigator.clipboard.writeText("RADAR clipboard test " + new Date().toISOString())
         .then(function () { out.textContent = "PASS - text copied"; out.className = "pass"; setResult("Clipboard copy", "PASS", "navigator.clipboard.writeText succeeded."); })
         .catch(function (e) { out.textContent = "FAIL - " + e; out.className = "fail"; setResult("Clipboard copy", "FAIL", String(e)); });
     } else {
@@ -267,7 +267,7 @@ No data leaves this computer. No network requests are made.</p>
   // ---- Report export ------------------------------------------------------
   document.getElementById("exportBtn").addEventListener("click", function () {
     var report = {
-      report: "SupervisorAssistantEnvironmentTest",
+      report: "RADAREnvironmentTest",
       generatedAt: new Date().toISOString(),
       location: location.href.replace(/[^/\\]*$/, "..."),
       protocol: location.protocol,
@@ -278,7 +278,7 @@ No data leaves this computer. No network requests are made.</p>
     var url = URL.createObjectURL(blob);
     var a = document.createElement("a");
     a.href = url;
-    a.download = "SupervisorAssistant_EnvironmentReport_" + new Date().toISOString().slice(0, 10) + ".json";
+    a.download = "RADAR_EnvironmentReport_" + new Date().toISOString().slice(0, 10) + ".json";
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function () { URL.revokeObjectURL(url); }, 5000);
   });

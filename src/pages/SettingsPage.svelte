@@ -109,7 +109,7 @@
   async function exportBackup() {
     try {
       const pkg = await app.buildBackup();
-      downloadJson(backupFilename("SupervisorAssistant_Backup", "json"), pkg);
+      downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
       app.toast("Backup exported", "success");
     } catch (e) {
       app.toast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -163,7 +163,12 @@
       orphanTaskBoardColumn: app.tasks.filter((t) => t.boardColumnId && !boardColumnIds.has(t.boardColumnId)).length,
       orphanNotes: app.taskNotes.filter((n) => !taskIds.has(n.taskId)).length,
       orphanChecklist: app.checklistItems.filter((c) => !taskIds.has(c.taskId)).length,
-      orphanTraining: app.employeeTrainingRecords.filter((r) => !empIds.has(r.employeeId)).length
+      orphanTraining: app.employeeTrainingRecords.filter((r) => !empIds.has(r.employeeId)).length,
+      orphanMeetingEmployees: app.meetingNotes.reduce(
+        (count, note) => count + note.attendeeEmployeeIds.filter((id) => !empIds.has(id)).length,
+        0
+      ),
+      orphanMeetingProjects: app.meetingNotes.filter((note) => note.projectId && !projIds.has(note.projectId)).length
     };
   });
   let healthIssues = $derived(Object.values(health).reduce((a, b) => a + b, 0));
@@ -378,6 +383,8 @@
         {#if health.orphanNotes}<li>{health.orphanNotes} note(s) reference a missing task</li>{/if}
         {#if health.orphanChecklist}<li>{health.orphanChecklist} checklist item(s) reference a missing task</li>{/if}
         {#if health.orphanTraining}<li>{health.orphanTraining} training record(s) reference a missing employee</li>{/if}
+        {#if health.orphanMeetingEmployees}<li>{health.orphanMeetingEmployees} meeting attendee link(s) reference a missing employee</li>{/if}
+        {#if health.orphanMeetingProjects}<li>{health.orphanMeetingProjects} meeting note(s) reference a missing project</li>{/if}
       </ul>
       <p class="small muted">Export a backup before attempting any manual repair.</p>
     {/if}
@@ -403,8 +410,8 @@
   <section class="card">
     <h2>About</h2>
     <p>
-      Supervisor Assistant v{APPLICATION_VERSION} — a local-first supervisory cockpit. No server, no telemetry, no
-      network access. All data stays in this browser and in backups you export.
+      RADAR v{APPLICATION_VERSION} — Reporting, Administration, Delegation, Analytics & Review. No server, no
+      telemetry, no network access. All data stays in this browser and in backups you export.
     </p>
     <p class="small muted">
       Use only for information authorized for local supervisory tracking. Do not enter classified information,

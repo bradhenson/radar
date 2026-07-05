@@ -263,6 +263,27 @@ describe("telework attention rules", () => {
     const codes = items.map((i) => i.reasonCode).sort();
     expect(codes).toEqual(["telework_expiring", "telework_pending_action"]);
   });
+
+  it("does not treat situational request end dates as agreement expirations", () => {
+    const items = teleworkAttention(
+      baseCtx({
+        employees: [emp],
+        teleworkRecords: [
+          {
+            id: "tw3",
+            employeeId: emp.id,
+            recordType: "Situational request",
+            status: "approved",
+            effectiveDate: "2026-07-10",
+            expirationDate: "2026-07-10",
+            createdAt: TS,
+            updatedAt: TS
+          }
+        ]
+      })
+    );
+    expect(items).toHaveLength(0);
+  });
 });
 
 describe("backup attention rules", () => {

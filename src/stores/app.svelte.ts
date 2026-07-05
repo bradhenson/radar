@@ -15,6 +15,7 @@ import type {
   EmployeeTrainingRecord,
   EvaluationCycle,
   LeaveRecord,
+  MeetingNote,
   PerformanceElement,
   PerformanceInput,
   Project,
@@ -47,6 +48,7 @@ export interface Toast {
 }
 
 const MUTATING_ACTIVITY = new Set(["created", "updated", "status_changed", "completed", "reopened", "archived", "restored", "deleted"]);
+const LEGACY_DEFAULT_APPLICATION_NAMES = new Set(["Supervisor Assistant"]);
 
 class AppStore {
   // --- reactive entity state ------------------------------------------------
@@ -67,6 +69,7 @@ class AppStore {
   teleworkRecords = $state<TeleworkRecord[]>([]);
   awardRecords = $state<AwardRecord[]>([]);
   employeeInteractions = $state<EmployeeInteraction[]>([]);
+  meetingNotes = $state<MeetingNote[]>([]);
   activityEntries = $state<ActivityEntry[]>([]);
   attentionSnoozes = $state<AttentionSnooze[]>([]);
 
@@ -233,10 +236,20 @@ class AppStore {
       this.store.getMeta()
     ]);
     this.applySnapshotToState(snapshot);
-    this.settings = settings ?? { ...DEFAULT_SETTINGS };
+    this.settings = this.migrateSettings(settings ?? { ...DEFAULT_SETTINGS });
     this.meta = meta;
+    if (settings && settings.applicationName !== this.settings.applicationName) {
+      await this.store.saveSettings(this.plainRecord(this.settings));
+    }
     await this.ensureBoardColumns();
     await this.ensureTaskCategories();
+  }
+
+  private migrateSettings(settings: AppSettings): AppSettings {
+    if (LEGACY_DEFAULT_APPLICATION_NAMES.has(settings.applicationName)) {
+      return { ...settings, applicationName: DEFAULT_SETTINGS.applicationName };
+    }
+    return settings;
   }
 
   private applySnapshotToState(snapshot: DatabaseSnapshot): void {
@@ -257,6 +270,7 @@ class AppStore {
     this.teleworkRecords = snapshot.collections.teleworkRecords;
     this.awardRecords = snapshot.collections.awardRecords;
     this.employeeInteractions = snapshot.collections.employeeInteractions;
+    this.meetingNotes = snapshot.collections.meetingNotes;
     this.activityEntries = snapshot.collections.activityEntries;
     this.attentionSnoozes = snapshot.collections.attentionSnoozes;
   }
@@ -736,7 +750,8 @@ class AppStore {
   }
 
   async replaceDatabase(pkg: BackupPackage): Promise<void> {
-    const snapshot = snapshotFromBackup(pkg);
+    // Unwrap any $state proxy: IndexedDB structured clone rejects Proxy objects.
+    const snapshot = snapshotFromBackup(this.plainRecord(pkg));
     await this.store.replaceAll(snapshot);
     await this.loadAll();
     await this.recordActivity("system", "backup", "imported", `Imported backup exported at ${pkg.exportedAt}`);

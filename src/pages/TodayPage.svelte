@@ -25,7 +25,7 @@
       .slice(0, 8)
   );
 
-  // Next-14-day strip: due dates, leave, training expirations, telework dates.
+  // Next-14-day strip: due dates, leave, training expirations, telework dates, meetings.
   let upcoming = $derived.by(() => {
     const events: { date: string; label: string; kind: string }[] = [];
     const horizon = addDays(app.today, 14);
@@ -46,8 +46,23 @@
       }
     }
     for (const tw of app.teleworkRecords) {
-      if (tw.expirationDate && tw.expirationDate >= app.today && tw.expirationDate <= horizon)
-        events.push({ date: tw.expirationDate, label: `Telework expires — ${app.employeeName(tw.employeeId)}`, kind: "Telework" });
+      if (tw.recordType === "Situational request") {
+        if (
+          tw.effectiveDate &&
+          !["denied", "cancelled", "expired"].includes(tw.status) &&
+          tw.effectiveDate >= app.today &&
+          tw.effectiveDate <= horizon
+        ) {
+          events.push({ date: tw.effectiveDate, label: `${app.employeeName(tw.employeeId)} situational telework`, kind: "Telework" });
+        }
+      } else if (tw.expirationDate && tw.expirationDate >= app.today && tw.expirationDate <= horizon) {
+        events.push({ date: tw.expirationDate, label: `Telework agreement expires — ${app.employeeName(tw.employeeId)}`, kind: "Telework" });
+      }
+    }
+    for (const note of app.meetingNotes) {
+      if (!note.isArchived && note.meetingDate >= app.today && note.meetingDate <= horizon) {
+        events.push({ date: note.meetingDate, label: note.title, kind: "Meeting" });
+      }
     }
     return events.sort((a, b) => (a.date < b.date ? -1 : 1)).slice(0, 20);
   });
@@ -95,6 +110,7 @@
     <button type="button" onclick={() => router.go("training")}>Record Training</button>
     <button type="button" onclick={() => router.go("leave")}>Add Leave</button>
     <button type="button" onclick={() => router.go("telework")}>Add Telework Item</button>
+    <button type="button" onclick={() => router.go("meetings")}>Meeting Notes</button>
   </div>
 
   {#if app.attention.length === 0}

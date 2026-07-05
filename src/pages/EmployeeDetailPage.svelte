@@ -5,18 +5,21 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
+  import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { INTERACTION_TYPES, statusLabel } from "../domain/models";
+  import { INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
   import { compareDates, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
 
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"overview" | "tasks" | "performance" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
+  let tab = $state<"overview" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
   let editOpen = $state(false);
   let checkInOpen = $state(false);
+  let meetingNoteOpen = $state(false);
+  let editingMeetingNote = $state<MeetingNote | undefined>(undefined);
   let checkInType = $state(INTERACTION_TYPES[1] ?? "Informal check-in");
   let checkInSummary = $state("");
   let checkInFollowUp = $state(false);
@@ -36,12 +39,29 @@
   let interactions = $derived(
     app.employeeInteractions.filter((i) => i.employeeId === employeeId).sort((a, b) => (a.interactionDate < b.interactionDate ? 1 : -1))
   );
+  let meetingNotes = $derived(
+    app.meetingNotes
+      .filter((note) => !note.isArchived && note.attendeeEmployeeIds.includes(employeeId))
+      .sort((a, b) => (a.meetingDate < b.meetingDate ? 1 : -1))
+  );
   let activity = $derived(
     app.activityEntries
-      .filter((a) => (a.entityType === "employees" && a.entityId === employeeId) || tasks.some((t) => t.id === a.entityId))
+      .filter(
+        (a) =>
+          (a.entityType === "employees" && a.entityId === employeeId) ||
+          tasks.some((t) => t.id === a.entityId) ||
+          (a.entityType === "meetingNotes" && meetingNotes.some((note) => note.id === a.entityId))
+      )
       .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
       .slice(0, 30)
   );
+
+  function teleworkRange(t: { effectiveDate?: string; expirationDate?: string }): string {
+    const end = t.expirationDate || t.effectiveDate;
+    if (!t.effectiveDate && !end) return "";
+    if (t.effectiveDate && end && t.effectiveDate !== end) return `${formatDate(t.effectiveDate)} - ${formatDate(end)}`;
+    return formatDate(t.effectiveDate ?? end);
+  }
 
   async function saveCheckIn() {
     if (!employee) return;
@@ -71,6 +91,7 @@
     ["overview", "Overview"],
     ["tasks", "Tasks"],
     ["performance", "Performance"],
+    ["meetings", "Meetings"],
     ["training", "Training"],
     ["leave", "Leave"],
     ["telework", "Telework"],
@@ -95,6 +116,7 @@
       <button type="button" onclick={() => (checkInOpen = true)}>Record check-in</button>
       <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
+      <button type="button" onclick={() => (meetingNoteOpen = true)}>Add meeting note</button>
       <button type="button" onclick={() => (editOpen = true)}>Edit</button>
     </div>
 
@@ -151,6 +173,18 @@
           {/each}
         </ul>
       {/if}
+      <h2 style="margin-top:1rem">Recent meeting notes</h2>
+      {#if meetingNotes.length === 0}
+        <p class="muted">No linked meeting notes.</p>
+      {:else}
+        {#each meetingNotes.slice(0, 3) as note (note.id)}
+          <div class="card" style="margin-bottom:.5rem">
+            <div class="small muted">{formatDate(note.meetingDate)} · {note.meetingType}{#if note.projectId} · {app.projectName(note.projectId)}{/if}</div>
+            <div>{note.title}</div>
+            {#if note.actionItems}<div class="small muted">Actions: {note.actionItems}</div>{/if}
+          </div>
+        {/each}
+      {/if}
     {:else if tab === "tasks"}
       {#if tasks.length === 0}
         <EmptyState message="No tasks for this employee." hint="Use Add task above." />
@@ -185,6 +219,26 @@
             <div><strong>Action:</strong> {p.actionOrAccomplishment}</div>
             {#if p.result}<div><strong>Result:</strong> {p.result}</div>{/if}
             {#if p.impact}<div><strong>Impact:</strong> {p.impact}</div>{/if}
+          </div>
+        {/each}
+      {/if}
+    {:else if tab === "meetings"}
+      {#if meetingNotes.length === 0}
+        <EmptyState message="No linked meeting notes." hint="Link this employee in a meeting note to show product-team context here." />
+      {:else}
+        {#each meetingNotes as note (note.id)}
+          <div class="card" style="margin-bottom:.6rem">
+            <div class="small muted">
+              {formatDate(note.meetingDate)} · {note.meetingType}
+              {#if note.projectId} · {app.projectName(note.projectId)}{/if}
+            </div>
+            <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
+              <strong>{note.title}</strong>
+              <span class="spacer" style="flex:1"></span>
+              <button type="button" onclick={() => (editingMeetingNote = note)}>Edit</button>
+            </div>
+            {#if note.notes}<div><strong>Discussion:</strong> {note.notes}</div>{/if}
+            {#if note.actionItems}<div><strong>Action items:</strong> {note.actionItems}</div>{/if}
           </div>
         {/each}
       {/if}
@@ -229,13 +283,13 @@
         <EmptyState message="No telework records." />
       {:else}
         <table class="data">
-          <thead><tr><th>Type</th><th>Status</th><th>Effective</th><th>Expires</th><th>Schedule</th></tr></thead>
+          <thead><tr><th>Type</th><th>Status</th><th>Requested</th><th>Telework date</th><th>Schedule</th><th>Email record</th></tr></thead>
           <tbody>
             {#each telework as t (t.id)}
               <tr>
                 <td>{t.recordType}</td><td>{t.status.replace(/_/g, " ")}</td>
-                <td>{formatDate(t.effectiveDate)}</td><td>{formatDate(t.expirationDate)}</td>
-                <td>{t.scheduleSummary ?? ""}</td>
+                <td>{formatDate(t.requestDate)}</td><td>{teleworkRange(t)}</td>
+                <td>{t.scheduleSummary ?? ""}</td><td>{t.sourceReference ?? ""}</td>
               </tr>
             {/each}
           </tbody>
@@ -286,6 +340,12 @@
         <button type="button" class="primary" onclick={() => void saveCheckIn()}>Save</button>
       </div>
     </Dialog>
+  {/if}
+  {#if meetingNoteOpen}
+    <MeetingNoteForm prefill={{ attendeeEmployeeIds: [employeeId], meetingType: "Product team" }} onclose={() => (meetingNoteOpen = false)} />
+  {/if}
+  {#if editingMeetingNote}
+    <MeetingNoteForm note={editingMeetingNote} onclose={() => (editingMeetingNote = undefined)} />
   {/if}
 {/if}
 
