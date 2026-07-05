@@ -10,6 +10,8 @@
   import { backupFilename, downloadText } from "../utils/download";
 
   const SITUATIONAL_TYPE = "Situational request";
+  const CALENDAR_WEEK_COUNT = 5;
+  const CALENDAR_DAY_COUNT = CALENDAR_WEEK_COUNT * 7;
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
   const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
     { value: "pending", label: "Pending" },
@@ -32,6 +34,7 @@
   let fEndDate = $state("");
   let fNotes = $state("");
   let fError = $state("");
+  let activeCalendarDate = $state<string | undefined>(undefined);
 
   function statusLabel(status: TeleworkStatus): string {
     return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
@@ -51,16 +54,40 @@
     return Boolean(end && end < app.today && (t.status === "approved" || t.status === "active"));
   }
 
-  function openForm(t?: TeleworkRecord) {
+  function openForm(
+    t?: TeleworkRecord,
+    defaults: Partial<Pick<TeleworkRecord, "employeeId" | "effectiveDate" | "expirationDate">> = {}
+  ) {
     editing = t;
-    fEmployee = t?.employeeId ?? "";
+    fEmployee = t?.employeeId ?? defaults.employeeId ?? "";
     fStatus = t?.status ?? "pending";
     fRequestDate = t?.requestDate ?? todayIso();
-    fStartDate = t?.effectiveDate ?? "";
-    fEndDate = t?.expirationDate ?? "";
+    fStartDate = t?.effectiveDate ?? defaults.effectiveDate ?? "";
+    fEndDate = t?.expirationDate ?? defaults.expirationDate ?? "";
     fNotes = t?.notes ?? "";
     fError = "";
     formOpen = true;
+  }
+
+  function openFormForDate(date: string) {
+    openForm(undefined, {
+      employeeId: filterEmployee || undefined,
+      effectiveDate: date,
+      expirationDate: date
+    });
+  }
+
+  function showDayActions(date: string) {
+    activeCalendarDate = date;
+  }
+
+  function hideDayActions(date: string) {
+    if (activeCalendarDate === date) activeCalendarDate = undefined;
+  }
+
+  function hideDayActionsAfterFocus(date: string, e: FocusEvent) {
+    const next = e.relatedTarget;
+    if (!(next instanceof Node) || !(e.currentTarget as HTMLElement).contains(next)) hideDayActions(date);
   }
 
   async function save() {
@@ -125,7 +152,7 @@
   let calendarDays = $derived.by(() => {
     const nextMonth = addMonths(calendarMonth, 1);
     const gridStart = addDays(calendarMonth, -weekday(calendarMonth));
-    return Array.from({ length: 42 }, (_, i) => {
+    return Array.from({ length: CALENDAR_DAY_COUNT }, (_, i) => {
       const date = addDays(gridStart, i);
       return {
         date,
@@ -136,6 +163,9 @@
       };
     });
   });
+  let calendarWeeks = $derived.by(() =>
+    Array.from({ length: CALENDAR_WEEK_COUNT }, (_, i) => calendarDays.slice(i * 7, i * 7 + 7))
+  );
 
   function requestCoversDate(t: TeleworkRecord, date: string): boolean {
     if (!t.effectiveDate) return false;
@@ -212,29 +242,31 @@
     <button type="button" class="primary" onclick={() => openForm()}>Add Request</button>
   </div>
 
-  {#if rows.length === 0}
-    <EmptyState message="No situational telework requests." hint="Add requests as they arrive by email." />
-  {:else if view === "list"}
-    <table class="data">
-      <thead>
-        <tr>
-          <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Notes</th><th></th>
-        </tr>
-      </thead>
-      <tbody>
-        {#each rows as t (t.id)}
+  {#if view === "list"}
+    {#if rows.length === 0}
+      <EmptyState message="No situational telework requests." hint="Add requests as they arrive by email." />
+    {:else}
+      <table class="data">
+        <thead>
           <tr>
-            <td>{app.employeeName(t.employeeId)}</td>
-            <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
-            <td>{formatDate(t.requestDate)}</td>
-            <td>{formatDate(t.effectiveDate)}</td>
-            <td>{formatDate(requestEndDate(t))}</td>
-            <td class="notes-cell">{t.notes ?? ""}</td>
-            <td><button type="button" onclick={() => openForm(t)}>Edit</button></td>
+            <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Notes</th><th></th>
           </tr>
-        {/each}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          {#each rows as t (t.id)}
+            <tr>
+              <td>{app.employeeName(t.employeeId)}</td>
+              <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
+              <td>{formatDate(t.requestDate)}</td>
+              <td>{formatDate(t.effectiveDate)}</td>
+              <td>{formatDate(requestEndDate(t))}</td>
+              <td class="notes-cell">{t.notes ?? ""}</td>
+              <td><button type="button" onclick={() => openForm(t)}>Edit</button></td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
   {:else}
     <section class="calendar-view" aria-label="Situational telework calendar">
       <div class="calendar-header">
@@ -243,24 +275,50 @@
         <button type="button" onclick={() => (calendarMonth = `${app.today.slice(0, 7)}-01`)}>Today</button>
         <button type="button" onclick={() => setMonth(1)} aria-label="Next month">&gt;</button>
       </div>
-      <div class="calendar-grid">
-        {#each ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as day (day)}
-          <div class="calendar-weekday">{day}</div>
-        {/each}
-        {#each calendarDays as day (day.date)}
-          <div class="calendar-day" class:outside={!day.inMonth} class:today={day.isToday}>
-            <div class="day-number">{day.day}</div>
-            <div class="day-events">
-              {#each day.events.slice(0, 4) as event (event.id)}
-                <button type="button" class="calendar-event status-{event.status}" onclick={() => openForm(event)}>
-                  <span>{app.employeeName(event.employeeId)}</span>
-                  <small>{statusLabel(event.status)}</small>
-                </button>
-              {/each}
-              {#if day.events.length > 4}
-                <span class="more-events">+{day.events.length - 4} more</span>
-              {/if}
-            </div>
+      <div class="calendar-grid" aria-label="Situational telework month calendar">
+        <div class="weekday-row">
+          {#each ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as day (day)}
+            <div class="calendar-weekday">{day}</div>
+          {/each}
+        </div>
+        {#each calendarWeeks as week (week[0]!.date)}
+          <div class="week-row">
+            {#each week as day, i (day.date)}
+              <div
+                class="calendar-day"
+                class:outside={!day.inMonth}
+                class:today={day.isToday}
+                class:weekend={i === 0 || i === 6}
+                role="group"
+                aria-label={formatDate(day.date)}
+                onmouseenter={() => showDayActions(day.date)}
+                onmouseleave={() => hideDayActions(day.date)}
+                onfocusin={() => showDayActions(day.date)}
+                onfocusout={(e) => hideDayActionsAfterFocus(day.date, e)}
+              >
+                <div class="day-head">
+                  <span class="day-number" class:today-number={day.isToday}>{day.day}</span>
+                  <button
+                    type="button"
+                    class="day-add"
+                    class:visible={activeCalendarDate === day.date}
+                    aria-label={`Add situational telework for ${formatDate(day.date)}`}
+                    title="Add situational telework on this day"
+                    onclick={() => openFormForDate(day.date)}>+</button>
+                </div>
+                <div class="day-events">
+                  {#each day.events.slice(0, 4) as event (event.id)}
+                    <button type="button" class="calendar-event status-{event.status}" onclick={() => openForm(event)}>
+                      <span>{app.employeeName(event.employeeId)}</span>
+                      <small>{statusLabel(event.status)}</small>
+                    </button>
+                  {/each}
+                  {#if day.events.length > 4}
+                    <span class="more-events">+{day.events.length - 4} more</span>
+                  {/if}
+                </div>
+              </div>
+            {/each}
           </div>
         {/each}
       </div>
@@ -359,7 +417,8 @@
     margin-top: 1rem;
   }
   .calendar-view {
-    min-width: 54rem;
+    min-width: 0;
+    width: 100%;
   }
   .calendar-header {
     display: flex;
@@ -373,49 +432,100 @@
     font-size: 1rem;
   }
   .calendar-grid {
-    display: grid;
-    grid-template-columns: repeat(7, minmax(7rem, 1fr));
     border: 1px solid var(--border);
-    border-radius: 8px;
+    border-radius: var(--radius-lg);
     overflow: hidden;
     background: var(--surface);
+    box-shadow: var(--shadow);
+    min-width: 0;
+  }
+  .weekday-row,
+  .week-row {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
   .calendar-weekday {
-    padding: .5rem .6rem;
+    padding: .45rem .55rem;
     background: var(--surface-2);
+    border-bottom: 1px solid var(--border);
     border-right: 1px solid var(--border);
     color: var(--text-muted);
     font-size: .78rem;
     font-weight: 700;
   }
-  .calendar-weekday:nth-child(7) {
+  .weekday-row .calendar-weekday:last-child {
     border-right: 0;
   }
   .calendar-day {
     min-height: 7.5rem;
-    padding: .45rem;
-    border-top: 1px solid var(--border);
+    min-width: 0;
+    padding: .35rem .4rem .45rem;
+    border-bottom: 1px solid var(--border);
     border-right: 1px solid var(--border);
     background: var(--surface);
+    display: flex;
+    flex-direction: column;
+    gap: .3rem;
+    overflow: hidden;
   }
-  .calendar-day:nth-child(7n) {
+  .week-row .calendar-day:last-child {
     border-right: 0;
+  }
+  .calendar-grid > .week-row:last-child .calendar-day {
+    border-bottom: 0;
+  }
+  .calendar-day.weekend {
+    background: color-mix(in srgb, var(--surface-2) 32%, var(--surface));
   }
   .calendar-day.outside {
     background: color-mix(in srgb, var(--surface-2) 45%, var(--surface));
     color: var(--text-muted);
   }
+  .calendar-day.outside .day-number {
+    opacity: .55;
+  }
   .calendar-day.today {
     box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
+  }
+  .day-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .3rem;
+    min-height: 1.45rem;
   }
   .day-number {
     font-weight: 700;
     font-size: .8rem;
-    margin-bottom: .3rem;
+  }
+  .today-number {
+    color: var(--accent);
+  }
+  .day-add {
+    min-width: 1.45rem;
+    min-height: 1.45rem;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-muted);
+    font-weight: 700;
+    opacity: 0;
+    transition: opacity .12s ease, background-color .12s ease, color .12s ease;
+  }
+  .day-add.visible,
+  .day-add:focus {
+    opacity: 1;
+  }
+  .day-add:hover {
+    background: var(--accent-soft);
+    color: var(--accent);
   }
   .day-events {
-    display: grid;
-    gap: .25rem;
+    display: flex;
+    flex-direction: column;
+    gap: .22rem;
+    min-height: 0;
   }
   .calendar-event {
     display: grid;
@@ -429,6 +539,9 @@
     color: var(--text);
     text-align: left;
     overflow: hidden;
+  }
+  .calendar-event:hover {
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
   }
   .calendar-event span,
   .calendar-event small {
@@ -470,6 +583,13 @@
     }
     .telework-toolbar {
       align-items: stretch;
+    }
+    .calendar-weekday {
+      padding-inline: .3rem;
+    }
+    .calendar-day {
+      min-height: 5.5rem;
+      padding-inline: .3rem;
     }
   }
 </style>
