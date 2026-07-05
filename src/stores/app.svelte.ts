@@ -34,7 +34,7 @@ import { InMemoryDataStore } from "../data/InMemoryDataStore";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import { newId } from "../utils/ids";
-import { nowTimestamp, todayIso } from "../utils/dates";
+import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 
@@ -726,6 +726,18 @@ class AppStore {
     await this.putRecord("tasks", updated, {
       actionType: "status_changed",
       summary: `Moved "${task.title}" from ${prev} to ${status}`
+    });
+  }
+
+  /** Set or clear a task's due date (calendar drag-to-reschedule and its keyboard alternative). */
+  async rescheduleTask(task: Task, dueDate: string | undefined): Promise<void> {
+    if (task.dueDate === dueDate) return;
+    const updated: Task = { ...task, dueDate, updatedAt: nowTimestamp() };
+    await this.putRecord("tasks", updated, {
+      actionType: "updated",
+      summary: dueDate
+        ? `Rescheduled "${task.title}" to ${formatDate(dueDate)}`
+        : `Removed due date from "${task.title}"`
     });
   }
 

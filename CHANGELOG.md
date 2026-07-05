@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### Added
+- Calendar page (sidebar, between Board and Employees): a combined month view showing task due
+  dates alongside leave days and situational telework days (matching the Telework page's
+  calendar). Each layer — tasks, leave, telework — can be toggled independently (tasks on by
+  default, leave and telework off), and the whole view can be filtered by employee.
+- Drag a task chip to another day to reschedule it, or drop it on the "No due date" tray to
+  clear the due date. Keyboard alternative: focus a chip and use `[` / `]` to move the due date
+  by a day, `{` / `}` by a week (Enter opens the task detail, where the date can also be edited
+  directly). Reschedules are recorded in the activity log.
+- Each day has a hover/focus "+" button to create a task due that day; leave and telework chips
+  link to their respective pages.
+
 ### Fixed
 - Restore from backup ("Replace Database") failed with "Import failed: Failed to execute 'put'
   on 'IDBObjectStore': #<Object> could not be cloned". The parsed backup was held in Svelte

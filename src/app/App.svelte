@@ -9,6 +9,7 @@
   import Icon from "../components/common/Icon.svelte";
   import TodayPage from "../pages/TodayPage.svelte";
   import BoardPage from "../pages/BoardPage.svelte";
+  import CalendarPage from "../pages/CalendarPage.svelte";
   import EmployeesPage from "../pages/EmployeesPage.svelte";
   import EmployeeDetailPage from "../pages/EmployeeDetailPage.svelte";
   import ProjectsPage from "../pages/ProjectsPage.svelte";
@@ -44,6 +45,7 @@
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
     { page: "today", label: "Today", icon: "today" },
     { page: "board", label: "Board", icon: "board" },
+    { page: "calendar", label: "Calendar", icon: "calendar" },
     { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },
@@ -158,6 +160,8 @@
           <TodayPage />
         {:else if router.current.page === "board"}
           <BoardPage />
+        {:else if router.current.page === "calendar"}
+          <CalendarPage />
         {:else if router.current.page === "employees" && router.current.param}
           <EmployeeDetailPage employeeId={router.current.param} />
         {:else if router.current.page === "employees"}
