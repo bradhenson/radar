@@ -45,9 +45,9 @@
   });
 
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
-    { page: "today", label: "Today", icon: "today" },
     { page: "board", label: "Board", icon: "board" },
     { page: "calendar", label: "Calendar", icon: "calendar" },
+    { page: "today", label: "Today", icon: "today" },
     { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },

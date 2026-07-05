@@ -6,10 +6,12 @@ export interface Route {
   param?: string;
 }
 
+const DEFAULT_PAGE = "board";
+
 function parseHash(hash: string): Route {
   const clean = hash.replace(/^#\/?/, "");
-  const [page = "today", param] = clean.split("/");
-  return { page: page || "today", param };
+  const [page = DEFAULT_PAGE, param] = clean.split("/");
+  return { page: page || DEFAULT_PAGE, param };
 }
 
 class Router {
