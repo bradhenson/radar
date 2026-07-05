@@ -2,6 +2,7 @@
   // Leave awareness (plan 12.8, 19): availability tracking, not official
   // leave accounting. No medical or reason details are collected.
   import { app } from "../stores/app.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { LeaveRecord, LeaveStatus } from "../domain/models";
@@ -25,6 +26,7 @@
   let fVerified = $state("");
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
+  let pendingDelete = $state<LeaveRecord | undefined>(undefined);
 
   function openForm(l?: LeaveRecord, defaults: Partial<Pick<LeaveRecord, "employeeId" | "startDate" | "endDate">> = {}) {
     editing = l;
@@ -174,6 +176,24 @@
   async function markVerified(l: LeaveRecord) {
     await app.putRecord("leaveRecords", { ...l, lastVerifiedDate: todayIso(), updatedAt: nowTimestamp() });
   }
+
+  function requestDelete(l: LeaveRecord) {
+    pendingDelete = l;
+  }
+
+  async function deleteLeave(l: LeaveRecord) {
+    await app.deleteRecord(
+      "leaveRecords",
+      l.id,
+      `Deleted leave for ${app.employeeName(l.employeeId)} (${l.startDate} to ${l.endDate})`
+    );
+    if (editing?.id === l.id) {
+      formOpen = false;
+      editing = undefined;
+    }
+    pendingDelete = undefined;
+    app.toast("Leave record deleted", "success");
+  }
 </script>
 
 <div class="page leave-page">
@@ -214,7 +234,12 @@
                 {#if l.lastVerifiedDate}{formatDate(l.lastVerifiedDate)}
                 {:else}<button type="button" class="link" onclick={() => void markVerified(l)}>Mark verified</button>{/if}
               </td>
-              <td><button type="button" onclick={() => openForm(l)}>Edit</button></td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" onclick={() => openForm(l)}>Edit</button>
+                  <button type="button" class="danger" onclick={() => requestDelete(l)}>Delete</button>
+                </div>
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -321,12 +346,27 @@
       <input id="lf-note" type="text" bind:value={fNote} maxlength="500" style="width:100%" />
       <label for="lf-verified">Verified against ERP on</label>
       <input id="lf-verified" type="date" bind:value={fVerified} style="width:100%" />
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div class="dialog-actions">
+        {#if editing}
+          <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>
+        {/if}
+        <span class="spacer"></span>
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
   </Dialog>
+{/if}
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete leave record"
+    message={`Permanently delete ${app.employeeName(pendingDelete.employeeId)} leave from ${formatDate(pendingDelete.startDate)} to ${formatDate(pendingDelete.endDate)}?`}
+    confirmLabel="Delete leave"
+    danger
+    onconfirm={() => void deleteLeave(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
 {/if}
 
 <style>
@@ -360,6 +400,20 @@
   .view-toggle button.active {
     background: var(--accent-soft);
     color: var(--accent);
+  }
+  .row-actions,
+  .dialog-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .row-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .dialog-actions {
+    justify-content: flex-end;
+    margin-top: 1rem;
   }
   .calendar-view {
     min-width: 0;

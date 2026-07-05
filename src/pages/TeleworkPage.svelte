@@ -1,6 +1,7 @@
 <script lang="ts">
   // Situational telework request tracking (plan 12.9, 20).
   import { app } from "../stores/app.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { TeleworkRecord, TeleworkStatus } from "../domain/models";
@@ -35,6 +36,7 @@
   let fNotes = $state("");
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
+  let pendingDelete = $state<TeleworkRecord | undefined>(undefined);
 
   function statusLabel(status: TeleworkStatus): string {
     return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
@@ -213,6 +215,24 @@
     );
     downloadText(backupFilename("RADAR_SituationalTelework", "csv"), csv, "text/csv");
   }
+
+  function requestDelete(t: TeleworkRecord) {
+    pendingDelete = t;
+  }
+
+  async function deleteTelework(t: TeleworkRecord) {
+    await app.deleteRecord(
+      "teleworkRecords",
+      t.id,
+      `Deleted situational telework request for ${app.employeeName(t.employeeId)} (${t.effectiveDate ?? "no start"} to ${requestEndDate(t) ?? "no end"})`
+    );
+    if (editing?.id === t.id) {
+      formOpen = false;
+      editing = undefined;
+    }
+    pendingDelete = undefined;
+    app.toast("Telework request deleted", "success");
+  }
 </script>
 
 <div class="page telework-page">
@@ -261,7 +281,12 @@
               <td>{formatDate(t.effectiveDate)}</td>
               <td>{formatDate(requestEndDate(t))}</td>
               <td class="notes-cell">{t.notes ?? ""}</td>
-              <td><button type="button" onclick={() => openForm(t)}>Edit</button></td>
+              <td>
+                <div class="row-actions">
+                  <button type="button" onclick={() => openForm(t)}>Edit</button>
+                  <button type="button" class="danger" onclick={() => requestDelete(t)}>Delete</button>
+                </div>
+              </td>
             </tr>
           {/each}
         </tbody>
@@ -363,11 +388,26 @@
       <label for="tw-notes">Notes</label>
       <textarea id="tw-notes" bind:value={fNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
       <div class="dialog-actions">
+        {#if editing}
+          <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>
+        {/if}
+        <span class="spacer"></span>
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
   </Dialog>
+{/if}
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete telework request"
+    message={`Permanently delete ${app.employeeName(pendingDelete.employeeId)} telework from ${formatDate(pendingDelete.effectiveDate)} to ${formatDate(requestEndDate(pendingDelete))}?`}
+    confirmLabel="Delete request"
+    danger
+    onconfirm={() => void deleteTelework(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
 {/if}
 
 <style>
@@ -412,9 +452,16 @@
   }
   .dialog-actions {
     display: flex;
+    align-items: center;
     gap: .5rem;
     justify-content: flex-end;
     margin-top: 1rem;
+  }
+  .row-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    flex-wrap: wrap;
   }
   .calendar-view {
     min-width: 0;
