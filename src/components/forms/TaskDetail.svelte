@@ -420,7 +420,7 @@
   {#if !isNewTask}
     <hr style="border:none; border-top:1px solid var(--border); margin:1rem 0" />
 
-    <div class="grid2">
+    <div class="sections">
       <section>
         <h3>Checklist {#if checklist.length}<span class="muted small">({checklist.filter((c) => c.isComplete).length} of {checklist.length} complete)</span>{/if}</h3>
         <label class="show-on-card">
@@ -493,14 +493,13 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 0 .8rem;
   }
-  .grid2 {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
+  .sections {
+    display: flex;
+    flex-direction: column;
     gap: 1rem;
   }
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr 1fr; }
-    .grid2 { grid-template-columns: 1fr; }
   }
   .show-on-card {
     display: flex;

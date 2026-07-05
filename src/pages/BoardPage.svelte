@@ -254,7 +254,7 @@
   <div class="board-header">
     <div>
       <span class="eyebrow">Tasks</span>
-      <h1>Supervisor Task Board</h1>
+      <h1>Kanban Board</h1>
     </div>
     <div class="board-stats" aria-label="Board summary">
       <span><strong>{boardStats.total}</strong> visible</span>

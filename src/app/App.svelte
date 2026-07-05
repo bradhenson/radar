@@ -124,10 +124,6 @@
         <span class="brand-mark" aria-hidden="true">R</span>
         <span>{app.settings.applicationName}</span>
       </span>
-      <button type="button" class="primary new-task-btn" onclick={() => ui.openNewTask()} title="Shortcut: N">
-        <Icon name="plus" size={15} />
-        New Task
-      </button>
       <span class="spacer"></span>
       <span class="chip save-status" data-status={app.saveStatus} title={backupAgeText}>
         <span class="dot" aria-hidden="true"></span>
@@ -284,13 +280,6 @@
     letter-spacing: .02em;
     flex: 0 0 auto;
     box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
-  }
-  .new-task-btn {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    border-radius: 999px;
-    padding-inline: .95rem;
   }
   .spacer { flex: 1; }
 

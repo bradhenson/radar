@@ -14,6 +14,10 @@
 - Each day has a hover/focus "+" button to create a task due that day; leave and telework chips
   link to their respective pages.
 
+### Changed
+- Task dialog: the Notes section now sits below the Checklist section (previously side by side),
+  so both get the dialog's full width.
+
 ### Fixed
 - Restore from backup ("Replace Database") failed with "Import failed: Failed to execute 'put'
   on 'IDBObjectStore': #<Object> could not be cloned". The parsed backup was held in Svelte
