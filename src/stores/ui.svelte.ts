@@ -12,6 +12,13 @@ class UiState {
   performancePromptTask = $state<Task | undefined>(undefined);
   /** Prefill for the performance input form; undefined = closed. */
   performanceFormPrefill = $state<Partial<PerformanceInput> | undefined>(undefined);
+  /** Existing performance input open for editing; undefined = closed. */
+  performanceFormInput = $state<PerformanceInput | undefined>(undefined);
+
+  closePerformanceForm(): void {
+    this.performanceFormPrefill = undefined;
+    this.performanceFormInput = undefined;
+  }
 
   openNewTask(defaults: Partial<Task> = {}): void {
     this.newTaskDefaults = defaults;

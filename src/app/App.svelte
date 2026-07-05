@@ -23,18 +23,21 @@
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
   import { formatTimestamp } from "../utils/dates";
+  import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
 
   $effect(() => {
     void app.initialize();
   });
 
-  // Theme handling: light / dark / system via data-theme attribute.
+  // Theme handling: light / dark / system via data-theme attribute,
+  // accent palette via data-palette.
   $effect(() => {
     const apply = () => {
       const pref = app.settings.theme;
       const dark =
         pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
+      document.documentElement.dataset.palette = app.settings.colorTheme ?? "default";
     };
     apply();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
@@ -215,22 +218,23 @@
           type="button"
           class="primary"
           onclick={() => {
-            ui.performanceFormPrefill = {
-              employeeId: t.employeeId,
-              inputDate: t.completedDate ?? app.today,
-              actionOrAccomplishment: t.title,
-              projectId: t.projectId,
-              relatedTaskId: t.id,
-              source: "Completed Task"
-            };
+            ui.performanceFormPrefill = performanceInputPrefillFromTask(t, {
+              today: app.today,
+              notes: app.taskNotes,
+              checklistItems: app.checklistItems
+            });
             ui.performancePromptTask = undefined;
           }}>Create input</button
         >
       </div>
     </Dialog>
   {/if}
-  {#if ui.performanceFormPrefill}
-    <PerformanceInputForm prefill={ui.performanceFormPrefill} onclose={() => (ui.performanceFormPrefill = undefined)} />
+  {#if ui.performanceFormPrefill || ui.performanceFormInput}
+    <PerformanceInputForm
+      input={ui.performanceFormInput}
+      prefill={ui.performanceFormPrefill ?? {}}
+      onclose={() => ui.closePerformanceForm()}
+    />
   {/if}
   <Toasts />
 {/if}

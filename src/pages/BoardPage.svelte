@@ -686,9 +686,13 @@
   }
   .task-card:hover,
   .task-card:focus {
-    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
-    box-shadow: 0 4px 12px rgba(16, 24, 40, .13);
+    background: color-mix(in srgb, var(--surface) 88%, var(--accent-soft));
+    border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+    box-shadow:
+      inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
+      0 4px 12px rgba(16, 24, 40, .13);
     transform: translateY(-1px);
+    z-index: 2;
   }
   .task-card.dragging { opacity: .4; }
   .card-labels {

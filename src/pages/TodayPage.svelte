@@ -6,6 +6,7 @@
   import { router } from "../app/router.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { AttentionItem } from "../domain/rules/attention";
+  import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
   import { addDays, daysBetween, formatDate } from "../utils/dates";
 
   let overdueCount = $derived(app.attention.filter((i) => i.reasonCode === "overdue").length);
@@ -96,7 +97,7 @@
     <span class="muted">{formatDate(app.today)}</span>
   </div>
 
-  <div class="summary-cards">
+  <div class="summary-cards today-summary">
     <div class="stat" class:alert={overdueCount > 0}><div class="num">{overdueCount}</div><div class="lbl">Overdue</div></div>
     <div class="stat" class:warn={dueTodayCount > 0}><div class="num">{dueTodayCount}</div><div class="lbl">Due today</div></div>
     <div class="stat"><div class="num">{dueSoonCount}</div><div class="lbl">Due soon</div></div>
@@ -122,15 +123,21 @@
     {#each [{ title: "Tasks", items: taskItems }, { title: "Employees", items: peopleItems }, { title: "Training, leave, telework, and system", items: otherItems }] as group (group.title)}
       {#if group.items.length}
         <h2 style="margin-top:1rem">{group.title}</h2>
-        <table class="data">
+        <table class="data attention-table">
+          <colgroup>
+            <col class="reason-col" />
+            <col />
+            <col class="severity-col" />
+            <col class="actions-col" />
+          </colgroup>
           <thead>
-            <tr><th style="width:9rem">Reason</th><th>Item</th><th style="width:6rem">Severity</th><th style="width:16rem">Actions</th></tr>
+            <tr><th>Reason</th><th>Item</th><th>Severity</th><th>Actions</th></tr>
           </thead>
           <tbody>
             {#each group.items as item (item.entityType + item.entityId + item.reasonCode)}
               <tr>
-                <td><span class="badge {item.severity === 'critical' || item.severity === 'high' ? 'overdue' : item.severity === 'medium' ? 'warning' : ''}">{item.reasonText}</span></td>
-                <td>
+                <td class="reason-cell"><span class="badge {item.severity === 'critical' || item.severity === 'high' ? 'overdue' : item.severity === 'medium' ? 'warning' : ''}">{item.reasonText}</span></td>
+                <td class="item-cell">
                   <button type="button" class="link" onclick={() => open(item)}>{item.title}</button>
                   {#if item.employeeId && item.entityType === "task"}
                     <span class="muted small">· {app.employeeName(item.employeeId)}</span>
@@ -138,10 +145,12 @@
                   <div class="muted small">{item.suggestedAction}</div>
                 </td>
                 <td>{SEVERITY_LABEL[item.severity]}</td>
-                <td class="actions">
-                  <button type="button" onclick={() => open(item)}>Open</button>
-                  <button type="button" onclick={() => void snooze(item, 1)}>Snooze 1d</button>
-                  <button type="button" onclick={() => void snooze(item, 7)}>1w</button>
+                <td>
+                  <div class="actions">
+                    <button type="button" onclick={() => open(item)}>Open</button>
+                    <button type="button" onclick={() => void snooze(item, 1)}>Snooze 1d</button>
+                    <button type="button" onclick={() => void snooze(item, 7)}>1w</button>
+                  </div>
                 </td>
               </tr>
             {/each}
@@ -185,14 +194,11 @@
                   {#if t.employeeId && !t.performanceInputCreated}
                     <button
                       type="button"
-                      onclick={() => (ui.performanceFormPrefill = {
-                        employeeId: t.employeeId,
-                        inputDate: t.completedDate ?? app.today,
-                        actionOrAccomplishment: t.title,
-                        projectId: t.projectId,
-                        relatedTaskId: t.id,
-                        source: "Completed Task"
-                      })}>→ Performance input</button
+                      onclick={() => (ui.performanceFormPrefill = performanceInputPrefillFromTask(t, {
+                        today: app.today,
+                        notes: app.taskNotes,
+                        checklistItems: app.checklistItems
+                      }))}>→ Performance input</button
                     >
                   {:else if t.performanceInputCreated}
                     <span class="badge success">Input created</span>
@@ -208,8 +214,44 @@
 </div>
 
 <style>
+  .today-summary {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(8.5rem, 1fr));
+    align-items: stretch;
+  }
+  .today-summary .stat {
+    min-width: 0;
+  }
+  .attention-table {
+    table-layout: fixed;
+  }
+  .attention-table .reason-col {
+    width: 15.5rem;
+  }
+  .attention-table .severity-col {
+    width: 6rem;
+  }
+  .attention-table .actions-col {
+    width: 16rem;
+  }
+  .reason-cell .badge {
+    max-width: 100%;
+    white-space: normal;
+    text-align: left;
+  }
+  .item-cell {
+    min-width: 0;
+  }
   .actions { display: flex; gap: .3rem; flex-wrap: wrap; }
   .actions button { font-size: .78rem; padding: .15rem .5rem; }
   .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
-  @media (max-width: 1000px) { .two-col { grid-template-columns: 1fr; } }
+  @media (max-width: 1000px) {
+    .today-summary { grid-template-columns: repeat(3, minmax(8.5rem, 1fr)); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 760px) {
+    .today-summary { grid-template-columns: repeat(2, minmax(8.5rem, 1fr)); }
+    .attention-table .reason-col { width: 12rem; }
+    .attention-table .actions-col { width: 12rem; }
+  }
 </style>

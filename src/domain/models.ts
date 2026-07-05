@@ -345,7 +345,20 @@ export interface AppSettings {
   trainingWarningDays: number;
   leaveLookaheadDays: number;
   theme: "light" | "dark" | "system";
+  colorTheme: ColorTheme;
 }
+
+export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
+
+/** Selectable accent palettes. Swatches are the light/dark accent colors (for pickers). */
+export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; swatchDark: string }[] = [
+  { value: "default", label: "Default", swatch: "#3661e4", swatchDark: "#4daafc" },
+  { value: "ocean", label: "Ocean", swatch: "#0d7489", swatchDark: "#4cc3dd" },
+  { value: "forest", label: "Forest", swatch: "#1f7a44", swatchDark: "#63c992" },
+  { value: "violet", label: "Violet", swatch: "#6d3ac4", swatchDark: "#b39cf2" },
+  { value: "sunset", label: "Sunset", swatch: "#b45309", swatchDark: "#e8a558" },
+  { value: "graphite", label: "Graphite", swatch: "#47525f", swatchDark: "#a6b2c0" }
+];
 
 export const DEFAULT_SETTINGS: AppSettings = {
   schemaVersion: 1,
@@ -360,7 +373,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   backupChangeThreshold: 50,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
-  theme: "system"
+  theme: "system",
+  colorTheme: "default"
 };
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [

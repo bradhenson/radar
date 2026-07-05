@@ -1,26 +1,96 @@
 <script lang="ts">
   // Structured Context / Action / Result / Impact capture (plan 17.4).
+  // Creates a new input (optionally prefilled) or edits an existing one; either
+  // way, task details can be imported into the empty fields (plan 17.5).
   import Dialog from "../common/Dialog.svelte";
   import { app } from "../../stores/app.svelte";
-  import type { PerformanceInput } from "../../domain/models";
-  import { isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
+  import type { PerformanceInput, Task } from "../../domain/models";
+  import { statusLabel } from "../../domain/models";
+  import {
+    mergeTaskImportIntoDraft,
+    performanceInputPrefillFromTask
+  } from "../../domain/rules/performanceImport";
+  import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
   import { newId } from "../../utils/ids";
 
   let {
+    input,
     prefill = {},
     onclose
-  }: { prefill?: Partial<PerformanceInput>; onclose: () => void } = $props();
+  }: { input?: PerformanceInput; prefill?: Partial<PerformanceInput>; onclose: () => void } = $props();
 
-  let employeeId = $state(prefill.employeeId ?? "");
-  let inputDate = $state(prefill.inputDate ?? todayIso());
-  let situationOrContext = $state(prefill.situationOrContext ?? "");
-  let actionOrAccomplishment = $state(prefill.actionOrAccomplishment ?? "");
-  let result = $state(prefill.result ?? "");
-  let impact = $state(prefill.impact ?? "");
-  let projectId = $state(prefill.projectId ?? "");
-  let performanceElementId = $state(prefill.performanceElementId ?? "");
-  let recognitionPotential = $state(prefill.recognitionPotential ?? false);
+  const base: Partial<PerformanceInput> = input ?? prefill;
+  let employeeId = $state(base.employeeId ?? "");
+  let inputDate = $state(base.inputDate ?? todayIso());
+  // Distinguish the untouched default date from a chosen one, so a task import
+  // can supply the completion date without discarding a user-picked date.
+  let dateTouched = $state(Boolean(base.inputDate));
+  let situationOrContext = $state(base.situationOrContext ?? "");
+  let actionOrAccomplishment = $state(base.actionOrAccomplishment ?? "");
+  let result = $state(base.result ?? "");
+  let impact = $state(base.impact ?? "");
+  let projectId = $state(base.projectId ?? "");
+  let performanceElementId = $state(base.performanceElementId ?? "");
+  let recognitionPotential = $state(base.recognitionPotential ?? false);
+  let relatedTaskId = $state(base.relatedTaskId);
+  let source = $state(base.source);
+  let importTaskId = $state("");
+  let importNote = $state("");
   let error = $state("");
+
+  // Task import candidates: when an employee is selected, their tasks plus
+  // unassigned ones; most recently completed/updated first.
+  let importCandidates = $derived.by(() => {
+    const eligible = app.tasks.filter(
+      (t) => !t.isArchived && (!employeeId || !t.employeeId || t.employeeId === employeeId)
+    );
+    const key = (t: Task) => t.completedDate ?? t.updatedAt.slice(0, 10);
+    return eligible.sort((a, b) => key(b).localeCompare(key(a)) || a.title.localeCompare(b.title));
+  });
+
+  function importOptionLabel(t: Task): string {
+    const parts = [t.completedDate ? `Completed ${formatDate(t.completedDate)}` : statusLabel(t.status)];
+    if (!employeeId && t.employeeId) parts.push(app.employeeName(t.employeeId));
+    if (t.performanceInputCreated) parts.push("input created");
+    return `${t.title} (${parts.join(" · ")})`;
+  }
+
+  function importFromTask() {
+    const task = app.tasks.find((t) => t.id === importTaskId);
+    if (!task) return;
+    const taskPrefill = performanceInputPrefillFromTask(task, {
+      today: app.today,
+      notes: app.taskNotes,
+      checklistItems: app.checklistItems
+    });
+    const { merged, skipped } = mergeTaskImportIntoDraft(
+      {
+        employeeId,
+        inputDate: dateTouched ? inputDate : "",
+        situationOrContext,
+        actionOrAccomplishment,
+        result,
+        impact,
+        projectId
+      },
+      taskPrefill
+    );
+    employeeId = merged.employeeId;
+    if (merged.inputDate) {
+      inputDate = merged.inputDate;
+      dateTouched = true;
+    }
+    situationOrContext = merged.situationOrContext;
+    actionOrAccomplishment = merged.actionOrAccomplishment;
+    result = merged.result;
+    impact = merged.impact;
+    projectId = merged.projectId;
+    if (!relatedTaskId) relatedTaskId = task.id;
+    if (!source || source === "Supervisor") source = taskPrefill.source;
+    importNote = skipped.length
+      ? `Imported from “${task.title}”. Fields you had already filled were kept: ${skipped.join(", ")}.`
+      : `Imported from “${task.title}”.`;
+  }
 
   async function save() {
     if (!employeeId) {
@@ -36,8 +106,7 @@
       return;
     }
     const now = nowTimestamp();
-    const input: PerformanceInput = {
-      id: newId(),
+    const fields = {
       employeeId,
       inputDate,
       situationOrContext: situationOrContext.trim() || undefined,
@@ -46,22 +115,28 @@
       impact: impact.trim() || undefined,
       projectId: projectId || undefined,
       performanceElementId: performanceElementId || undefined,
-      relatedTaskId: prefill.relatedTaskId,
-      source: prefill.source ?? "Supervisor",
-      inputStatus: "draft",
+      relatedTaskId,
       recognitionPotential,
-      tags: [],
-      createdAt: now,
-      updatedAt: now,
-      isArchived: false
+      updatedAt: now
     };
-    await app.putRecord("performanceInputs", input, {
-      actionType: "created",
-      summary: `Recorded performance input for ${app.employeeName(employeeId)}`
+    const record: PerformanceInput = input
+      ? { ...input, ...fields, source }
+      : {
+          id: newId(),
+          ...fields,
+          source: source ?? "Supervisor",
+          inputStatus: "draft",
+          tags: [],
+          createdAt: now,
+          isArchived: false
+        };
+    await app.putRecord("performanceInputs", record, {
+      actionType: input ? "updated" : "created",
+      summary: `${input ? "Updated" : "Recorded"} performance input for ${app.employeeName(employeeId)}`
     });
     // Mark the source task so we do not prompt again (plan 17.5).
-    if (prefill.relatedTaskId) {
-      const task = app.tasks.find((t) => t.id === prefill.relatedTaskId);
+    if (relatedTaskId) {
+      const task = app.tasks.find((t) => t.id === relatedTaskId);
       if (task && !task.performanceInputCreated) {
         await app.putRecord("tasks", { ...task, performanceInputCreated: true });
       }
@@ -71,13 +146,28 @@
   }
 </script>
 
-<Dialog title="Performance Input" wide {onclose}>
+<Dialog title={input ? "Edit Performance Input" : "Performance Input"} wide {onclose}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
       void save();
     }}
   >
+    <div class="import-box">
+      <label for="pi-import">
+        Import from task
+        <span class="field-hint">Fills the empty fields below from the selected task; text you have entered is kept.</span>
+      </label>
+      <div style="display:flex; gap:.5rem;">
+        <select id="pi-import" bind:value={importTaskId} style="flex:1; min-width:0">
+          <option value="">(select a task)</option>
+          {#each importCandidates as t (t.id)}<option value={t.id}>{importOptionLabel(t)}</option>{/each}
+        </select>
+        <button type="button" onclick={importFromTask} disabled={!importTaskId}>Import</button>
+      </div>
+      {#if importNote}<div class="small muted" role="status">{importNote}</div>{/if}
+    </div>
+
     <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:0 .8rem;">
       <div>
         <label for="pi-emp">Employee <span class="req">*</span></label>
@@ -88,7 +178,13 @@
       </div>
       <div>
         <label for="pi-date">Date <span class="req">*</span></label>
-        <input id="pi-date" type="date" bind:value={inputDate} style="width:100%" />
+        <input
+          id="pi-date"
+          type="date"
+          bind:value={inputDate}
+          onchange={() => (dateTouched = true)}
+          style="width:100%"
+        />
       </div>
       <div>
         <label for="pi-proj">Project</label>
@@ -136,4 +232,10 @@
 
 <style>
   .check-inline { display: flex; align-items: center; gap: .45rem; font-weight: 400; margin-top: .8rem; }
+  .import-box {
+    border: 1px dashed var(--border);
+    border-radius: .5rem;
+    padding: .6rem .8rem .7rem;
+    margin-bottom: 1rem;
+  }
 </style>

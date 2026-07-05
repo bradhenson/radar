@@ -148,6 +148,7 @@
             {#if p.projectId}<span>· {app.projectName(p.projectId)}</span>{/if}
             {#if p.recognitionPotential}<span class="badge success">Recognition potential</span>{/if}
             <span class="spacer" style="flex:1"></span>
+            <button type="button" onclick={() => (ui.performanceFormInput = p)}>Edit</button>
             <label style="margin:0; font-weight:400" class="small">
               Status:
               <select value={p.inputStatus} onchange={(e) => void setStatus(p.id, (e.currentTarget as HTMLSelectElement).value)}>

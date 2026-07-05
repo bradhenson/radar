@@ -4,6 +4,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import { APPLICATION_VERSION, parseAndValidateBackup, type BackupValidationResult } from "../data/backup";
+  import { COLOR_THEMES } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { formatTimestamp } from "../utils/dates";
 
@@ -234,6 +235,23 @@
       <option value="light">Light</option>
       <option value="dark">Dark</option>
     </select>
+
+    <div class="palette-label" id="set-color-theme">Color theme</div>
+    <div class="palette-row" role="group" aria-labelledby="set-color-theme">
+      {#each COLOR_THEMES as t (t.value)}
+        <button
+          type="button"
+          class="palette-btn"
+          class:selected={(app.settings.colorTheme ?? "default") === t.value}
+          aria-pressed={(app.settings.colorTheme ?? "default") === t.value}
+          onclick={() => void updateSetting("colorTheme", t.value)}
+        >
+          <span class="palette-dot" style={`--dot-light:${t.swatch}; --dot-dark:${t.swatchDark}`} aria-hidden="true"></span>
+          {t.label}
+          {#if (app.settings.colorTheme ?? "default") === t.value}<span aria-hidden="true">✓</span>{/if}
+        </button>
+      {/each}
+    </div>
   </section>
 
   <section class="card" style="margin-bottom:1rem">
@@ -496,6 +514,40 @@
 {/if}
 
 <style>
+  .palette-label {
+    font-weight: 600;
+    margin: .65rem 0 .2rem;
+    font-size: .85rem;
+  }
+  .palette-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .5rem;
+  }
+  .palette-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    font-weight: 600;
+  }
+  .palette-btn.selected {
+    border-color: var(--accent);
+    background: var(--accent-soft);
+    box-shadow: 0 0 0 1px var(--accent);
+  }
+  .palette-dot {
+    width: .9rem;
+    height: .9rem;
+    border-radius: 50%;
+    background: var(--dot-light);
+    border: 1px solid rgba(0, 0, 0, .15);
+    flex: none;
+  }
+  :global([data-theme="dark"]) .palette-dot {
+    background: var(--dot-dark);
+    border-color: rgba(255, 255, 255, .2);
+  }
+
   .settings-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(14rem, 1fr));

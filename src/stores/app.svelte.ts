@@ -246,10 +246,12 @@ class AppStore {
   }
 
   private migrateSettings(settings: AppSettings): AppSettings {
-    if (LEGACY_DEFAULT_APPLICATION_NAMES.has(settings.applicationName)) {
-      return { ...settings, applicationName: DEFAULT_SETTINGS.applicationName };
+    // Fill in keys added after the data was first saved (e.g. colorTheme).
+    const merged = { ...DEFAULT_SETTINGS, ...settings };
+    if (LEGACY_DEFAULT_APPLICATION_NAMES.has(merged.applicationName)) {
+      merged.applicationName = DEFAULT_SETTINGS.applicationName;
     }
-    return settings;
+    return merged;
   }
 
   private applySnapshotToState(snapshot: DatabaseSnapshot): void {

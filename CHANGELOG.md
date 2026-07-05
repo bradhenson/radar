@@ -13,8 +13,26 @@
   directly). Reschedules are recorded in the activity log.
 - Each day has a hover/focus "+" button to create a task due that day; leave and telework chips
   link to their respective pages.
+- Performance inputs can now be edited after creation: each input on the Performance page has an
+  Edit button that reopens the full Context/Action/Result/Impact form (previously only the status
+  could be changed).
+- "Import from task" inside the performance input form (new and edit): pick any of the selected
+  employee's tasks (or any task, if no employee is chosen) and pull its details into the form.
+  The task title and completed checklist items become the Action, the description becomes the
+  Context, completion notes become the Result, and the employee, project, and completion date
+  carry over. Importing only fills fields that are still empty — text already typed is never
+  overwritten, and a notice lists any fields that were kept.
+- The existing task-to-input shortcuts (the prompt after completing a task, and the Today page's
+  "→ Performance input" button) now use the same richer mapping, so they also prefill Context and
+  Result from the task's description and completion notes.
+
+- Color themes: Settings → Appearance now offers six accent palettes — Default (blue), Ocean,
+  Forest, Violet, Sunset, and Graphite — each with matching light and dark variants. The choice
+  is saved with settings and included in backups; older backups load with the Default theme.
 
 ### Changed
+- Dark mode now uses flat neutral greys (in the style of VS Code's dark theme) instead of the
+  previous blue-tinted dark palette.
 - Task dialog: the Notes section now sits below the Checklist section (previously side by side),
   so both get the dialog's full width.
 
