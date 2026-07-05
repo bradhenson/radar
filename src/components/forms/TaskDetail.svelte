@@ -37,6 +37,7 @@
   let newChecklistItem = $state("");
   let error = $state("");
   let saving = $state(false);
+  let deleting = $state(false);
 
   let notes = $derived(
     isNewTask ? [] : app.taskNotes.filter((n) => n.taskId === initialTask.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
@@ -275,6 +276,24 @@
     close();
   }
 
+  async function deleteTask() {
+    if (isNewTask || deleting) return;
+    const unsavedNote = hasUnsavedChanges ? "\n\nUnsaved changes in this dialog will be discarded." : "";
+    const confirmed = window.confirm(
+      `Permanently delete "${initialTask.title}"?\n\nThis removes the task, its notes, and its checklist items.${unsavedNote}`
+    );
+    if (!confirmed) return;
+    deleting = true;
+    try {
+      await app.deleteTask(initialTask);
+      close();
+    } catch (e) {
+      error = `Delete failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      deleting = false;
+    }
+  }
+
   async function addNote() {
     const body = newNote.trim();
     if (!body) return;
@@ -411,6 +430,11 @@
       {/if}
       {#if !isNewTask && !initialTask.isArchived}
         <button type="button" onclick={() => void archive()}>Archive</button>
+      {/if}
+      {#if !isNewTask}
+        <button type="button" class="danger" disabled={saving || deleting} onclick={() => void deleteTask()}>
+          {deleting ? "Deleting..." : "Delete"}
+        </button>
       {/if}
       <span class="spacer" style="flex:1"></span>
       <button type="button" onclick={discardAndClose} title="Close without saving changes">Cancel</button>

@@ -859,6 +859,60 @@ class AppStore {
     return updated;
   }
 
+  async deleteTask(taskOrId: Task | string): Promise<void> {
+    const task = typeof taskOrId === "string" ? this.tasks.find((t) => t.id === taskOrId) : taskOrId;
+    if (!task) return;
+    this.saveStatus = "saving";
+    try {
+      const id = task.id;
+      const relatedNotes = this.taskNotes.filter((note) => note.taskId === id);
+      const relatedChecklistItems = this.checklistItems.filter((item) => item.taskId === id);
+      const updatedAt = nowTimestamp();
+
+      for (const note of relatedNotes) await this.store.delete("taskNotes", note.id);
+      for (const item of relatedChecklistItems) await this.store.delete("checklistItems", item.id);
+
+      for (const input of this.performanceInputs.filter((record) => record.relatedTaskId === id)) {
+        await this.store.put("performanceInputs", this.plainRecord({ ...input, relatedTaskId: undefined, updatedAt }));
+      }
+      for (const leave of this.leaveRecords.filter((record) => record.relatedTaskId === id)) {
+        await this.store.put("leaveRecords", this.plainRecord({ ...leave, relatedTaskId: undefined, updatedAt }));
+      }
+      for (const telework of this.teleworkRecords.filter((record) => record.relatedTaskId === id)) {
+        await this.store.put("teleworkRecords", this.plainRecord({ ...telework, relatedTaskId: undefined, updatedAt }));
+      }
+      for (const interaction of this.employeeInteractions.filter((record) => record.relatedTaskId === id)) {
+        await this.store.put("employeeInteractions", this.plainRecord({ ...interaction, relatedTaskId: undefined, updatedAt }));
+      }
+
+      await this.store.delete("tasks", id);
+      this.taskNotes = this.taskNotes.filter((note) => note.taskId !== id);
+      this.checklistItems = this.checklistItems.filter((item) => item.taskId !== id);
+      this.performanceInputs = this.performanceInputs.map((record) =>
+        record.relatedTaskId === id ? { ...record, relatedTaskId: undefined, updatedAt } : record
+      );
+      this.leaveRecords = this.leaveRecords.map((record) =>
+        record.relatedTaskId === id ? { ...record, relatedTaskId: undefined, updatedAt } : record
+      );
+      this.teleworkRecords = this.teleworkRecords.map((record) =>
+        record.relatedTaskId === id ? { ...record, relatedTaskId: undefined, updatedAt } : record
+      );
+      this.employeeInteractions = this.employeeInteractions.map((record) =>
+        record.relatedTaskId === id ? { ...record, relatedTaskId: undefined, updatedAt } : record
+      );
+      this.tasks = this.tasks.filter((t) => t.id !== id);
+
+      await this.recordActivity("tasks", id, "deleted", `Deleted task "${task.title}"`);
+      await this.bumpChangeCount("deleted");
+      this.saveStatus = "saved";
+      this.toast(`Deleted "${task.title}"`, "success");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
+  }
+
   // --- training service ---------------------------------------------------------
   /**
    * Record a completion for one employee, creating the fact record on first

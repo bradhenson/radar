@@ -1,6 +1,6 @@
 <script lang="ts">
   // Archive (plan 12.12): archived tasks and inactive employees remain
-  // searchable and restorable. Nothing is permanently deleted here.
+  // searchable and restorable. Archived tasks can also be permanently deleted.
   import { app } from "../stores/app.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import { formatDate, nowTimestamp } from "../utils/dates";
@@ -29,6 +29,16 @@
       { actionType: "restored", summary: `Restored "${t.title}" from archive` }
     );
     app.toast("Task restored", "success");
+  }
+
+  async function deleteTask(id: string) {
+    const t = app.tasks.find((x) => x.id === id);
+    if (!t) return;
+    const confirmed = window.confirm(
+      `Permanently delete "${t.title}"?\n\nThis removes the task, its notes, and its checklist items.`
+    );
+    if (!confirmed) return;
+    await app.deleteTask(t);
   }
 
   async function restoreMeetingNote(id: string) {
@@ -62,7 +72,12 @@
             <td>{statusLabel(t.status)}</td>
             <td>{app.employeeName(t.employeeId)}</td>
             <td>{formatDate(t.completedDate)}</td>
-            <td><button type="button" onclick={() => void restoreTask(t.id)}>Restore</button></td>
+            <td>
+              <div class="row-actions">
+                <button type="button" onclick={() => void restoreTask(t.id)}>Restore</button>
+                <button type="button" class="danger" onclick={() => void deleteTask(t.id)}>Delete</button>
+              </div>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -107,3 +122,12 @@
     </table>
   {/if}
 </div>
+
+<style>
+  .row-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .4rem;
+    flex-wrap: wrap;
+  }
+</style>
