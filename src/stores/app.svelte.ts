@@ -913,6 +913,65 @@ class AppStore {
     }
   }
 
+  async deletePerformanceInput(inputOrId: PerformanceInput | string): Promise<void> {
+    const input = typeof inputOrId === "string" ? this.performanceInputs.find((p) => p.id === inputOrId) : inputOrId;
+    if (!input) return;
+    this.saveStatus = "saving";
+    try {
+      const id = input.id;
+      const updatedAt = nowTimestamp();
+      const linkedAwards = this.awardRecords.filter((award) => award.relatedPerformanceInputIds.includes(id));
+      let updatedTask: Task | undefined;
+
+      for (const award of linkedAwards) {
+        await this.store.put(
+          "awardRecords",
+          this.plainRecord({
+            ...award,
+            relatedPerformanceInputIds: award.relatedPerformanceInputIds.filter((inputId) => inputId !== id),
+            updatedAt
+          })
+        );
+      }
+
+      if (input.relatedTaskId) {
+        const task = this.tasks.find((t) => t.id === input.relatedTaskId);
+        const hasOtherInputForTask = this.performanceInputs.some(
+          (record) => record.id !== id && record.relatedTaskId === input.relatedTaskId
+        );
+        if (task && task.performanceInputCreated && !hasOtherInputForTask) {
+          updatedTask = { ...task, performanceInputCreated: false, updatedAt };
+          await this.store.put("tasks", this.plainRecord(updatedTask));
+        }
+      }
+
+      await this.store.delete("performanceInputs", id);
+      this.awardRecords = this.awardRecords.map((award) =>
+        award.relatedPerformanceInputIds.includes(id)
+          ? { ...award, relatedPerformanceInputIds: award.relatedPerformanceInputIds.filter((inputId) => inputId !== id), updatedAt }
+          : award
+      );
+      if (updatedTask) {
+        this.tasks = this.tasks.map((task) => (task.id === updatedTask.id ? updatedTask : task));
+      }
+      this.performanceInputs = this.performanceInputs.filter((p) => p.id !== id);
+
+      await this.recordActivity(
+        "performanceInputs",
+        id,
+        "deleted",
+        `Deleted performance input for ${this.employeeName(input.employeeId)} (${formatDate(input.inputDate)})`
+      );
+      await this.bumpChangeCount("deleted");
+      this.saveStatus = "saved";
+      this.toast("Performance input deleted", "success");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
+  }
+
   // --- training service ---------------------------------------------------------
   /**
    * Record a completion for one employee, creating the fact record on first

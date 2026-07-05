@@ -2,6 +2,7 @@
   // Structured Context / Action / Result / Impact capture (plan 17.4).
   // Creates a new input (optionally prefilled) or edits an existing one; either
   // way, task details can be imported into the empty fields (plan 17.5).
+  import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
   import { app } from "../../stores/app.svelte";
   import type { PerformanceInput, Task } from "../../domain/models";
@@ -37,6 +38,7 @@
   let importTaskId = $state("");
   let importNote = $state("");
   let error = $state("");
+  let confirmDelete = $state(false);
 
   // Task import candidates: when an employee is selected, their tasks plus
   // unassigned ones; most recently completed/updated first.
@@ -144,6 +146,13 @@
     app.toast("Performance input saved", "success");
     onclose();
   }
+
+  async function deleteInput() {
+    if (!input) return;
+    await app.deletePerformanceInput(input);
+    confirmDelete = false;
+    onclose();
+  }
 </script>
 
 <Dialog title={input ? "Edit Performance Input" : "Performance Input"} wide {onclose}>
@@ -223,15 +232,39 @@
       Recognition potential (candidate for award nomination)
     </label>
 
-    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+    <div class="dialog-actions">
+      {#if input}
+        <button type="button" class="danger delete-action" onclick={() => (confirmDelete = true)}>Delete</button>
+      {/if}
       <button type="button" onclick={onclose}>Cancel</button>
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
 </Dialog>
 
+{#if confirmDelete && input}
+  <ConfirmDialog
+    title="Delete performance input"
+    message={`Permanently delete the ${formatDate(input.inputDate)} performance input for ${app.employeeName(input.employeeId)}?`}
+    confirmLabel="Delete input"
+    danger
+    onconfirm={() => void deleteInput()}
+    oncancel={() => (confirmDelete = false)}
+  />
+{/if}
+
 <style>
   .check-inline { display: flex; align-items: center; gap: .45rem; font-weight: 400; margin-top: .8rem; }
+  .dialog-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
+  .delete-action {
+    margin-right: auto;
+  }
   .import-box {
     border: 1px dashed var(--border);
     border-radius: .5rem;

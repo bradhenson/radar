@@ -1,8 +1,9 @@
 <script lang="ts">
+  import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
   import { app } from "../../stores/app.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../../domain/models";
-  import { isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
+  import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
   import { newId } from "../../utils/ids";
 
   let {
@@ -26,6 +27,7 @@
   let actionItems = $state(initialSource().actionItems ?? "");
   let error = $state("");
   let saving = $state(false);
+  let confirmDelete = $state(false);
 
   let linkedEmployees = $derived(
     attendeeEmployeeIds
@@ -87,6 +89,21 @@
       onclose();
     } catch (e) {
       error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      saving = false;
+    }
+  }
+
+  async function deleteNote() {
+    if (!note || saving) return;
+    saving = true;
+    try {
+      await app.deleteRecord("meetingNotes", note.id, `Deleted meeting note "${note.title}"`);
+      app.toast("Meeting note deleted", "success");
+      confirmDelete = false;
+      onclose();
+    } catch (e) {
+      error = `Delete failed: ${e instanceof Error ? e.message : String(e)}`;
     } finally {
       saving = false;
     }
@@ -163,11 +180,25 @@
     <textarea id="mn-actions" bind:value={actionItems} rows="3" maxlength="10000" style="width:100%"></textarea>
 
     <div class="form-actions">
+      {#if isEditing}
+        <button type="button" class="danger delete-action" disabled={saving} onclick={() => (confirmDelete = true)}>Delete</button>
+      {/if}
       <button type="button" onclick={onclose}>Cancel</button>
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
     </div>
   </form>
 </Dialog>
+
+{#if confirmDelete && note}
+  <ConfirmDialog
+    title="Delete meeting note"
+    message={`Permanently delete "${note.title}" from ${formatDate(note.meetingDate)}?`}
+    confirmLabel="Delete note"
+    danger
+    onconfirm={() => void deleteNote()}
+    oncancel={() => (confirmDelete = false)}
+  />
+{/if}
 
 <style>
   .grid {
@@ -223,9 +254,13 @@
   }
   .form-actions {
     display: flex;
+    align-items: center;
     gap: .5rem;
     justify-content: flex-end;
     margin-top: 1rem;
+  }
+  .delete-action {
+    margin-right: auto;
   }
   .discussion-notes {
     width: 100%;

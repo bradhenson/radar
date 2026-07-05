@@ -2,6 +2,7 @@
   // Awards (plan 12.10, 21). Optional module for the first MVP — a simple
   // status list; a status board can follow in Phase 9.
   import { app } from "../stores/app.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { AwardRecord } from "../domain/models";
@@ -18,6 +19,7 @@
   let fDue = $state("");
   let fNotes = $state("");
   let fError = $state("");
+  let pendingDelete = $state<AwardRecord | undefined>(undefined);
 
   function openForm(a?: AwardRecord) {
     editing = a;
@@ -60,6 +62,20 @@
     formOpen = false;
   }
 
+  function requestDelete(a: AwardRecord) {
+    pendingDelete = a;
+  }
+
+  async function deleteAward(a: AwardRecord) {
+    await app.deleteRecord("awardRecords", a.id, `Deleted award "${a.title}" for ${app.employeeName(a.employeeId)}`);
+    if (editing?.id === a.id) {
+      formOpen = false;
+      editing = undefined;
+    }
+    pendingDelete = undefined;
+    app.toast("Award record deleted", "success");
+  }
+
   let rows = $derived(
     [...app.awardRecords].sort((a, b) => (a.nominationDueDate ?? "9999").localeCompare(b.nominationDueDate ?? "9999"))
   );
@@ -88,7 +104,12 @@
             <td>{a.awardType ?? ""}</td>
             <td>{a.status}</td>
             <td>{formatDate(a.nominationDueDate)}</td>
-            <td><button type="button" onclick={() => openForm(a)}>Edit</button></td>
+            <td>
+              <div class="row-actions">
+                <button type="button" onclick={() => openForm(a)}>Edit</button>
+                <button type="button" class="danger" onclick={() => requestDelete(a)}>Delete</button>
+              </div>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -130,10 +151,44 @@
       </div>
       <label for="aw-notes">Supporting notes</label>
       <textarea id="aw-notes" bind:value={fNotes} rows="3" maxlength="10000" style="width:100%"></textarea>
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div class="dialog-actions">
+        {#if editing}
+          <button type="button" class="danger delete-action" onclick={() => requestDelete(editing!)}>Delete</button>
+        {/if}
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
   </Dialog>
 {/if}
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete award record"
+    message={`Permanently delete "${pendingDelete.title}" for ${app.employeeName(pendingDelete.employeeId)}?`}
+    confirmLabel="Delete award"
+    danger
+    onconfirm={() => void deleteAward(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
+{/if}
+
+<style>
+  .row-actions,
+  .dialog-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+  }
+  .row-actions {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+  .dialog-actions {
+    justify-content: flex-end;
+    margin-top: 1rem;
+  }
+  .delete-action {
+    margin-right: auto;
+  }
+</style>

@@ -1,12 +1,15 @@
 <script lang="ts">
   // Archive (plan 12.12): archived tasks and inactive employees remain
-  // searchable and restorable. Archived tasks can also be permanently deleted.
+  // searchable and restorable. Archived tasks and meeting notes can also be permanently deleted.
   import { app } from "../stores/app.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import type { MeetingNote } from "../domain/models";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { statusLabel } from "../domain/models";
 
   let search = $state("");
+  let pendingDeleteMeetingNote = $state<MeetingNote | undefined>(undefined);
 
   let archivedTasks = $derived(
     app.tasks
@@ -50,6 +53,12 @@
       { actionType: "restored", summary: `Restored meeting note "${note.title}" from archive` }
     );
     app.toast("Meeting note restored", "success");
+  }
+
+  async function deleteMeetingNote(note: MeetingNote) {
+    await app.deleteRecord("meetingNotes", note.id, `Deleted meeting note "${note.title}"`);
+    pendingDeleteMeetingNote = undefined;
+    app.toast("Meeting note deleted", "success");
   }
 </script>
 
@@ -97,7 +106,12 @@
             <td>{formatDate(note.meetingDate)}</td>
             <td>{note.meetingType}</td>
             <td>{app.projectName(note.projectId)}</td>
-            <td><button type="button" onclick={() => void restoreMeetingNote(note.id)}>Restore</button></td>
+            <td>
+              <div class="row-actions">
+                <button type="button" onclick={() => void restoreMeetingNote(note.id)}>Restore</button>
+                <button type="button" class="danger" onclick={() => (pendingDeleteMeetingNote = note)}>Delete</button>
+              </div>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -122,6 +136,17 @@
     </table>
   {/if}
 </div>
+
+{#if pendingDeleteMeetingNote}
+  <ConfirmDialog
+    title="Delete meeting note"
+    message={`Permanently delete "${pendingDeleteMeetingNote.title}" from ${formatDate(pendingDeleteMeetingNote.meetingDate)}?`}
+    confirmLabel="Delete note"
+    danger
+    onconfirm={() => void deleteMeetingNote(pendingDeleteMeetingNote!)}
+    oncancel={() => (pendingDeleteMeetingNote = undefined)}
+  />
+{/if}
 
 <style>
   .row-actions {

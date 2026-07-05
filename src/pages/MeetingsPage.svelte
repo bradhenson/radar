@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../domain/models";
@@ -14,6 +15,7 @@
   let filterEmployee = $state("");
   let createOpen = $state(false);
   let editing = $state<MeetingNote | undefined>(undefined);
+  let pendingDelete = $state<MeetingNote | undefined>(undefined);
 
   function includesText(value: string | undefined, needle: string): boolean {
     return Boolean(value?.toLowerCase().includes(needle));
@@ -79,6 +81,17 @@
     app.toast("Meeting note archived", "success");
   }
 
+  function requestDelete(note: MeetingNote) {
+    pendingDelete = note;
+  }
+
+  async function deleteMeetingNote(note: MeetingNote) {
+    await app.deleteRecord("meetingNotes", note.id, `Deleted meeting note "${note.title}"`);
+    if (editing?.id === note.id) editing = undefined;
+    pendingDelete = undefined;
+    app.toast("Meeting note deleted", "success");
+  }
+
   function createFollowUpTask(note: MeetingNote) {
     const category = app.activeTaskCategories.find((c) => c.id === "meeting")?.id ?? app.defaultTaskCategoryId();
     ui.openNewTask({
@@ -141,6 +154,7 @@
             <span class="spacer" style="flex:1"></span>
             <button type="button" onclick={() => (editing = note)}>Edit</button>
             <button type="button" onclick={() => void archive(note)}>Archive</button>
+            <button type="button" class="danger" onclick={() => requestDelete(note)}>Delete</button>
           </div>
 
           <h2 class="meeting-title">{note.title}</h2>
@@ -184,6 +198,17 @@
 
 {#if editing}
   <MeetingNoteForm note={editing} onclose={() => (editing = undefined)} />
+{/if}
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete meeting note"
+    message={`Permanently delete "${pendingDelete.title}" from ${formatDate(pendingDelete.meetingDate)}?`}
+    confirmLabel="Delete note"
+    danger
+    onconfirm={() => void deleteMeetingNote(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
 {/if}
 
 <style>
