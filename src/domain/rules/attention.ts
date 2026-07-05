@@ -396,7 +396,7 @@ export function teleworkAttention(
       employeeId: emp.id
     };
 
-    if (tw.status === "pending_supervisor") {
+    if (tw.status === "pending" || tw.status === "pending_supervisor") {
       items.push({
         ...base,
         reasonCode: "telework_pending_action",

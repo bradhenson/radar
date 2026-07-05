@@ -72,7 +72,7 @@
     <input type="search" placeholder="Search employees" bind:value={search} aria-label="Search employees" />
     <select bind:value={filterCompetency} aria-label="Filter by competency">
       <option value="">All competencies</option>
-      {#each app.competencies as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
+      {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
     <label style="display:flex; align-items:center; gap:.35rem; font-weight:400; margin:0">
       <input type="checkbox" bind:checked={showInactive} /> Show inactive

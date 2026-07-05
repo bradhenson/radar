@@ -23,7 +23,7 @@ Last updated:
 July 5, 2026
 
 Intended user:
-A single supervisor managing approximately 40 employees across competencies 55140 and 55230 at Naval Information Warfare Center Atlantic.
+A single supervisor managing approximately 40 employees across configurable organizational competencies.
 
 IMPORTANT BOUNDARY:
 This document is a software design and development plan, not an authorization to store government information in an unapproved application. Before real employee data is entered, the user must determine what information may be stored locally on an NMCI computer and where backup files may be saved. Initial development and testing should use invented or sanitized data.
@@ -45,7 +45,7 @@ Current implemented application state:
 - Build pipeline includes single-file inlining and no-network verification.
 - IndexedDB is the primary local store, with an in-memory fallback and a visible warning when persistent storage is unavailable.
 - Backup export/import, replace confirmation, database health checks, reset confirmation, and backup reminders are implemented.
-- Main navigation includes Today, Board, Calendar, Employees, Performance, Training, Leave, Telework, Awards, Meetings, Projects, Reports, Archive, and Settings.
+- Main navigation includes Today, Board, Calendar, Employees, Performance, Training, Leave, Telework, Awards, Meetings, Projects, Archive, and Settings.
 - Implemented major workflows include:
   - Today attention dashboard with fixed-alignment summary cards and grouped attention tables.
   - Kanban Board with editable/reorderable columns, task drag-and-drop, keyboard card movement, filters, inline card checklist preview, and improved hover/focus highlighting.
@@ -56,7 +56,7 @@ Current implemented application state:
   - Meeting notes with linked employees/projects, action items, CSV export, archive/restore, and follow-up task creation.
   - Training requirements, bulk assignment, matrix view, completions, expiration calculation, and Today warnings.
   - Leave and telework tracking with calendars/lists, CSV export, verification/source fields, and pending-action attention.
-  - Awards list, reports, archive, settings, editable board columns, editable task categories, themes, color palettes, sample data, and diagnostic environment test.
+  - Awards list, archive, settings, editable competencies, editable board columns, editable task categories, themes, color palettes, sample data, and diagnostic environment test.
 
 Current remaining planned work:
 
@@ -65,7 +65,7 @@ Current remaining planned work:
 - Global search.
 - Bulk actions.
 - Merge-on-import conflict handling.
-- Print-friendly report views.
+- Useful report/print views.
 - More comprehensive end-to-end test coverage against the built file surface.
 
 Change history:
@@ -301,7 +301,7 @@ The initial product will include:
 - Employee directory.
 - Employee profile view.
 - Project directory.
-- Competency filters for 55140 and 55230.
+- Competency filters populated from the configured competency list.
 - Categories for project work, personnel actions, training, leave, telework, performance, awards, and general follow-up.
 - Due dates.
 - Reminder dates.
@@ -1838,12 +1838,11 @@ Values:
 
 15.3 Competencies
 
-Initial competencies:
+Competencies are user-configurable records managed from Settings.
 
-- 55140.
-- 55230.
-
-Competency is stored as a reference rather than free text.
+Competency is stored as a reference rather than free text. Sample data may include example
+competencies such as 55140 and 55230, but a blank first-run database should not hard-code those
+values.
 
 15.4 Employee deletion
 
@@ -2591,12 +2590,11 @@ Saved view fields:
 - createdAt.
 - updatedAt.
 
-Default saved views:
+Example saved views:
 
 - My Today.
 - All Open Work.
-- 55140.
-- 55230.
+- Configured competency view.
 - Waiting.
 - Training Actions.
 - Personnel Actions.
@@ -3613,7 +3611,6 @@ SupervisorAssistant/
             LeavePage.svelte
             TeleworkPage.svelte
             AwardsPage.svelte
-            ReportsPage.svelte
             ArchivePage.svelte
             SettingsPage.svelte
         data/
@@ -3920,8 +3917,8 @@ Acceptance:
 PHASE 8: POLISH AND RELEASE
 
 Status:
-Partially implemented. Keyboard shortcuts, archive, reports, visual polish, build package,
-README-RUN.txt, and no-network verification exist. Bulk actions, print views, and expanded
+Partially implemented. Keyboard shortcuts, archive, visual polish, build package, README-RUN.txt,
+and no-network verification exist. Bulk actions, useful reports/print views, and expanded
 end-to-end release testing remain planned.
 
 Goal:
@@ -3934,7 +3931,7 @@ Deliverables:
 - Performance improvements.
 - Bulk actions.
 - Archive.
-- Reports.
+- Useful reports.
 - Print views.
 - Error boundary.
 - Help documentation.

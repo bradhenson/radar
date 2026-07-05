@@ -524,7 +524,11 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       requestDate: addDays(today, -((i % 10) + 1)),
       effectiveDate: addDays(today, situational ? i + 1 : -90 + i),
       expirationDate: addDays(today, situational ? i + 1 : 30 + i * 4),
-      status: situational ? "pending_supervisor" : i % 7 === 0 ? "pending_approval" : "active",
+      status: situational
+        ? (["pending", "approved", "denied", "cancelled"] as const)[(i / 4) % 4]!
+        : i % 7 === 0
+          ? "pending_approval"
+          : "active",
       scheduleSummary: situational ? "One-day remote work request for focused analysis." : "Hybrid schedule captured for planning.",
       sourceSystem: "Email",
       sourceReference: `Synthetic telework reference ${i + 1}`,

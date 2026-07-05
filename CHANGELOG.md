@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Changed
+- Competencies are now configurable in Settings instead of being seeded as fixed first-run values.
+  Active competencies appear in employee forms and training bulk-selection shortcuts; inactive
+  competencies remain attached to existing records and can be reactivated.
+- Meeting note linked employees now use an add picker with removable selected employees instead
+  of rendering every active employee as a checkbox.
+- Reports has been removed from the active navigation for now; the current page was not adding
+  enough value compared with the focused Today, Employees, Performance, Training, and export views.
 - Sample data now represents a larger supervisory workload: 40 fictional employees, 10 training
   requirements, mostly supervisor-owned task cards, and broader performance input, leave,
   telework, meeting, award, and check-in examples.
@@ -17,7 +24,15 @@
   one-click "Complete", multi-select + shared completion date for bulk entry, and Undo. The
   matrix is now an optional compact overview (symbol + color per cell, click to edit details);
   per-employee due-date overrides, waivers, and verification dates remain in the details dialog.
-- Employee profiles, Reports, and the Today page derive training status from the same shared
+- Training matrix cells now show plain colored status marks instead of pill badges, and the
+  employee-name column shrinks to fit the longest name so the requirement columns start closer
+  to it. Cells remain clickable (with a hover highlight) to open the record editor.
+- Situational telework tracking is simplified to the fields that matter: Employee, Status,
+  Request received, Telework start, Telework end, and Notes. Status is now just Pending, Approved,
+  Denied, or Cancelled (the earlier draft/pending-employee/pending-supervisor/pending-approval/
+  active/expired workflow states are gone from this view). The schedule/coverage, email-record,
+  and reviewed-on fields were removed from the form, list, and CSV export.
+- Employee profiles and the Today page derive training status from the same shared
   rule, so an employee with no record still shows as due once a requirement applies to them.
 - When many employees are due for the same requirement, the attention list shows one aggregated
   line (for example "Annual Cybersecurity Awareness — 12 employees") instead of one row per
@@ -120,8 +135,7 @@ Initial implementation from the project plan (phases 0–6, plus a basic awards 
   grouped review, plain-text export.
 - Training requirements, bulk assignment, matrix view, completion with expiration calculation.
 - Leave and telework tracking with verification dates and advisory overlap warnings.
-- Reports (overdue by employee, open by category, training windows, verification aging) and
-  task CSV export; employee CSV export.
+- Employee CSV export.
 - Backup: full JSON export package with record counts; import with validation, preview,
   export-current-first option, and confirmed replace. Typed-phrase "reset all data".
   Database health check (orphan references, record counts).

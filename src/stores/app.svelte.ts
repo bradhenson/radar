@@ -114,6 +114,10 @@ class AppStore {
   );
 
   activeEmployees = $derived(this.employees.filter((e) => e.activeStatus === "active" && !e.isArchived));
+  competencyList = $derived(
+    [...this.competencies].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.id.localeCompare(b.id))
+  );
+  activeCompetencies = $derived(this.competencyList.filter((c) => c.active));
 
   // One derived roster row per (active requirement × applicable employee);
   // every training view reads status from here so they cannot disagree.
@@ -159,6 +163,33 @@ class AppStore {
   competencyCode(id: string | undefined): string {
     if (!id) return "";
     return this.competencies.find((c) => c.id === id)?.code ?? "";
+  }
+
+  competencyOptions(currentCompetencyId?: string): Competency[] {
+    const options = this.competencyList.filter((c) => c.active || c.id === currentCompetencyId);
+    if (currentCompetencyId && !options.some((c) => c.id === currentCompetencyId)) {
+      options.push({
+        id: currentCompetencyId,
+        code: "(missing)",
+        name: "Missing competency",
+        active: false,
+        createdAt: "",
+        updatedAt: ""
+      });
+    }
+    return options;
+  }
+
+  competencyEmployeeCount(id: string): number {
+    return this.employees.filter((e) => e.competencyId === id && !e.isArchived).length;
+  }
+
+  competencyProjectCount(id: string): number {
+    return this.projects.filter((p) => p.competencyId === id && !p.isArchived).length;
+  }
+
+  competencyTaskCount(id: string): number {
+    return this.tasks.filter((t) => t.competencyId === id && !t.isArchived).length;
   }
 
   taskCategoryLabel(id: string | undefined): string {
@@ -240,15 +271,6 @@ class AppStore {
         this.storageKind = "memory";
       }
       await this.loadAll();
-      // First run: seed the two default competencies (plan 15.3).
-      if (this.competencies.length === 0) {
-        const now = nowTimestamp();
-        for (const code of ["55140", "55230"]) {
-          const comp: Competency = { id: newId(), code, name: `Competency ${code}`, active: true, createdAt: now, updatedAt: now };
-          await this.store.put("competencies", comp);
-          this.competencies.push(comp);
-        }
-      }
       this.initialized = true;
     } catch (e) {
       this.initError = e instanceof Error ? e.message : String(e);
@@ -527,6 +549,60 @@ class AppStore {
   async saveSettings(settings: AppSettings): Promise<void> {
     this.settings = settings;
     await this.store.saveSettings($state.snapshot(settings) as AppSettings);
+  }
+
+  // --- competency service -----------------------------------------------------
+  async createCompetency(code: string, name: string): Promise<void> {
+    const trimmedCode = code.trim();
+    const trimmedName = name.trim();
+    if (!trimmedCode) throw new Error("Competency code is required.");
+    if (this.competencies.some((c) => c.code.toLowerCase() === trimmedCode.toLowerCase())) {
+      throw new Error("A competency with that code already exists.");
+    }
+    const now = nowTimestamp();
+    const competency: Competency = {
+      id: newId(),
+      code: trimmedCode,
+      name: trimmedName || undefined,
+      active: true,
+      createdAt: now,
+      updatedAt: now
+    };
+    await this.putRecord("competencies", competency, {
+      actionType: "created",
+      summary: `Created competency "${competency.code}"`
+    });
+  }
+
+  async updateCompetency(id: string, code: string, name: string): Promise<void> {
+    const competency = this.competencies.find((c) => c.id === id);
+    if (!competency) throw new Error("Competency not found.");
+    const trimmedCode = code.trim();
+    const trimmedName = name.trim();
+    if (!trimmedCode) throw new Error("Competency code is required.");
+    if (this.competencies.some((c) => c.id !== id && c.code.toLowerCase() === trimmedCode.toLowerCase())) {
+      throw new Error("A competency with that code already exists.");
+    }
+    if (competency.code === trimmedCode && (competency.name ?? "") === trimmedName) return;
+    await this.putRecord(
+      "competencies",
+      { ...competency, code: trimmedCode, name: trimmedName || undefined, updatedAt: nowTimestamp() },
+      { actionType: "updated", summary: `Updated competency "${trimmedCode}"` }
+    );
+  }
+
+  async setCompetencyActive(id: string, active: boolean): Promise<void> {
+    const competency = this.competencies.find((c) => c.id === id);
+    if (!competency) throw new Error("Competency not found.");
+    if (competency.active === active) return;
+    await this.putRecord(
+      "competencies",
+      { ...competency, active, updatedAt: nowTimestamp() },
+      {
+        actionType: active ? "restored" : "archived",
+        summary: `${active ? "Reactivated" : "Deactivated"} competency "${competency.code}"`
+      }
+    );
   }
 
   // --- board column service ---------------------------------------------------

@@ -12,15 +12,10 @@
   const SITUATIONAL_TYPE = "Situational request";
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
   const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
-    { value: "draft", label: "Draft" },
-    { value: "pending_employee", label: "Pending employee" },
-    { value: "pending_supervisor", label: "Pending supervisor" },
-    { value: "pending_approval", label: "Pending approval" },
+    { value: "pending", label: "Pending" },
     { value: "approved", label: "Approved" },
-    { value: "active", label: "Active" },
     { value: "denied", label: "Denied" },
-    { value: "cancelled", label: "Cancelled" },
-    { value: "expired", label: "Expired" }
+    { value: "cancelled", label: "Cancelled" }
   ];
 
   let view = $state<"list" | "calendar">("list");
@@ -31,13 +26,10 @@
   let formOpen = $state(false);
   let editing = $state<TeleworkRecord | undefined>(undefined);
   let fEmployee = $state("");
-  let fStatus = $state<TeleworkStatus>("pending_supervisor");
+  let fStatus = $state<TeleworkStatus>("pending");
   let fRequestDate = $state(todayIso());
   let fStartDate = $state("");
   let fEndDate = $state("");
-  let fSchedule = $state("");
-  let fEmailReference = $state("");
-  let fReviewed = $state("");
   let fNotes = $state("");
   let fError = $state("");
 
@@ -53,14 +45,6 @@
     return t.expirationDate || t.effectiveDate;
   }
 
-  function requestRange(t: Pick<TeleworkRecord, "effectiveDate" | "expirationDate">): string {
-    if (!t.effectiveDate && !t.expirationDate) return "";
-    if (t.effectiveDate && requestEndDate(t) && t.effectiveDate !== requestEndDate(t)) {
-      return `${formatDate(t.effectiveDate)} - ${formatDate(requestEndDate(t))}`;
-    }
-    return formatDate(t.effectiveDate ?? requestEndDate(t));
-  }
-
   function isHistorical(t: TeleworkRecord): boolean {
     const end = requestEndDate(t);
     if (HISTORICAL_STATUSES.has(t.status)) return true;
@@ -70,13 +54,10 @@
   function openForm(t?: TeleworkRecord) {
     editing = t;
     fEmployee = t?.employeeId ?? "";
-    fStatus = t?.status ?? "pending_supervisor";
+    fStatus = t?.status ?? "pending";
     fRequestDate = t?.requestDate ?? todayIso();
     fStartDate = t?.effectiveDate ?? "";
     fEndDate = t?.expirationDate ?? "";
-    fSchedule = t?.scheduleSummary ?? "";
-    fEmailReference = t?.sourceReference ?? "";
-    fReviewed = t?.lastVerifiedDate ?? "";
     fNotes = t?.notes ?? "";
     fError = "";
     formOpen = true;
@@ -91,7 +72,7 @@
       fError = "Telework start date is required.";
       return;
     }
-    for (const v of [fRequestDate, fStartDate, fEndDate, fReviewed]) {
+    for (const v of [fRequestDate, fStartDate, fEndDate]) {
       if (v && !isValidIsoDate(v)) {
         fError = "Dates must be valid.";
         return;
@@ -111,10 +92,10 @@
       requestDate: fRequestDate || undefined,
       effectiveDate: fStartDate,
       expirationDate: endDate,
-      scheduleSummary: fSchedule.trim() || undefined,
-      sourceSystem: "Email",
-      sourceReference: fEmailReference.trim() || undefined,
-      lastVerifiedDate: fReviewed || undefined,
+      scheduleSummary: editing?.scheduleSummary,
+      sourceSystem: editing?.sourceSystem,
+      sourceReference: editing?.sourceReference,
+      lastVerifiedDate: editing?.lastVerifiedDate,
       notes: fNotes.trim() || undefined,
       relatedTaskId: editing?.relatedTaskId,
       createdAt: editing?.createdAt ?? now,
@@ -182,12 +163,9 @@
       [
         "Employee",
         "Status",
-        "Request date",
+        "Request received",
         "Telework start",
         "Telework end",
-        "Schedule or coverage",
-        "Email record",
-        "Reviewed on",
         "Notes",
         "Created",
         "Updated"
@@ -198,9 +176,6 @@
         t.requestDate,
         t.effectiveDate,
         requestEndDate(t),
-        t.scheduleSummary,
-        t.sourceReference,
-        t.lastVerifiedDate,
         t.notes,
         t.createdAt.slice(0, 10),
         t.updatedAt.slice(0, 10)
@@ -243,7 +218,7 @@
     <table class="data">
       <thead>
         <tr>
-          <th>Employee</th><th>Status</th><th>Requested</th><th>Telework date</th><th>Schedule / coverage</th><th>Email record</th><th>Reviewed</th><th></th>
+          <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Notes</th><th></th>
         </tr>
       </thead>
       <tbody>
@@ -252,10 +227,9 @@
             <td>{app.employeeName(t.employeeId)}</td>
             <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
             <td>{formatDate(t.requestDate)}</td>
-            <td>{requestRange(t)}</td>
-            <td>{t.scheduleSummary ?? ""}</td>
-            <td>{t.sourceReference ?? ""}</td>
-            <td>{formatDate(t.lastVerifiedDate)}</td>
+            <td>{formatDate(t.effectiveDate)}</td>
+            <td>{formatDate(requestEndDate(t))}</td>
+            <td class="notes-cell">{t.notes ?? ""}</td>
             <td><button type="button" onclick={() => openForm(t)}>Edit</button></td>
           </tr>
         {/each}
@@ -328,12 +302,6 @@
           <input id="tw-end" type="date" bind:value={fEndDate} style="width:100%" />
         </div>
       </div>
-      <label for="tw-sched">Schedule / coverage</label>
-      <input id="tw-sched" type="text" bind:value={fSchedule} maxlength="200" style="width:100%" />
-      <label for="tw-email">Email record</label>
-      <input id="tw-email" type="text" bind:value={fEmailReference} maxlength="300" style="width:100%" />
-      <label for="tw-reviewed">Reviewed on</label>
-      <input id="tw-reviewed" type="date" bind:value={fReviewed} style="width:100%" />
       <label for="tw-notes">Notes</label>
       <textarea id="tw-notes" bind:value={fNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
       <div class="dialog-actions">
@@ -482,14 +450,19 @@
     color: var(--text-muted);
     font-size: .72rem;
   }
-  .status-pending_supervisor {
-    background: var(--overdue-bg);
-    color: var(--overdue-fg);
+  .notes-cell {
+    max-width: 22rem;
+    white-space: pre-wrap;
+    color: var(--text-muted);
   }
-  .status-pending_approval,
-  .status-pending_employee {
+  .status-pending {
     background: var(--duesoon-bg);
     color: var(--duesoon-fg);
+  }
+  .status-denied,
+  .status-cancelled {
+    background: var(--surface-2);
+    color: var(--text-muted);
   }
   @media (max-width: 900px) {
     .form-grid {

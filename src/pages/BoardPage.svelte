@@ -276,7 +276,7 @@
     </select>
     <select bind:value={filterCompetency} aria-label="Filter by competency">
       <option value="">All competencies</option>
-      {#each app.competencies as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
+      {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
     <select bind:value={filterProject} aria-label="Filter by project">
       <option value="">All projects</option>

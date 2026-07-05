@@ -249,6 +249,7 @@ export interface LeaveRecord {
 
 export type TeleworkStatus =
   | "draft"
+  | "pending"
   | "pending_employee"
   | "pending_supervisor"
   | "pending_approval"

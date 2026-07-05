@@ -19,7 +19,6 @@
   import LeavePage from "../pages/LeavePage.svelte";
   import TeleworkPage from "../pages/TeleworkPage.svelte";
   import AwardsPage from "../pages/AwardsPage.svelte";
-  import ReportsPage from "../pages/ReportsPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
   import { formatTimestamp } from "../utils/dates";
@@ -57,7 +56,6 @@
     { page: "awards", label: "Awards", icon: "awards" },
     { page: "meetings", label: "Meetings", icon: "meetings", section: "Work" },
     { page: "projects", label: "Projects", icon: "projects" },
-    { page: "reports", label: "Reports", icon: "reports" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings", section: "System" }
   ];
@@ -179,8 +177,6 @@
           <TeleworkPage />
         {:else if router.current.page === "awards"}
           <AwardsPage />
-        {:else if router.current.page === "reports"}
-          <ReportsPage />
         {:else if router.current.page === "archive"}
           <ArchivePage />
         {:else if router.current.page === "settings"}

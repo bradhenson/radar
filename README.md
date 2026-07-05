@@ -72,8 +72,9 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
 - **Tasks**: detailed creation/edit dialog from the start, auto-save on close, status and board
   column fields, editable categories, notes, checklists, tags, waiting metadata, activity history
   with concise changed-field summaries, archive/restore.
-- **Employees**: directory with workload columns, CSV export, 360° profile (tasks, performance,
-  meeting notes, training, leave, telework, awards, activity), check-in recording.
+- **Employees**: directory with workload columns, configurable competencies, CSV export, 360°
+  profile (tasks, performance, meeting notes, training, leave, telework, awards, activity),
+  check-in recording.
 - **Performance**: Context/Action/Result/Impact capture, edit existing inputs, import from tasks,
   completion-to-input conversion prompt, coverage table, text export for evaluation preparation.
 - **Meetings**: product-team meeting note capture with linked employees/projects, discussion
@@ -82,11 +83,12 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
   completion with expiration calculation, due warnings.
 - **Leave / Telework**: leave availability records plus situational telework request tracking,
   request calendar, email-reference fields, CSV export, and pending-action attention.
-- **Reports**, **Archive**, **Settings** (thresholds, light/dark/system theme, accent color
-  palettes, editable board columns, editable task categories, health check, sample data).
+- **Archive**, **Settings** (thresholds, light/dark/system theme, accent color palettes,
+  editable competencies, editable board columns, editable task categories, health check, sample
+  data).
 
 Not yet implemented (later phases): recurring-task templates (Phase 7), saved views, global
-search, bulk actions, merge-on-import, print views. See `CHANGELOG.md`.
+search, bulk actions, merge-on-import, useful reporting/print views. See `CHANGELOG.md`.
 
 ## Keyboard shortcuts
 

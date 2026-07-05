@@ -14,6 +14,9 @@
   let confirmReset = $state(false);
   let confirmSample = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
+  let newCompetencyCode = $state("");
+  let newCompetencyName = $state("");
+  let competencyError = $state("");
   let newBoardColumnName = $state("");
   let boardColumnError = $state("");
   let newCategoryName = $state("");
@@ -29,6 +32,36 @@
       const v = parseInt((e.currentTarget as HTMLInputElement).value, 10);
       if (Number.isFinite(v) && v >= 0) void updateSetting(key, v as never);
     };
+  }
+
+  async function addCompetency() {
+    try {
+      await app.createCompetency(newCompetencyCode, newCompetencyName);
+      newCompetencyCode = "";
+      newCompetencyName = "";
+      competencyError = "";
+      app.toast("Competency added", "success");
+    } catch (e) {
+      competencyError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function updateCompetency(id: string, code: string, name: string) {
+    try {
+      await app.updateCompetency(id, code, name);
+      competencyError = "";
+    } catch (e) {
+      competencyError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function setCompetencyActive(id: string, active: boolean) {
+    try {
+      await app.setCompetencyActive(id, active);
+      competencyError = "";
+    } catch (e) {
+      competencyError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   async function addBoardColumn() {
@@ -156,9 +189,13 @@
   let health = $derived.by(() => {
     const empIds = new Set(app.employees.map((e) => e.id));
     const projIds = new Set(app.projects.map((p) => p.id));
+    const competencyIds = new Set(app.competencies.map((c) => c.id));
     const boardColumnIds = new Set(app.boardColumns.map((c) => c.id));
     const taskIds = new Set(app.tasks.map((t) => t.id));
     return {
+      orphanEmployeeCompetency: app.employees.filter((e) => e.competencyId && !competencyIds.has(e.competencyId)).length,
+      orphanProjectCompetency: app.projects.filter((p) => p.competencyId && !competencyIds.has(p.competencyId)).length,
+      orphanTaskCompetency: app.tasks.filter((t) => t.competencyId && !competencyIds.has(t.competencyId)).length,
       orphanTaskEmployee: app.tasks.filter((t) => t.employeeId && !empIds.has(t.employeeId)).length,
       orphanTaskProject: app.tasks.filter((t) => t.projectId && !projIds.has(t.projectId)).length,
       orphanTaskBoardColumn: app.tasks.filter((t) => t.boardColumnId && !boardColumnIds.has(t.boardColumnId)).length,
@@ -252,6 +289,86 @@
         </button>
       {/each}
     </div>
+  </section>
+
+  <section class="card" style="margin-bottom:1rem">
+    <h2>Competencies</h2>
+    <p class="small muted">
+      Active competencies appear in employee forms and training bulk-selection shortcuts. Deactivated competencies stay
+      attached to existing records and can be reactivated later.
+    </p>
+    <form
+      class="settings-add competency-add"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void addCompetency();
+      }}
+    >
+      <input
+        type="text"
+        bind:value={newCompetencyCode}
+        maxlength="40"
+        placeholder="Code"
+        aria-label="New competency code"
+      />
+      <input
+        type="text"
+        bind:value={newCompetencyName}
+        maxlength="120"
+        placeholder="Name"
+        aria-label="New competency name"
+      />
+      <button type="submit" class="primary">Add competency</button>
+    </form>
+    {#if competencyError}<div class="field-error">{competencyError}</div>{/if}
+    {#if app.competencyList.length === 0}
+      <p class="small muted">No competencies are configured yet. Add one before creating employees.</p>
+    {:else}
+      <table class="data settings-table competency-table">
+        <thead>
+          <tr><th>Code</th><th>Name</th><th>Employees</th><th>Status</th><th></th></tr>
+        </thead>
+        <tbody>
+          {#each app.competencyList as competency (competency.id)}
+            <tr class:inactive={!competency.active}>
+              <td>
+                <input
+                  type="text"
+                  value={competency.code}
+                  maxlength="40"
+                  aria-label={`Competency code ${competency.code}`}
+                  onchange={(e) => void updateCompetency(competency.id, (e.currentTarget as HTMLInputElement).value, competency.name ?? "")}
+                />
+              </td>
+              <td>
+                <input
+                  type="text"
+                  value={competency.name ?? ""}
+                  maxlength="120"
+                  aria-label={`Competency name ${competency.code}`}
+                  onchange={(e) => void updateCompetency(competency.id, competency.code, (e.currentTarget as HTMLInputElement).value)}
+                />
+              </td>
+              <td>{app.competencyEmployeeCount(competency.id)}</td>
+              <td>
+                {#if competency.active}
+                  <span class="badge success">Active</span>
+                {:else}
+                  <span class="badge">Inactive</span>
+                {/if}
+              </td>
+              <td>
+                {#if competency.active}
+                  <button type="button" onclick={() => void setCompetencyActive(competency.id, false)}>Deactivate</button>
+                {:else}
+                  <button type="button" onclick={() => void setCompetencyActive(competency.id, true)}>Reactivate</button>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
   </section>
 
   <section class="card" style="margin-bottom:1rem">
@@ -395,6 +512,9 @@
     </p>
     {#if healthIssues > 0}
         <ul class="small">
+        {#if health.orphanEmployeeCompetency}<li>{health.orphanEmployeeCompetency} employee(s) reference a missing competency</li>{/if}
+        {#if health.orphanProjectCompetency}<li>{health.orphanProjectCompetency} project(s) reference a missing competency</li>{/if}
+        {#if health.orphanTaskCompetency}<li>{health.orphanTaskCompetency} task(s) reference a missing competency</li>{/if}
         {#if health.orphanTaskEmployee}<li>{health.orphanTaskEmployee} task(s) reference a missing employee</li>{/if}
         {#if health.orphanTaskProject}<li>{health.orphanTaskProject} task(s) reference a missing project</li>{/if}
         {#if health.orphanTaskBoardColumn}<li>{health.orphanTaskBoardColumn} task(s) reference a missing board column</li>{/if}
@@ -579,6 +699,9 @@
     min-width: 12rem;
   }
   .category-table .archived {
+    opacity: .72;
+  }
+  .competency-table .inactive {
     opacity: .72;
   }
   .settings-actions,

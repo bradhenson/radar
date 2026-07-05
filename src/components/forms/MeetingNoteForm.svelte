@@ -21,15 +21,33 @@
   let meetingType = $state(initialSource().meetingType ?? "Product team");
   let projectId = $state(initialSource().projectId ?? "");
   let attendeeEmployeeIds = $state<string[]>([...(initialSource().attendeeEmployeeIds ?? [])]);
+  let selectedEmployeeId = $state("");
   let notes = $state(initialSource().notes ?? "");
   let actionItems = $state(initialSource().actionItems ?? "");
   let error = $state("");
   let saving = $state(false);
 
-  function toggleEmployee(id: string, checked: boolean) {
-    attendeeEmployeeIds = checked
-      ? [...new Set([...attendeeEmployeeIds, id])]
-      : attendeeEmployeeIds.filter((employeeId) => employeeId !== id);
+  let linkedEmployees = $derived(
+    attendeeEmployeeIds
+      .map((id) => app.employees.find((employee) => employee.id === id))
+      .filter((employee) => employee !== undefined)
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+  );
+
+  let employeePickerOptions = $derived(
+    app.activeEmployees
+      .filter((employee) => !attendeeEmployeeIds.includes(employee.id))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName))
+  );
+
+  function addEmployee(id: string) {
+    if (!id) return;
+    attendeeEmployeeIds = [...new Set([...attendeeEmployeeIds, id])];
+    selectedEmployeeId = "";
+  }
+
+  function removeEmployee(id: string) {
+    attendeeEmployeeIds = attendeeEmployeeIds.filter((employeeId) => employeeId !== id);
   }
 
   async function save() {
@@ -110,18 +128,32 @@
       </div>
     </div>
 
-    <div class="field-label">Linked employees</div>
-    <div class="employee-grid">
-      {#each app.activeEmployees as employee (employee.id)}
-        <label class="check-inline">
-          <input
-            type="checkbox"
-            checked={attendeeEmployeeIds.includes(employee.id)}
-            onchange={(e) => toggleEmployee(employee.id, (e.currentTarget as HTMLInputElement).checked)}
-          />
-          {employee.displayName}
-        </label>
-      {/each}
+    <div class="employee-field">
+      <div class="field-label">Linked employees</div>
+      <div class="employee-picker">
+        <select
+          bind:value={selectedEmployeeId}
+          aria-label="Link employee"
+          onchange={(e) => addEmployee((e.currentTarget as HTMLSelectElement).value)}
+        >
+          <option value="">Select employee</option>
+          {#each employeePickerOptions as employee (employee.id)}
+            <option value={employee.id}>{employee.displayName}</option>
+          {/each}
+        </select>
+      </div>
+      {#if linkedEmployees.length}
+        <div class="linked-employees" aria-label="Linked employees">
+          {#each linkedEmployees as employee (employee.id)}
+            <span class="employee-chip">
+              {employee.displayName}
+              <button type="button" aria-label={`Remove ${employee.displayName}`} onclick={() => removeEmployee(employee.id)}>Remove</button>
+            </span>
+          {/each}
+        </div>
+      {:else}
+        <p class="muted small linked-empty">No linked employees</p>
+      {/if}
     </div>
 
     <label for="mn-notes">Discussion notes</label>
@@ -143,12 +175,6 @@
     grid-template-columns: repeat(3, 1fr);
     gap: 0 .8rem;
   }
-  .employee-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
-    gap: .15rem .8rem;
-    margin: .2rem 0 .6rem;
-  }
   .field-label {
     display: block;
     margin-top: .7rem;
@@ -156,12 +182,44 @@
     font-size: .83rem;
     font-weight: 700;
   }
-  .check-inline {
+  .employee-field {
+    margin-bottom: .6rem;
+  }
+  .employee-picker {
     display: flex;
+    gap: .5rem;
+    align-items: end;
+    flex-wrap: wrap;
+  }
+  .employee-picker select {
+    flex: 1 1 16rem;
+  }
+  .linked-employees {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .35rem;
+    margin-top: .5rem;
+  }
+  .employee-chip {
+    display: inline-flex;
     align-items: center;
-    gap: .45rem;
-    font-weight: 400;
-    margin: .1rem 0;
+    gap: .35rem;
+    max-width: 100%;
+    padding: .18rem .35rem .18rem .55rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface-2);
+    font-size: .82rem;
+    font-weight: 600;
+  }
+  .employee-chip button {
+    min-height: 1.45rem;
+    padding: .05rem .35rem;
+    font-size: .72rem;
+    box-shadow: none;
+  }
+  .linked-empty {
+    margin: .35rem 0 0;
   }
   .form-actions {
     display: flex;
@@ -175,5 +233,9 @@
   }
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr; }
+    .employee-picker select {
+      flex-basis: 100%;
+      width: 100%;
+    }
   }
 </style>

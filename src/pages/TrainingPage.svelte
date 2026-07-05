@@ -271,7 +271,7 @@
   }
 </script>
 
-<div class="page">
+<div class="page training-page" class:matrix-open={showMatrix}>
   <div class="page-header">
     <h1>Training</h1>
   </div>
@@ -372,43 +372,45 @@
     {/if}
 
     {#if showMatrix}
-      <h2>Matrix overview</h2>
-      <p class="muted small">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
-      <div style="overflow-x:auto">
-        <table class="data matrix">
-          <thead>
-            <tr>
-              <th>Employee</th>
-              {#each activeReqs as r (r.id)}<th>{r.name}</th>{/each}
-            </tr>
-          </thead>
-          <tbody>
-            {#each app.activeEmployees as e (e.id)}
+      <section class="matrix-section">
+        <h2>Matrix overview</h2>
+        <p class="muted small">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
+        <div class="matrix-wrap">
+          <table class="data matrix">
+            <thead>
               <tr>
-                <td>{e.displayName}</td>
-                {#each activeReqs as r (r.id)}
-                  {@const row = matrixCells.get(`${e.id}|${r.id}`)}
-                  <td class="matrix-cell">
-                    {#if row}
-                      <button
-                        type="button"
-                        class="cell-btn"
-                        title={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
-                        aria-label={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
-                        onclick={() => openRecord(e.id, r)}
-                      >
-                        <span class="badge {CELL[row.status.state].cls}">{CELL[row.status.state].symbol}</span>
-                      </button>
-                    {:else}
-                      <span class="muted" aria-label="Not assigned"></span>
-                    {/if}
-                  </td>
-                {/each}
+                <th class="employee-col">Employee</th>
+                {#each activeReqs as r (r.id)}<th class="requirement-col"><span>{r.name}</span></th>{/each}
               </tr>
-            {/each}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {#each app.activeEmployees as e (e.id)}
+                <tr>
+                  <td class="employee-col employee-name">{e.displayName}</td>
+                  {#each activeReqs as r (r.id)}
+                    {@const row = matrixCells.get(`${e.id}|${r.id}`)}
+                    <td class="matrix-cell">
+                      {#if row}
+                        <button
+                          type="button"
+                          class="cell-btn"
+                          title={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
+                          aria-label={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
+                          onclick={() => openRecord(e.id, r)}
+                        >
+                          <span class="mark {CELL[row.status.state].cls}">{CELL[row.status.state].symbol}</span>
+                        </button>
+                      {:else}
+                        <span class="muted" aria-label="Not assigned"></span>
+                      {/if}
+                    </td>
+                  {/each}
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      </section>
     {/if}
   {/if}
 </div>
@@ -430,7 +432,9 @@
           <select id="tr-sched" bind:value={rSchedule} style="width:100%">
             <option value="annual">Annual — everyone due by the same date</option>
             <option value="once">One-time</option>
-            <option value="rolling">Repeats — due again after each completion</option>
+            {#if editingReq?.recurrenceType === "months" || editingReq?.recurrenceType === "days"}
+              <option value="rolling">Repeats — due again after each completion</option>
+            {/if}
           </select>
         </div>
         {#if rSchedule === "rolling"}
@@ -468,7 +472,7 @@
       </fieldset>
       {#if rScope === "selected"}
         <div class="toolbar" style="margin:.4rem 0 .2rem">
-          {#each app.competencies as c (c.id)}
+          {#each app.activeCompetencies as c (c.id)}
             <button type="button" onclick={() => addCompetency(c.id)}>Add {c.code}</button>
           {/each}
           <button type="button" onclick={() => (rSelected = [])}>Clear</button>
@@ -511,15 +515,15 @@
           </select>
         </div>
         <div>
-          <label for="rec-due">Due date override <span class="field-hint">(this employee only)</span></label>
+          <label for="rec-due">Due date override</label>
           <input id="rec-due" type="date" bind:value={recDue} style="width:100%" />
         </div>
         <div>
-          <label for="rec-completed">Completed date <span class="field-hint">sets status to complete</span></label>
+          <label for="rec-completed">Completed date</label>
           <input id="rec-completed" type="date" bind:value={recCompleted} style="width:100%" />
         </div>
         <div>
-          <label for="rec-verified">Last verified <span class="field-hint">against SWAT/authoritative system</span></label>
+          <label for="rec-verified">Last verified</label>
           <input id="rec-verified" type="date" bind:value={recVerified} style="width:100%" />
         </div>
       </div>
@@ -534,8 +538,78 @@
 
 <style>
   .cell-btn { border: none; background: none; padding: 0; cursor: pointer; }
-  .matrix-cell { text-align: center; }
-  .matrix th { font-size: 0.8rem; }
+  .training-page.matrix-open { max-width: none; }
+  .matrix-section { width: 100%; }
+  .matrix-wrap {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: .25rem;
+  }
+  .matrix {
+    width: 100%;
+  }
+  .matrix th,
+  .matrix td {
+    padding: .48rem .45rem;
+  }
+  .matrix .employee-col {
+    width: 1%;
+    white-space: nowrap;
+    padding-right: .9rem;
+  }
+  .matrix thead .employee-col {
+    position: sticky;
+    left: 0;
+    z-index: 3;
+  }
+  .matrix tbody .employee-col {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: var(--surface);
+    font-weight: 600;
+  }
+  .matrix tbody tr:hover .employee-col {
+    background: color-mix(in srgb, var(--accent-soft) 38%, var(--surface));
+  }
+  .matrix thead .requirement-col {
+    width: 5.75rem;
+    min-width: 5.75rem;
+    max-width: 6.25rem;
+    white-space: normal;
+    text-align: center;
+    vertical-align: bottom;
+    text-transform: none;
+    letter-spacing: 0;
+    line-height: 1.15;
+    font-size: .76rem;
+  }
+  .matrix thead .requirement-col span {
+    display: block;
+    overflow-wrap: anywhere;
+  }
+  .matrix-cell {
+    text-align: center;
+    vertical-align: middle;
+  }
+  .matrix-cell .cell-btn {
+    display: inline-flex;
+    justify-content: center;
+    width: 100%;
+    padding: .15rem 0;
+    border-radius: 4px;
+  }
+  .matrix-cell .cell-btn:hover {
+    background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+  }
+  .matrix-cell .mark {
+    font-size: .85rem;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+  .matrix-cell .mark.success { color: var(--success-fg); }
+  .matrix-cell .mark.warning { color: var(--duesoon-fg); }
+  .matrix-cell .mark.overdue { color: var(--overdue-fg); }
   .roster { margin-bottom: 1.2rem; }
   .roster-head { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
   .roster-head h2 { margin: 0; }

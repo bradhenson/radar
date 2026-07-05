@@ -8,7 +8,7 @@
   let { employee, onclose }: { employee?: Employee; onclose: () => void } = $props();
 
   let displayName = $state(employee?.displayName ?? "");
-  let competencyId = $state(employee?.competencyId ?? app.competencies[0]?.id ?? "");
+  let competencyId = $state(employee?.competencyId ?? app.activeCompetencies[0]?.id ?? "");
   let positionTitle = $state(employee?.positionTitle ?? "");
   let workEmail = $state(employee?.workEmail ?? "");
   let team = $state(employee?.team ?? "");
@@ -69,7 +69,13 @@
       <div>
         <label for="ef-comp">Competency <span class="req">*</span></label>
         <select id="ef-comp" bind:value={competencyId} style="width:100%">
-          {#each app.competencies.filter((c) => c.active) as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
+          {#if app.competencyOptions(competencyId).length === 0}
+            <option value="">Add competencies in Settings</option>
+          {:else}
+            {#each app.competencyOptions(competencyId) as c (c.id)}
+              <option value={c.id}>{c.code}{#if !c.active} (inactive){/if}</option>
+            {/each}
+          {/if}
         </select>
       </div>
       <div>
