@@ -222,14 +222,37 @@ describe("training attention rules", () => {
   });
 
   it("ignores waived and not-applicable records", () => {
+    const emp2 = makeEmployee({ id: "e2" });
     const items = trainingAttention(
       baseCtx({
-        employees: [emp],
+        employees: [emp, emp2],
         trainingRequirements: [req],
-        trainingRecords: [record({ status: "waived", dueDate: "2026-01-01" }), record({ id: "tr2", status: "not_applicable", dueDate: "2026-01-01" })]
+        trainingRecords: [
+          record({ status: "waived", dueDate: "2026-01-01" }),
+          record({ id: "tr2", employeeId: emp2.id, status: "not_applicable", dueDate: "2026-01-01" })
+        ]
       })
     );
     expect(items).toHaveLength(0);
+  });
+
+  it("flags employees with no record from the requirement's shared due date", () => {
+    const items = trainingAttention(
+      baseCtx({ employees: [emp], trainingRequirements: [{ ...req, dueDate: "2026-07-01" }], trainingRecords: [] })
+    );
+    expect(items[0]?.reasonCode).toBe("training_overdue");
+  });
+
+  it("aggregates many employees due for the same requirement into one item", () => {
+    const emps = ["e1", "e2", "e3", "e4", "e5"].map((id) => makeEmployee({ id }));
+    const items = trainingAttention(
+      baseCtx({ employees: emps, trainingRequirements: [{ ...req, dueDate: "2026-07-20" }], trainingRecords: [] })
+    );
+    expect(items).toHaveLength(1);
+    expect(items[0]?.reasonCode).toBe("training_due_soon");
+    expect(items[0]?.title).toBe("Cyber Awareness — 5 employees");
+    expect(items[0]?.reasonText).toBe("Training due soon for 5 employees");
+    expect(items[0]?.entityId).toBe(req.id);
   });
 });
 

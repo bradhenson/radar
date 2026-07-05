@@ -83,6 +83,7 @@ const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["startDate", "dueDate", "reminderDate", "followUpDate", "completedDate", "lastVerifiedDate"],
   employees: ["startDate", "lastCheckInDate"],
   performanceInputs: ["inputDate"],
+  trainingRequirements: ["dueDate"],
   employeeTrainingRecords: ["assignedDate", "dueDate", "completedDate", "expirationDate", "lastVerifiedDate"],
   leaveRecords: ["startDate", "endDate", "lastVerifiedDate"],
   teleworkRecords: ["requestDate", "effectiveDate", "expirationDate", "lastVerifiedDate"],
@@ -224,6 +225,7 @@ function normalizeSettings(raw: unknown): AppSettings {
       (out as unknown as Record<string, unknown>)[key] = v;
     }
   }
+  if (typeof src.userDisplayName === "string") out.userDisplayName = src.userDisplayName;
   return out;
 }
 

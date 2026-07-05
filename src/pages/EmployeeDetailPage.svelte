@@ -9,6 +9,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import { INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
+  import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
 
@@ -30,7 +31,21 @@
   let inputs = $derived(
     app.performanceInputs.filter((p) => p.employeeId === employeeId && !p.isArchived).sort((a, b) => (a.inputDate < b.inputDate ? 1 : -1))
   );
-  let training = $derived(app.employeeTrainingRecords.filter((r) => r.employeeId === employeeId));
+  // Roster rows cover applicable requirements; records for retired requirements
+  // or departed employees are still shown, with the same derived status.
+  let training = $derived.by(() => {
+    const emp = employee;
+    if (!emp) return [];
+    const rows = app.trainingStatusList.filter((r) => r.employee.id === employeeId);
+    const seen = new Set(rows.map((r) => r.requirement.id));
+    for (const rec of app.employeeTrainingRecords) {
+      if (rec.employeeId !== employeeId || seen.has(rec.trainingRequirementId)) continue;
+      const req = app.trainingRequirements.find((q) => q.id === rec.trainingRequirementId);
+      if (!req) continue;
+      rows.push({ requirement: req, employee: emp, record: rec, status: trainingStatus(req, rec, app.today, app.settings.trainingWarningDays) });
+    }
+    return rows;
+  });
   let leave = $derived(
     app.leaveRecords.filter((l) => l.employeeId === employeeId).sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
   );
@@ -244,19 +259,18 @@
       {/if}
     {:else if tab === "training"}
       {#if training.length === 0}
-        <EmptyState message="No training records." hint="Assign requirements from the Training page." />
+        <EmptyState message="No training requirements apply." hint="Requirements are managed from the Training page." />
       {:else}
         <table class="data">
-          <thead><tr><th>Requirement</th><th>Status</th><th>Due</th><th>Completed</th><th>Expires</th><th>Verified</th></tr></thead>
+          <thead><tr><th>Requirement</th><th>Status</th><th>Due / Expires</th><th>Completed</th><th>Verified</th></tr></thead>
           <tbody>
-            {#each training as r (r.id)}
+            {#each training as r (r.requirement.id)}
               <tr>
-                <td>{app.trainingRequirements.find((q) => q.id === r.trainingRequirementId)?.name ?? "(unknown)"}</td>
-                <td>{r.status}</td>
-                <td>{formatDate(r.dueDate)}</td>
-                <td>{formatDate(r.completedDate)}</td>
-                <td>{formatDate(r.expirationDate)}</td>
-                <td>{formatDate(r.lastVerifiedDate)}</td>
+                <td>{r.requirement.name}</td>
+                <td>{TRAINING_STATE_LABELS[r.status.state]}</td>
+                <td>{formatDate(r.status.dueDate)}</td>
+                <td>{formatDate(r.status.completedDate ?? r.record?.completedDate)}</td>
+                <td>{formatDate(r.record?.lastVerifiedDate)}</td>
               </tr>
             {/each}
           </tbody>

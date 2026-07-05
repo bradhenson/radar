@@ -16,6 +16,7 @@ import type {
   TrainingRequirement
 } from "../models";
 import { compareDates, daysBetween, daysSinceTimestamp, describeDueDistance, formatDate } from "../../utils/dates";
+import { requirementAppliesTo, trainingStatus } from "./training";
 
 export type AttentionSeverity = "info" | "low" | "medium" | "high" | "critical";
 
@@ -255,55 +256,91 @@ export function employeeAttention(
 // ---------------------------------------------------------------------------
 // Training rules (plan 22.5)
 
+// How many employees can share a requirement + urgency before their items
+// collapse into one aggregated line. With ~40 employees a fiscal-year
+// deadline would otherwise flood the Today page with 40 identical rows.
+const TRAINING_AGGREGATE_THRESHOLD = 4;
+
 export function trainingAttention(
   ctx: Pick<AttentionContext, "today" | "settings" | "trainingRecords" | "trainingRequirements" | "employees">
 ): AttentionItem[] {
   const { today } = ctx;
   const items: AttentionItem[] = [];
-  const reqById = new Map(ctx.trainingRequirements.map((r) => [r.id, r]));
-  const empById = new Map(ctx.employees.map((e) => [e.id, e]));
+  const recByKey = new Map(ctx.trainingRecords.map((r) => [`${r.employeeId}|${r.trainingRequirementId}`, r]));
 
-  for (const rec of ctx.trainingRecords) {
-    if (rec.status === "not_applicable" || rec.status === "waived") continue;
-    const emp = empById.get(rec.employeeId);
-    if (!emp || emp.activeStatus !== "active") continue;
-    const req = reqById.get(rec.trainingRequirementId);
-    const name = req?.name ?? "Training";
-    // A completed record still matters if its completion expires.
-    const effectiveDue = rec.status === "complete" ? rec.expirationDate : rec.dueDate;
-    if (!effectiveDue) continue;
+  for (const req of ctx.trainingRequirements) {
+    if (!req.active) continue;
+    const warnDays = Math.max(ctx.settings.trainingWarningDays, ...(req.warningDays ?? []));
+    const candidates: AttentionItem[] = [];
 
-    const warnDays = Math.max(ctx.settings.trainingWarningDays, ...(req?.warningDays ?? []));
-    const diff = daysBetween(today, effectiveDue);
-    const base = {
-      entityType: "training" as const,
-      entityId: rec.id,
-      title: `${name} — ${emp.displayName}`,
-      employeeId: emp.id,
-      dueDate: effectiveDue
-    };
+    for (const emp of ctx.employees) {
+      if (!requirementAppliesTo(req, emp)) continue;
+      const rec = recByKey.get(`${emp.id}|${req.id}`);
+      const status = trainingStatus(req, rec, today, warnDays);
+      if (!status.needsAction || !status.dueDate) continue;
 
-    if (diff < 0) {
-      items.push({
-        ...base,
-        reasonCode: rec.status === "complete" ? "training_expired" : "training_overdue",
-        reasonText: rec.status === "complete" ? `Training expired ${-diff} days ago` : `Training overdue by ${-diff} days`,
-        severity: "high",
-        sortScore: SEVERITY_SCORE.high + Math.min(-diff, 60) * 5,
-        suggestedAction: "Follow up on this training with the employee"
-      });
-    } else if (diff <= warnDays) {
-      items.push({
-        ...base,
-        reasonCode: rec.status === "complete" ? "training_expiring" : "training_due_soon",
-        reasonText: rec.status === "complete" ? `Training expires in ${diff} days` : `Training ${describeDueDistance(effectiveDue, today)}`,
-        severity: diff <= 7 ? "medium" : "low",
-        sortScore: SEVERITY_SCORE[diff <= 7 ? "medium" : "low"] + (warnDays - diff),
-        suggestedAction: "Remind the employee to complete this training"
-      });
+      const diff = daysBetween(today, status.dueDate);
+      const base = {
+        entityType: "training" as const,
+        entityId: rec?.id ?? `${req.id}:${emp.id}`,
+        title: `${req.name} — ${emp.displayName}`,
+        employeeId: emp.id,
+        dueDate: status.dueDate
+      };
+      if (status.state === "overdue" || status.state === "expired") {
+        candidates.push({
+          ...base,
+          reasonCode: status.state === "expired" ? "training_expired" : "training_overdue",
+          reasonText: status.state === "expired" ? `Training expired ${-diff} days ago` : `Training overdue by ${-diff} days`,
+          severity: "high",
+          sortScore: SEVERITY_SCORE.high + Math.min(-diff, 60) * 5,
+          suggestedAction: "Follow up on this training with the employee"
+        });
+      } else {
+        candidates.push({
+          ...base,
+          reasonCode: status.state === "expiring" ? "training_expiring" : "training_due_soon",
+          reasonText: status.state === "expiring" ? `Training expires in ${diff} days` : `Training ${describeDueDistance(status.dueDate, today)}`,
+          severity: diff <= 7 ? "medium" : "low",
+          sortScore: SEVERITY_SCORE[diff <= 7 ? "medium" : "low"] + (warnDays - diff),
+          suggestedAction: "Remind the employee to complete this training"
+        });
+      }
     }
+
+    items.push(...aggregateTrainingItems(req.id, req.name, candidates));
   }
   return items;
+}
+
+// Collapse large groups of identical per-employee items into a single
+// requirement-level item so one deadline never dominates the attention list.
+function aggregateTrainingItems(reqId: string, reqName: string, candidates: AttentionItem[]): AttentionItem[] {
+  const out: AttentionItem[] = [];
+  const byReason = new Map<string, AttentionItem[]>();
+  for (const item of candidates) {
+    const group = byReason.get(item.reasonCode);
+    if (group) group.push(item);
+    else byReason.set(item.reasonCode, [item]);
+  }
+  for (const [reasonCode, group] of byReason) {
+    if (group.length < TRAINING_AGGREGATE_THRESHOLD) {
+      out.push(...group);
+      continue;
+    }
+    const worst = group.reduce((a, b) => (b.sortScore > a.sortScore ? b : a));
+    const verb =
+      reasonCode === "training_overdue" ? "overdue" : reasonCode === "training_expired" ? "expired" : reasonCode === "training_expiring" ? "expiring" : "due soon";
+    out.push({
+      ...worst,
+      entityId: reqId,
+      title: `${reqName} — ${group.length} employees`,
+      employeeId: undefined,
+      reasonText: `Training ${verb} for ${group.length} employees`,
+      suggestedAction: "Open the Training page and work the roster for this requirement"
+    });
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------------------

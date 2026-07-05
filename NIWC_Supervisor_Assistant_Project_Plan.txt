@@ -1,23 +1,77 @@
-SUPERVISOR ASSISTANT
+RADAR
 DETAILED PRODUCT, ARCHITECTURE, AND IMPLEMENTATION PLAN
 
 Document purpose:
 This document is intended to be used as the primary starting specification for building a local-first supervisory productivity application in Visual Studio Code with assistance from Codex, Claude Code, or another coding agent.
 
-Working title:
+Product name:
+RADAR
+
+Name expansion:
+Reporting, Administration, Delegation, Analytics & Review
+
+Former working title:
 Supervisor Assistant
 
 Document version:
-0.1
+0.2
 
 Prepared:
 July 4, 2026
+
+Last updated:
+July 5, 2026
 
 Intended user:
 A single supervisor managing approximately 40 employees across competencies 55140 and 55230 at Naval Information Warfare Center Atlantic.
 
 IMPORTANT BOUNDARY:
 This document is a software design and development plan, not an authorization to store government information in an unapproved application. Before real employee data is entered, the user must determine what information may be stored locally on an NMCI computer and where backup files may be saved. Initial development and testing should use invented or sanitized data.
+
+======================================================================
+CURRENT IMPLEMENTATION SNAPSHOT
+======================================================================
+
+This plan now describes both the original product intent and the current RADAR codebase.
+
+Current implemented application state:
+
+- Svelte 5, TypeScript, and Vite application named RADAR.
+- Single-user, local-first operation with no backend server.
+- Production build creates self-contained local HTML files:
+  - dist/index.html
+  - dist/radar.html
+  - dist/supervisor-assistant.html for legacy compatibility.
+- Build pipeline includes single-file inlining and no-network verification.
+- IndexedDB is the primary local store, with an in-memory fallback and a visible warning when persistent storage is unavailable.
+- Backup export/import, replace confirmation, database health checks, reset confirmation, and backup reminders are implemented.
+- Main navigation includes Today, Board, Calendar, Employees, Performance, Training, Leave, Telework, Awards, Meetings, Projects, Reports, Archive, and Settings.
+- Implemented major workflows include:
+  - Today attention dashboard with fixed-alignment summary cards and grouped attention tables.
+  - Kanban Board with editable/reorderable columns, task drag-and-drop, keyboard card movement, filters, inline card checklist preview, and improved hover/focus highlighting.
+  - Calendar month view for task due dates, leave, and situational telework, including drag-and-drop and keyboard rescheduling.
+  - Task detail dialog with notes, checklist, activity history, categories, board column, status, and auto-save behavior.
+  - Employee directory and 360-degree employee profile with tasks, performance, meetings, training, leave, telework, awards, and activity.
+  - Performance input creation, editing, import-from-task, completed-task conversion prompt, coverage table, and text export.
+  - Meeting notes with linked employees/projects, action items, CSV export, archive/restore, and follow-up task creation.
+  - Training requirements, bulk assignment, matrix view, completions, expiration calculation, and Today warnings.
+  - Leave and telework tracking with calendars/lists, CSV export, verification/source fields, and pending-action attention.
+  - Awards list, reports, archive, settings, editable board columns, editable task categories, themes, color palettes, sample data, and diagnostic environment test.
+
+Current remaining planned work:
+
+- Recurring task templates and generated instances.
+- Saved views.
+- Global search.
+- Bulk actions.
+- Merge-on-import conflict handling.
+- Print-friendly report views.
+- More comprehensive end-to-end test coverage against the built file surface.
+
+Change history:
+
+- CHANGELOG.md records user-visible implementation changes.
+- README.md summarizes the current operator/developer-facing app state.
 
 ======================================================================
 TABLE OF CONTENTS
@@ -74,14 +128,15 @@ TABLE OF CONTENTS
 1. EXECUTIVE SUMMARY
 ======================================================================
 
-Supervisor Assistant will be a single-user, local-first web application designed to help a supervisor organize day-to-day work involving approximately 40 employees.
+RADAR will be a single-user, local-first web application designed to help a supervisor organize day-to-day work involving approximately 40 employees.
 
 The application will focus on:
 
-- A kanban-style task board as the primary working interface.
+- A kanban-style task board as a primary working interface.
 - A Today or Attention dashboard that identifies items needing action.
+- A calendar view for task due dates, leave, and telework.
 - Employee profiles that aggregate tasks, training, leave, telework, performance inputs, awards, and supervisory follow-ups.
-- Fast capture of tasks and performance observations.
+- Fast capture of tasks, performance observations, and meeting notes.
 - Recurring reminders for routine supervisory responsibilities.
 - Local data storage with explicit export, backup, and recovery.
 - No required server, cloud account, external API, or software installation on the operational NMCI computer.
@@ -135,7 +190,7 @@ The application should therefore not attempt to replace ERP, SWAT, Planner, or o
 
 Product vision statement:
 
-Supervisor Assistant is a private, local-first supervisory cockpit that helps one supervisor capture, organize, review, and complete work associated with employees, projects, requirements, and recurring responsibilities.
+RADAR is a private, local-first supervisory cockpit that helps one supervisor capture, organize, review, and complete work associated with employees, projects, requirements, meetings, and recurring responsibilities.
 
 The application should make it easy to answer:
 
@@ -690,9 +745,9 @@ The application does not need to support Internet Explorer.
 
 9.1 Purpose
 
-Before building the full application, create a tiny test application named:
+Before building or operating the full application, use a tiny test application named:
 
-Supervisor Assistant Environment Test
+RADAR Environment Test
 
 9.2 Test page features
 
@@ -925,30 +980,32 @@ Primary navigation:
 
 1. Today
 2. Board
-3. Employees
-4. Projects
+3. Calendar
+4. Employees
 5. Performance
 6. Training
-7. Leave and Availability
+7. Leave
 8. Telework
 9. Awards
-10. Reports
-11. Archive
-12. Settings
+10. Meetings
+11. Projects
+12. Reports
+13. Archive
+14. Settings
 
 Global controls:
 
-- Quick Add.
-- Global search.
+- Keyboard shortcut for New Task.
 - Backup status.
-- Current date.
-- Application menu.
-- Help.
+- Light/dark theme toggle.
+- Memory-only storage warning when IndexedDB is unavailable.
+- Persistent data-use notice.
 
 Recommended left navigation:
 
 TODAY
 BOARD
+CALENDAR
 
 PEOPLE
 - Employees
@@ -959,14 +1016,15 @@ PEOPLE
 - Awards
 
 WORK
+- Meetings
 - Projects
 - Reports
 - Archive
 
 SYSTEM
 - Settings
-- Backup and Restore
-- Help and About
+- Backup and Restore within Settings
+- Help and About within Settings
 
 On a smaller window, collapse the left navigation.
 
@@ -985,22 +1043,22 @@ A. Summary bar
 
 - Overdue count.
 - Due today count.
-- Due this week count.
+- Due soon count.
 - Waiting too long count.
-- Training due soon count.
-- Backup status.
+- Training warning count.
+
+Current implementation:
+The summary bar uses equal-width cards so counts line up cleanly across the page.
 
 B. Attention queue
 
 Each row should show:
 
 - Reason badge.
-- Task title.
-- Employee.
-- Project.
-- Due date.
-- Priority.
-- Status.
+- Item title.
+- Employee context when applicable.
+- Suggested action.
+- Severity.
 - Quick actions.
 
 Attention reasons include:
@@ -1017,6 +1075,10 @@ Attention reasons include:
 - Performance follow-up.
 - Recurring action due.
 - Backup due.
+
+Current implementation:
+Rows are grouped into Tasks, Employees, and Training/leave/telework/system. Each group uses
+fixed table columns so Reason, Item, Severity, and Actions line up across sections.
 
 C. Upcoming calendar strip
 
@@ -1045,10 +1107,10 @@ Buttons:
 
 - New Task.
 - New Performance Input.
-- New Employee Follow-up.
 - Record Training Completion.
 - Add Leave.
 - Add Telework Item.
+- Meeting Notes.
 
 F. Recently completed
 
@@ -1058,6 +1120,9 @@ Show the most recent completed tasks with an option to create performance inputs
 
 Purpose:
 Primary daily work interface.
+
+Current page title:
+Kanban Board.
 
 Default columns:
 
@@ -1076,35 +1141,45 @@ Board toolbar:
 - Project filter.
 - Category filter.
 - Priority filter.
+- Active-only toggle.
+- Clear filters.
+- New Task.
+
+Planned but not yet implemented:
+
 - Due-date filter.
 - Tag filter.
-- Hide completed.
 - Group or swimlane selector.
 - Saved view selector.
-- New Task.
 
 Card display:
 
 - Title.
-- Priority indicator.
-- Due-state indicator.
+- Category label.
+- Due-state indicator when relevant.
+- Priority indicator when high or critical.
 - Employee name.
 - Project.
-- Category.
-- Checklist progress.
+- Description preview or checklist preview, depending on the task setting.
+- Checklist progress when relevant.
 - Reminder indicator.
 - Waiting age.
-- Tags.
-- Source-system indicator.
-- Subtask count if added later.
+
+Current implementation:
+Cards intentionally do not show tags or a redundant status badge; the column conveys the
+visual work bucket. Hover/focus state highlights the full card surface, including the top edge.
 
 Card interactions:
 
 - Click to open.
 - Drag to another column.
 - Keyboard move.
-- Context menu.
 - Quick complete.
+- Inline checklist completion when the card is set to show the checklist.
+
+Planned but not yet implemented:
+
+- Context menu.
 - Quick snooze.
 - Quick assign.
 - Quick due date.
@@ -1160,6 +1235,7 @@ Tabs:
 - Overview.
 - Tasks.
 - Performance.
+- Meetings.
 - Training.
 - Leave.
 - Telework.
@@ -1179,6 +1255,7 @@ Quick actions:
 
 - Add task.
 - Add performance input.
+- Add meeting note.
 - Add training record.
 - Add leave.
 - Add telework item.
@@ -1231,6 +1308,16 @@ Filters:
 - Project.
 - Input status.
 - Review cycle.
+
+Current implementation:
+
+- Inputs are grouped by employee.
+- Existing inputs can be edited from the Performance page.
+- The full performance input form supports importing from a selected employee's tasks.
+- Completed-task conversion and the Today page performance shortcut use the same richer
+  import mapping.
+- The coverage table shows input count, most recent input, missing result count, and
+  missing impact count for each active employee.
 
 12.7 Training screen
 
@@ -1339,6 +1426,60 @@ Sections:
 - Data maintenance.
 - Appearance.
 - Help and About.
+
+Current implementation:
+
+- Backup and restore.
+- Attention rule thresholds.
+- Appearance with light/dark/system theme and color palettes:
+  Default, Ocean, Forest, Violet, Sunset, and Graphite.
+- Editable board columns.
+- Editable task categories.
+- Database health check.
+- Sample data load and reset all data.
+- About/version and data-use notice.
+
+12.14 Calendar screen
+
+Purpose:
+Provide a monthly planning view for dated supervisory work.
+
+Views and controls:
+
+- Month navigation.
+- Employee filter.
+- Independent layer toggles for tasks, leave, and telework.
+- No-due-date task tray.
+
+Current implementation:
+
+- Task due dates appear as draggable task chips.
+- Leave and situational telework can be shown as optional layers.
+- Dragging a task chip to a day reschedules it.
+- Dropping a task on the no-due-date tray clears the due date.
+- Keyboard alternative:
+  - [ and ] move the due date by one day.
+  - { and } move the due date by one week.
+  - Enter opens task detail.
+- Each day has a hover/focus add button to create a task due that day.
+- Leave and telework chips navigate to their respective pages.
+- Reschedules are recorded in activity history.
+
+12.15 Meetings screen
+
+Purpose:
+Capture meeting notes, discussion outcomes, and follow-up work linked to employees and projects.
+
+Current implementation:
+
+- Meeting note creation and editing.
+- Meeting type, date, title, linked employees, linked projects, discussion notes, decisions,
+  and action items.
+- Filters/search.
+- CSV export.
+- Archive/restore.
+- Follow-up task creation from a meeting note.
+- Meeting notes appear on employee profiles when linked to an employee.
 
 ======================================================================
 13. KANBAN BOARD SPECIFICATION
@@ -3314,16 +3455,21 @@ Test:
 
 - Due-state calculation.
 - Attention rules.
-- Recurrence generation.
+- Recurrence generation. Planned; recurrence is not implemented yet.
 - Date calculations.
 - Board ordering.
 - Filters.
 - Search normalization.
 - Backup validation.
-- Merge conflict detection.
+- Merge conflict detection. Planned; merge-on-import is not implemented yet.
 - Schema migrations.
 - Employee attention calculations.
 - Training expiration calculation.
+- Calendar month/grid/task mapping.
+- Performance import mapping from task details, notes, and checklist items.
+
+Current unit coverage includes dates, board ordering, attention rules, backup validation and
+round-trip behavior, calendar rules, and performance-import mapping.
 
 34.2 Component tests
 
@@ -3348,7 +3494,7 @@ Test:
 - Move task between columns.
 - Complete task.
 - Create performance input from completed task.
-- Create recurring task.
+- Create recurring task. Planned; recurrence is not implemented yet.
 - Import backup.
 - Export and re-import backup.
 - Archive and restore.
@@ -3372,6 +3518,11 @@ Critical path:
 10. Reset data.
 11. Import backup.
 12. Confirm restored records.
+
+Current status:
+Automated end-to-end coverage is still planned. Local verification currently uses build, unit
+tests, svelte-check, no-network scan, and targeted Playwright checks against the built or dev
+surface as needed.
 
 34.5 Manual NMCI tests
 
@@ -3417,11 +3568,15 @@ Never include real personnel data in the source repository.
 35. REPOSITORY AND CODE ORGANIZATION
 ======================================================================
 
-Suggested structure:
+Current structure:
 
-supervisor-assistant/
+SupervisorAssistant/
+    .claude/
+        skills/
+            verify/
+                SKILL.md
     README.md
-    PRODUCT_PLAN.txt
+    NIWC_Supervisor_Assistant_Project_Plan.txt
     CHANGELOG.md
     package.json
     package-lock.json
@@ -3429,41 +3584,30 @@ supervisor-assistant/
     tsconfig.json
     index.html
     src/
+        main.ts
         app/
             App.svelte
-            routes.ts
+            router.svelte.ts
         components/
-            board/
-                Board.svelte
-                BoardColumn.svelte
-                TaskCard.svelte
-                BoardToolbar.svelte
-            dialogs/
-                ConfirmDialog.svelte
-                ImportDialog.svelte
-                BackupDialog.svelte
-            forms/
-                TaskForm.svelte
-                EmployeeForm.svelte
-                PerformanceInputForm.svelte
-                TrainingRecordForm.svelte
-            layout/
-                AppHeader.svelte
-                SideNavigation.svelte
-                StatusBar.svelte
             common/
-                Badge.svelte
+                ConfirmDialog.svelte
+                Dialog.svelte
                 EmptyState.svelte
-                SearchBox.svelte
-                DateField.svelte
+                Icon.svelte
                 Toasts.svelte
+            forms/
+                TaskDetail.svelte
+                EmployeeForm.svelte
+                MeetingNoteForm.svelte
+                PerformanceInputForm.svelte
         pages/
             TodayPage.svelte
             BoardPage.svelte
+            CalendarPage.svelte
             EmployeesPage.svelte
             EmployeeDetailPage.svelte
             ProjectsPage.svelte
-            ProjectDetailPage.svelte
+            MeetingsPage.svelte
             PerformancePage.svelte
             TrainingPage.svelte
             LeavePage.svelte
@@ -3476,56 +3620,36 @@ supervisor-assistant/
             DataStore.ts
             IndexedDbDataStore.ts
             InMemoryDataStore.ts
-            migrations/
-            backup/
-                backupTypes.ts
-                backupExport.ts
-                backupImport.ts
-                backupValidation.ts
+            backup.ts
+            seed.ts
         domain/
-            models/
-            services/
-                taskService.ts
-                employeeService.ts
-                attentionService.ts
-                recurrenceService.ts
-                reportService.ts
+            models.ts
             rules/
-                taskRules.ts
-                trainingRules.ts
-                employeeRules.ts
-            validation/
+                attention.ts
+                boardOrder.ts
+                calendar.ts
+                dueState.ts
+                performanceImport.ts
+                training.ts
         stores/
-            appState.ts
-            uiState.ts
-            filterState.ts
+            app.svelte.ts
+            ui.svelte.ts
         utils/
             dates.ts
             ids.ts
-            text.ts
             csv.ts
             download.ts
-            capabilityDetection.ts
         styles/
-            variables.css
             base.css
-            components.css
-        test/
-            fixtures/
-            factories/
     environment-test/
         index.html
-        src/
     public/
         README-RUN.txt
     tests/
         unit/
-        integration/
-        e2e/
     scripts/
         build-single-file.mjs
         verify-no-network.mjs
-        generate-test-data.mjs
     dist/
 
 35.1 Repository rules
@@ -3556,7 +3680,36 @@ v0.2.0
 36. IMPLEMENTATION PHASES
 ======================================================================
 
+Current phase status:
+
+- Phases 0 through 6 are implemented at usable local-first depth.
+- Portions of Phase 7 are implemented:
+  - employee check-in records,
+  - employee attention reminders,
+  - meeting notes,
+  - performance import workflows.
+- Portions of Phase 8 are implemented:
+  - keyboard shortcuts,
+  - archive,
+  - reports,
+  - visual polish,
+  - build/release package,
+  - no-network verification,
+  - README-RUN.txt.
+- Phase 9 awards support is implemented as a simple awards list.
+- Remaining planned work:
+  - recurring task templates and generated instances,
+  - saved views,
+  - global search,
+  - bulk actions,
+  - merge-on-import conflict handling,
+  - print views,
+  - broader end-to-end release verification.
+
 PHASE 0: ENVIRONMENT COMPATIBILITY TEST
+
+Status:
+Implemented.
 
 Goal:
 Determine whether the planned local browser approach works on NMCI.
@@ -3578,6 +3731,9 @@ Acceptance:
 - Final storage strategy is selected.
 
 PHASE 1: PROJECT FOUNDATION
+
+Status:
+Implemented.
 
 Goal:
 Create maintainable application skeleton.
@@ -3605,6 +3761,9 @@ Acceptance:
 - No external network resources exist.
 
 PHASE 2: EMPLOYEES AND CORE TASKS
+
+Status:
+Implemented.
 
 Goal:
 Create the minimum usable organizer.
@@ -3634,6 +3793,9 @@ Acceptance:
 
 PHASE 3: TODAY DASHBOARD AND REMINDERS
 
+Status:
+Implemented, with later visual alignment polish.
+
 Goal:
 Make the app proactively identify work.
 
@@ -3656,6 +3818,10 @@ Acceptance:
 - Tests cover date boundaries.
 
 PHASE 4: BACKUP AND RECOVERY
+
+Status:
+Implemented for export, import preview, replace database, backup reminders, and health checks.
+Merge-on-import conflict handling remains planned.
 
 Goal:
 Make operational data recoverable.
@@ -3680,6 +3846,9 @@ Acceptance:
 
 PHASE 5: PERFORMANCE INPUTS
 
+Status:
+Implemented, including editing existing inputs and importing task details into performance inputs.
+
 Goal:
 Capture year-round employee accomplishments.
 
@@ -3700,6 +3869,9 @@ Acceptance:
 - Export readable summary.
 
 PHASE 6: TRAINING, LEAVE, AND TELEWORK
+
+Status:
+Implemented at current workflow depth.
 
 Goal:
 Add major personnel-related tracking areas.
@@ -3723,6 +3895,10 @@ Acceptance:
 
 PHASE 7: RECURRING WORK AND REVIEW
 
+Status:
+Partially implemented. Employee check-ins and attention reminders exist. Recurring task templates
+and generated instances remain planned.
+
 Goal:
 Reduce repeated manual creation.
 
@@ -3742,6 +3918,11 @@ Acceptance:
 - Completion-based recurrence schedules correctly.
 
 PHASE 8: POLISH AND RELEASE
+
+Status:
+Partially implemented. Keyboard shortcuts, archive, reports, visual polish, build package,
+README-RUN.txt, and no-network verification exist. Bulk actions, print views, and expanded
+end-to-end release testing remain planned.
 
 Goal:
 Prepare dependable daily-use release.
@@ -3770,6 +3951,10 @@ Acceptance:
 - User can operate core features without developer tools.
 
 PHASE 9: OPTIONAL AWARDS MODULE
+
+Status:
+Implemented as a simple awards list and employee-profile tab. A dedicated awards workflow board
+and richer award export remain optional future work.
 
 Goal:
 Add recognition workflow after the core system proves useful.
@@ -3802,6 +3987,8 @@ Deliverables:
 - Movement persists.
 - User can filter by employee, competency, project, category, and priority.
 - Completed tasks can be archived.
+- Board card hover/focus state is visible across the full card surface.
+- Board columns can be edited and reordered.
 - Board remains responsive at realistic data volume.
 
 37.3 Today
@@ -3813,15 +4000,28 @@ Deliverables:
 - Training and telework warnings display.
 - Backup reminder displays.
 - Every row states its reason.
+- Summary cards align consistently.
+- Attention queue columns align consistently across groups.
 
-37.4 Employees
+37.4 Calendar
+
+- Task due dates display on the month view.
+- Leave and telework layers can be toggled.
+- Employee filtering works.
+- User can reschedule a task by drag-and-drop.
+- User can reschedule a task by keyboard.
+- User can clear a due date through the no-due-date tray.
+- User can create a task due on a selected day.
+- Calendar task movements are recorded in activity history.
+
+37.5 Employees
 
 - User can create and edit employees.
 - Employee profile aggregates related records.
 - Inactive employees do not appear in normal assignment lists.
 - Historical records remain accessible.
 
-37.5 Backup
+37.6 Backup
 
 - Full export downloads a valid file.
 - Full import validates the file.
@@ -3829,15 +4029,17 @@ Deliverables:
 - Import cannot silently destroy current data.
 - Backup age is visible.
 
-37.6 Performance
+37.7 Performance
 
 - User can create structured input.
+- User can edit existing structured input.
 - Input can link to employee, project, and task.
 - Completed task can prefill input.
+- User can import details from an existing task.
 - Inputs can be grouped for review.
 - Inputs can export to text.
 
-37.7 Training
+37.8 Training
 
 - Requirement can be defined.
 - Requirement can be assigned.
@@ -3845,7 +4047,7 @@ Deliverables:
 - Due state is calculated.
 - Due items appear in Today.
 
-37.8 Security
+37.9 Security
 
 - No external scripts.
 - No external fonts.
@@ -3855,13 +4057,31 @@ Deliverables:
 - Security notice is visible.
 - Test data contains no real employee information.
 
+37.10 Meetings
+
+- User can create and edit meeting notes.
+- Meeting notes can link to employees and projects.
+- Action items can be recorded.
+- Follow-up tasks can be created from meeting notes.
+- Meeting notes can be exported to CSV.
+- Archived meeting notes remain recoverable.
+
+37.11 Settings and appearance
+
+- User can choose light, dark, or system theme.
+- User can choose an accent color palette.
+- Theme choices persist and are included in backups.
+- User can edit board columns.
+- User can edit task categories.
+- Database health checks expose orphaned references and record counts.
+
 ======================================================================
 38. CODING AGENT WORKING RULES
 ======================================================================
 
 These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent repository instruction file.
 
-1. Read PRODUCT_PLAN.txt before making architectural changes.
+1. Read NIWC_Supervisor_Assistant_Project_Plan.txt before making architectural changes.
 
 2. Do not add any runtime network dependency.
 
@@ -3916,7 +4136,7 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 25. Update CHANGELOG.md for user-visible changes.
 
-26. Update this plan only when an architectural decision changes.
+26. Update this plan when an architectural decision changes or when shipped scope materially changes.
 
 27. Prefer small, reviewable commits.
 
@@ -3932,15 +4152,15 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 PROMPT 1: CREATE ENVIRONMENT TEST
 
-Read PRODUCT_PLAN.txt, especially Sections 8 through 10. Create the smallest possible static browser application that tests local execution on an enterprise-managed Microsoft Edge browser. It must run without a server and without internet access. Test JavaScript execution, relative assets, IndexedDB create/write/read/persistence, JSON download, JSON import, drag-and-drop, clipboard availability, storage estimate availability, and File System Access API feature detection. Provide an on-screen results table and an Export Diagnostic Report button. Do not begin the main Supervisor Assistant application yet. Add instructions for testing persistence after a complete browser restart.
+Read NIWC_Supervisor_Assistant_Project_Plan.txt, especially Sections 8 through 10. Create the smallest possible static browser application that tests local execution on an enterprise-managed Microsoft Edge browser. It must run without a server and without internet access. Test JavaScript execution, relative assets, IndexedDB create/write/read/persistence, JSON download, JSON import, drag-and-drop, clipboard availability, storage estimate availability, and File System Access API feature detection. Provide an on-screen results table and an Export Diagnostic Report button. Do not begin the main RADAR application yet. Add instructions for testing persistence after a complete browser restart.
 
 PROMPT 2: INITIALIZE APPLICATION
 
-Read PRODUCT_PLAN.txt and the environment-test result. Initialize a Svelte, TypeScript, and Vite application using strict TypeScript. Create the layout, navigation shell, theme variables, DataStore interface, InMemoryDataStore, and IndexedDbDataStore. Configure a production build with relative assets and no external resources. Add unit-test setup and a script that scans the production output for external URLs. Do not build feature modules yet.
+Read NIWC_Supervisor_Assistant_Project_Plan.txt and the environment-test result. Initialize a Svelte, TypeScript, and Vite application using strict TypeScript. Create the layout, navigation shell, theme variables, DataStore interface, InMemoryDataStore, and IndexedDbDataStore. Configure a production build with relative assets and no external resources. Add unit-test setup and a script that scans the production output for external URLs. Do not build feature modules yet.
 
 PROMPT 3: IMPLEMENT EMPLOYEES
 
-Implement the Employee entity and employee management screens from PRODUCT_PLAN.txt. Include list, add, edit, archive, validation, competency selection, search, and test fixtures. Route all persistence through DataStore. Do not permanently delete employees with related data. Add unit and component tests.
+Implement the Employee entity and employee management screens from NIWC_Supervisor_Assistant_Project_Plan.txt. Include list, add, edit, archive, validation, competency selection, search, and test fixtures. Route all persistence through DataStore. Do not permanently delete employees with related data. Add unit and component tests.
 
 PROMPT 4: IMPLEMENT CORE TASKS
 
@@ -3972,7 +4192,7 @@ Implement recurrence templates with simple daily, weekly, monthly, annual, and c
 
 PROMPT 11: RELEASE REVIEW
 
-Review the entire repository against PRODUCT_PLAN.txt. Identify missing acceptance criteria, architecture violations, direct IndexedDB calls from UI, external network dependencies, unsafe HTML rendering, missing tests, inaccessible interactions, and destructive actions without recovery. Fix high-priority findings. Build a release folder and write README-RUN.txt for the operational user.
+Review the entire repository against NIWC_Supervisor_Assistant_Project_Plan.txt. Identify missing acceptance criteria, architecture violations, direct IndexedDB calls from UI, external network dependencies, unsafe HTML rendering, missing tests, inaccessible interactions, and destructive actions without recovery. Fix high-priority findings. Build a release folder and write README-RUN.txt for the operational user.
 
 ======================================================================
 40. FUTURE ENHANCEMENTS
@@ -4165,47 +4385,73 @@ Phase 2 must deliver a usable employee list and kanban board before building spe
 42. OPEN DECISIONS
 ======================================================================
 
-These decisions should be made after the environment test or early use.
+These decisions should be revisited during operational validation. Current implementation status:
 
 1. Does IndexedDB persist reliably on the actual NMCI browser?
+   - Still environment-specific. The environment test page and memory-only fallback exist.
 
 2. Can the application be opened from a local folder, approved network folder, or both?
+   - Still environment-specific. The production artifact is a self-contained HTML file intended
+     for local-file opening when policy permits.
 
 3. Should the production package be one HTML file or a folder?
+   - Current decision: one self-contained HTML file, with dist/radar.html as the primary operator
+     artifact.
 
 4. Is Svelte acceptable, or would plain TypeScript reduce build complexity enough to justify more manual UI work?
+   - Current decision: Svelte 5 with TypeScript and Vite is the implemented stack.
 
 5. Which fields are authorized for local storage?
+   - Still requires local policy review before real data entry.
 
 6. Where may backups be stored?
+   - Still requires local policy review. The app exports JSON backups but does not choose the
+     storage location.
 
 7. Should employee work email be stored?
+   - Supported by the data model and employee form; use depends on local authorization.
 
 8. Should leave type be stored, or only availability dates?
+   - Current implementation supports leave type plus availability dates. Users may choose
+     "Not specified" when only availability should be tracked.
 
 9. What official performance elements should be configured?
+   - Still organization-specific. The model supports performance elements.
 
 10. What default employee check-in interval is useful?
+    - Current default: 30 days, configurable in Settings.
 
 11. What threshold defines a stale task?
+    - Current default: 30 days, configurable in Settings.
 
 12. What threshold defines Waiting too long?
+    - Current default: 14 days, configurable in Settings.
 
 13. Should Complete remain on the board for 7, 14, or 30 days?
+    - Current default: 7 days, configurable in Settings.
 
 14. Should recurring employee check-ins generate one task per employee or one checklist task?
+    - Still open. Recurring task templates are not yet implemented.
 
 15. Are award records useful enough for the first operational release?
+    - Current decision: yes, implemented as a simple list and employee-profile tab.
 
 16. Are telework requests individual events, standing agreements, or both?
+    - Current implementation supports agreements, routine requests, situational requests,
+      renewals, modifications, and other record types.
 
 17. Is a leave calendar necessary, or is a sorted list sufficient?
+    - Current decision: both list-style tracking and calendar visibility are useful. Calendar
+      view can show leave as an optional layer.
 
 18. Is importing Planner or Excel data allowed and useful?
+    - Still open. No direct Planner or Excel import is implemented.
 
 19. Is calendar-file export allowed?
+    - Still open. No calendar-file export is implemented.
 
 20. Is encryption of backup files needed and technically supportable?
+    - Still open. Backup export is plain JSON and must be stored only in an approved location.
 
 ======================================================================
 43. DEFINITION OF DONE
@@ -4232,7 +4478,8 @@ A feature is done when:
 The first operational release is done when:
 
 - The NMCI compatibility test passes.
-- Core employees, tasks, board, Today dashboard, and backup work.
+- Core employees, tasks, Kanban Board, Calendar, Today dashboard, performance inputs, meetings,
+  training, leave, telework, and backup work.
 - Data survives browser restart.
 - Full backup round-trip is proven.
 - No external network calls occur.
@@ -4253,10 +4500,10 @@ Competencies:
 
 Employees:
 
-- Alex Morgan, 55140, Systems Engineer
-- Jordan Lee, 55140, Test Engineer
-- Casey Smith, 55230, Software Engineer
-- Taylor Brown, 55230, Project Analyst
+- 40 fictional active employees.
+- Approximately half assigned to competency 55140 and half to competency 55230.
+- Employees should cover multiple roles and teams so filters, profile tabs, reports, training,
+  leave, telework, and performance coverage can be exercised realistically.
 
 Projects:
 
@@ -4264,122 +4511,48 @@ Projects:
 - Project Harbor
 - Internal Training Improvement
 - Competency Workforce Planning
+- Customer Reporting Modernization
+- Knowledge Base Refresh
 
 Tasks:
 
-1.
-Title:
-Review Project Lighthouse test schedule
-
-Status:
-Planned
-
-Priority:
-High
-
-Category:
-Project Work
-
-Employee:
-Alex Morgan
-
-Due:
-Seven days from seed date
-
-2.
-Title:
-Verify annual cybersecurity training
-
-Status:
-Waiting
-
-Priority:
-Normal
-
-Category:
-Training
-
-Employee:
-Jordan Lee
-
-Waiting on:
-Updated SWAT record
-
-3.
-Title:
-Prepare telework renewal follow-up
-
-Status:
-Inbox
-
-Priority:
-Normal
-
-Category:
-Telework
-
-Employee:
-Casey Smith
-
-4.
-Title:
-Capture Project Harbor customer recognition
-
-Status:
-Needs Review
-
-Priority:
-Normal
-
-Category:
-Performance
-
-Employee:
-Taylor Brown
-
-5.
-Title:
-Weekly timekeeping review
-
-Status:
-Planned
-
-Priority:
-Normal
-
-Category:
-Timekeeping
-
-Recurrence:
-Weekly
+- Enough tasks to populate every default Kanban column.
+- Most task cards should be supervisor-owned administrative/project work rather than linked
+  to one of the 40 employees, because the employee records are primarily used for performance,
+  training, telework, and leave tracking.
+- A smaller number of tasks should be linked to employees to demonstrate task-to-employee
+  context, completion-to-performance conversion, training follow-up, telework follow-up, and
+  award/recognition workflows.
+- Include both board preview modes:
+  - description preview,
+  - checklist preview.
 
 Performance input:
 
-Employee:
-Taylor Brown
-
-Context:
-Project Harbor required a revised delivery approach after a schedule change.
-
-Action:
-Coordinated the revised task sequence and maintained communication with project stakeholders.
-
-Result:
-The team completed the revised deliverables without missing the adjusted milestone.
-
-Impact:
-Reduced schedule risk and preserved customer confidence.
+- Multiple fictional performance inputs across a broad set of employees.
+- Include a mix of ready and draft inputs.
+- Include some inputs missing Result or Impact so the Performance coverage table has useful
+  examples.
+- Include at least one completed, employee-linked task suitable for import into a performance
+  input.
 
 Training requirement:
 
-Name:
-Annual Cybersecurity Awareness
+- At least 10 fictional requirements.
+- Include all-employee annual requirements with shared due dates.
+- Include selected-employee one-time requirements.
+- Include at least one rolling requirement derived from completion date.
+- Include examples of complete, due soon, overdue, waived, not applicable, and assigned states.
 
-Recurrence:
-Annual
+Current sample data should also include:
 
-Warning days:
-30, 14, 7
+- Fictional meeting notes tied to employees and projects.
+- Fictional leave records.
+- Fictional telework agreement/request records.
+- Fictional award records.
+- Fictional check-in/interaction records.
+- Enough records to make employee profile tabs, reports, Today attention, Calendar layers, and
+  Settings health checks meaningful during manual review.
 
 ======================================================================
 45. GLOSSARY

@@ -184,13 +184,22 @@ export interface PerformanceInput {
   isArchived: boolean;
 }
 
+export type TrainingAssignmentScope = "all" | "selected";
+
 export interface TrainingRequirement {
   id: Id;
   name: string;
   description?: string;
-  category?: string;
+  category?: string; // legacy field, no longer surfaced in the UI
   recurrenceType?: "none" | "days" | "months" | "annual";
   recurrenceInterval?: number;
+  // Fixed due date shared by every assigned employee (annual and one-time
+  // requirements). Rolling requirements derive due from each completion.
+  dueDate?: IsoDate;
+  // Missing scope means "all" — annual requirements apply to everyone,
+  // including employees added later, without per-employee assignment.
+  assignmentScope?: TrainingAssignmentScope;
+  assignedEmployeeIds?: Id[];
   warningDays: number[];
   sourceSystem?: string;
   sourceReference?: string;

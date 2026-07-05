@@ -34,9 +34,9 @@
   let trainingWindows = $derived.by(() => {
     return [30, 60, 90].map((days) => {
       const horizon = addDays(app.today, days);
-      const due = app.employeeTrainingRecords.filter((r) => {
-        if (["not_applicable", "waived"].includes(r.status)) return false;
-        const d = r.status === "complete" ? r.expirationDate : r.dueDate;
+      const due = app.trainingStatusList.filter((r) => {
+        if (["not_applicable", "waived", "complete"].includes(r.status.state)) return false;
+        const d = r.status.dueDate;
         return Boolean(d && d >= app.today && d <= horizon);
       });
       return { days, count: due.length };

@@ -485,7 +485,7 @@
 {#if confirmSample}
   <ConfirmDialog
     title="Load sample data"
-    message="This replaces the current database with fictional sample data (4 employees, 4 projects, sample tasks). Continue?"
+    message="This replaces the current database with fictional sample data (40 employees, 10 training requirements, and sample tasks, performance inputs, leave, telework, meetings, and awards). Continue?"
     confirmLabel="Load sample data"
     danger
     onconfirm={async () => {

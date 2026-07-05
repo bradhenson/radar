@@ -1,41 +1,140 @@
 <script lang="ts">
-  // Training tracking (plan 12.7, 18): requirements, per-employee records,
-  // matrix view, bulk assignment, completion with expiration calculation.
+  // Training tracking (plan 12.7, 18 — revised): due dates live on the
+  // requirement (fixed date for everyone, or rolling from completion),
+  // assignment is declarative (everyone, or a selected list), and the primary
+  // working view is a per-requirement roster with one-click completion.
   import { app } from "../stores/app.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
-  import { addDays, addMonths, compareDates, daysBetween, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
+  import type { TrainingStatusRow } from "../stores/app.svelte";
+  import { TRAINING_STATE_LABELS, TRAINING_STATE_ORDER, rollingExpiration, type TrainingState, type TrainingStatus } from "../domain/rules/training";
+  import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
+
+  type Schedule = "annual" | "once" | "rolling";
 
   let reqFormOpen = $state(false);
   let editingReq = $state<TrainingRequirement | undefined>(undefined);
   let rName = $state("");
-  let rCategory = $state("");
-  let rRecurrence = $state<"none" | "days" | "months" | "annual">("annual");
-  let rInterval = $state(1);
-  let rWarning = $state("30, 14, 7");
+  let rSchedule = $state<Schedule>("annual");
+  let rDueDate = $state("");
+  let rInterval = $state(12);
+  let rUnit = $state<"months" | "days">("months");
+  let rScope = $state<"all" | "selected">("all");
+  let rSelected = $state<string[]>([]);
   let rError = $state("");
 
-  let recordDialog = $state<{ record: EmployeeTrainingRecord; reqName: string } | undefined>(undefined);
+  let selectedReqId = $state("");
+  let checkedIds = $state<string[]>([]);
+  let completeDate = $state(todayIso());
+  let showMatrix = $state(false);
+
+  let recordDialog = $state<{ employeeId: string; req: TrainingRequirement } | undefined>(undefined);
   let recDue = $state("");
   let recCompleted = $state("");
   let recStatus = $state<EmployeeTrainingRecord["status"]>("assigned");
   let recVerified = $state("");
   let recError = $state("");
 
-  let assignReqId = $state("");
-  let assignScope = $state("all");
+  let activeReqs = $derived(
+    app.trainingRequirements.filter((r) => r.active).sort((a, b) => a.name.localeCompare(b.name))
+  );
+  let selectedReq = $derived(activeReqs.find((r) => r.id === selectedReqId));
 
-  let activeReqs = $derived(app.trainingRequirements.filter((r) => r.active));
+  let summaries = $derived(
+    activeReqs.map((req) => {
+      const rows = app.trainingStatusList.filter((r) => r.requirement.id === req.id);
+      const counted = rows.filter((r) => r.status.state !== "waived" && r.status.state !== "not_applicable");
+      return {
+        req,
+        applicable: rows.length,
+        total: counted.length,
+        done: counted.filter((r) => r.status.state === "complete" || r.status.state === "expiring").length,
+        overdue: counted.filter((r) => r.status.state === "overdue" || r.status.state === "expired").length
+      };
+    })
+  );
+
+  let roster = $derived.by<TrainingStatusRow[]>(() => {
+    if (!selectedReq) return [];
+    return app.trainingStatusList
+      .filter((r) => r.requirement.id === selectedReq!.id)
+      .slice()
+      .sort(
+        (a, b) =>
+          TRAINING_STATE_ORDER[a.status.state] - TRAINING_STATE_ORDER[b.status.state] ||
+          a.employee.displayName.localeCompare(b.employee.displayName)
+      );
+  });
+  let incompleteIds = $derived(
+    roster
+      .filter((r) => !["complete", "waived", "not_applicable"].includes(r.status.state))
+      .map((r) => r.employee.id)
+  );
+
+  const CELL: Record<TrainingState, { symbol: string; cls: string }> = {
+    complete: { symbol: "✓", cls: "success" },
+    expiring: { symbol: "⚠", cls: "warning" },
+    expired: { symbol: "✗", cls: "overdue" },
+    due_soon: { symbol: "!", cls: "warning" },
+    overdue: { symbol: "✗", cls: "overdue" },
+    not_completed: { symbol: "–", cls: "" },
+    waived: { symbol: "W", cls: "" },
+    not_applicable: { symbol: "n/a", cls: "" }
+  };
+
+  let matrixCells = $derived.by(() => {
+    const map = new Map<string, TrainingStatusRow>();
+    for (const row of app.trainingStatusList) map.set(`${row.employee.id}|${row.requirement.id}`, row);
+    return map;
+  });
+
+  function scheduleText(req: TrainingRequirement): string {
+    if (req.recurrenceType === "months" || req.recurrenceType === "days")
+      return `Every ${req.recurrenceInterval ?? 12} ${req.recurrenceType} after completion`;
+    if (req.recurrenceType === "none") return req.dueDate ? `One-time — due ${formatDate(req.dueDate)}` : "One-time";
+    return req.dueDate ? `Annual — due ${formatDate(req.dueDate)}` : "Annual (no date set)";
+  }
+
+  function scopeText(req: TrainingRequirement): string {
+    if ((req.assignmentScope ?? "all") === "all") return "All active employees";
+    return `${(req.assignedEmployeeIds ?? []).length} selected`;
+  }
+
+  function statusText(status: TrainingStatus): string {
+    switch (status.state) {
+      case "complete":
+        return status.completedDate ? `Complete ${formatDate(status.completedDate)}` : "Complete";
+      case "expiring":
+        return `Expires ${formatDate(status.dueDate)}`;
+      case "expired":
+        return `Expired ${formatDate(status.dueDate)}`;
+      case "due_soon":
+      case "not_completed":
+        return status.dueDate ? `Due ${formatDate(status.dueDate)}` : "Not completed";
+      case "overdue":
+        return `Overdue — due ${formatDate(status.dueDate)}`;
+      default:
+        return TRAINING_STATE_LABELS[status.state];
+    }
+  }
 
   function openReqForm(req?: TrainingRequirement) {
     editingReq = req;
     rName = req?.name ?? "";
-    rCategory = req?.category ?? "";
-    rRecurrence = req?.recurrenceType ?? "annual";
-    rInterval = req?.recurrenceInterval ?? 1;
-    rWarning = (req?.warningDays ?? [30, 14, 7]).join(", ");
+    if (req?.recurrenceType === "months" || req?.recurrenceType === "days") {
+      rSchedule = "rolling";
+      rUnit = req.recurrenceType;
+      rInterval = req.recurrenceInterval ?? 12;
+    } else {
+      rSchedule = req?.recurrenceType === "none" ? "once" : "annual";
+      rUnit = "months";
+      rInterval = 12;
+    }
+    rDueDate = req?.dueDate ?? "";
+    rScope = req?.assignmentScope ?? "all";
+    rSelected = [...(req?.assignedEmployeeIds ?? [])];
     rError = "";
     reqFormOpen = true;
   }
@@ -46,18 +145,32 @@
       rError = "Name is required.";
       return;
     }
-    const warningDays = rWarning
-      .split(",")
-      .map((s) => parseInt(s.trim(), 10))
-      .filter((n) => Number.isFinite(n) && n > 0);
+    if (rSchedule === "annual" && !isValidIsoDate(rDueDate)) {
+      rError = "An annual requirement needs the shared due date.";
+      return;
+    }
+    if (rSchedule === "once" && rDueDate && !isValidIsoDate(rDueDate)) {
+      rError = "Due date must be a valid date.";
+      return;
+    }
+    if (rSchedule === "rolling" && (!Number.isFinite(rInterval) || rInterval < 1)) {
+      rError = "Interval must be at least 1.";
+      return;
+    }
+    if (rScope === "selected" && rSelected.length === 0) {
+      rError = "Select at least one employee, or apply to all.";
+      return;
+    }
     const now = nowTimestamp();
     const record: TrainingRequirement = {
       id: editingReq?.id ?? newId(),
       name,
-      category: rCategory.trim() || undefined,
-      recurrenceType: rRecurrence,
-      recurrenceInterval: rInterval,
-      warningDays,
+      recurrenceType: rSchedule === "annual" ? "annual" : rSchedule === "once" ? "none" : rUnit,
+      recurrenceInterval: rSchedule === "rolling" ? rInterval : 1,
+      dueDate: rSchedule === "rolling" ? undefined : rDueDate || undefined,
+      assignmentScope: rScope,
+      assignedEmployeeIds: rScope === "selected" ? [...rSelected] : undefined,
+      warningDays: editingReq?.warningDays ?? [30, 14, 7],
       active: editingReq?.active ?? true,
       createdAt: editingReq?.createdAt ?? now,
       updatedAt: now
@@ -67,40 +180,61 @@
       summary: `${editingReq ? "Updated" : "Created"} training requirement ${name}`
     });
     reqFormOpen = false;
+    if (!editingReq) selectedReqId = record.id;
   }
 
-  async function bulkAssign() {
-    if (!assignReqId) return;
-    const targets = app.activeEmployees.filter(
-      (e) => assignScope === "all" || e.competencyId === assignScope
-    );
-    const existing = new Set(
-      app.employeeTrainingRecords.filter((r) => r.trainingRequirementId === assignReqId).map((r) => r.employeeId)
-    );
-    const now = nowTimestamp();
-    let created = 0;
-    for (const e of targets) {
-      if (existing.has(e.id)) continue;
-      await app.putRecord("employeeTrainingRecords", {
-        id: newId(),
-        employeeId: e.id,
-        trainingRequirementId: assignReqId,
-        assignedDate: todayIso(),
-        status: "assigned",
-        createdAt: now,
-        updatedAt: now
-      });
-      created++;
+  function toggleSelected(id: string) {
+    rSelected = rSelected.includes(id) ? rSelected.filter((x) => x !== id) : [...rSelected, id];
+  }
+
+  function addCompetency(competencyId: string) {
+    const ids = app.activeEmployees.filter((e) => e.competencyId === competencyId).map((e) => e.id);
+    rSelected = [...new Set([...rSelected, ...ids])];
+  }
+
+  function openRoster(reqId: string) {
+    selectedReqId = selectedReqId === reqId ? "" : reqId;
+    checkedIds = [];
+  }
+
+  function toggleChecked(id: string) {
+    checkedIds = checkedIds.includes(id) ? checkedIds.filter((x) => x !== id) : [...checkedIds, id];
+  }
+
+  function toggleCheckAll() {
+    checkedIds = checkedIds.length === incompleteIds.length ? [] : [...incompleteIds];
+  }
+
+  async function markComplete(employeeIds: string[]) {
+    const req = selectedReq;
+    if (!req || employeeIds.length === 0) return;
+    const date = isValidIsoDate(completeDate) ? completeDate : todayIso();
+    const undos: { employeeId: string; before: EmployeeTrainingRecord | undefined }[] = [];
+    for (const id of employeeIds) {
+      const employee = app.activeEmployees.find((e) => e.id === id);
+      if (!employee) continue;
+      const before = await app.markTrainingComplete(employee, req, date);
+      undos.push({ employeeId: id, before });
     }
-    app.toast(created ? `Assigned to ${created} employee${created === 1 ? "" : "s"}` : "All selected employees already have this requirement");
+    checkedIds = [];
+    const n = undos.length;
+    app.toast(`Marked ${req.name} complete for ${n} employee${n === 1 ? "" : "s"}`, "success", async () => {
+      for (const u of undos) {
+        const current = app.employeeTrainingRecords.find(
+          (r) => r.employeeId === u.employeeId && r.trainingRequirementId === req.id
+        );
+        if (current) await app.undoTrainingComplete(req, current, u.before);
+      }
+    });
   }
 
-  function openRecord(record: EmployeeTrainingRecord, reqName: string) {
-    recordDialog = { record, reqName };
-    recDue = record.dueDate ?? "";
-    recCompleted = record.completedDate ?? "";
-    recStatus = record.status;
-    recVerified = record.lastVerifiedDate ?? "";
+  function openRecord(employeeId: string, req: TrainingRequirement) {
+    const rec = app.employeeTrainingRecords.find((r) => r.employeeId === employeeId && r.trainingRequirementId === req.id);
+    recordDialog = { employeeId, req };
+    recDue = rec?.dueDate ?? "";
+    recCompleted = rec?.completedDate ?? "";
+    recStatus = rec?.status ?? "assigned";
+    recVerified = rec?.lastVerifiedDate ?? "";
     recError = "";
   }
 
@@ -112,59 +246,28 @@
         return;
       }
     }
-    const rec = recordDialog.record;
-    const req = app.trainingRequirements.find((q) => q.id === rec.trainingRequirementId);
-    let expirationDate = rec.expirationDate;
-    let status = recStatus;
-    if (recCompleted) {
-      status = "complete";
-      // Calculate expiration from recurrence (plan 18.6).
-      if (req?.recurrenceType === "annual") expirationDate = addMonths(recCompleted, 12 * (req.recurrenceInterval ?? 1));
-      else if (req?.recurrenceType === "months" && req.recurrenceInterval) expirationDate = addMonths(recCompleted, req.recurrenceInterval);
-      else if (req?.recurrenceType === "days" && req.recurrenceInterval) expirationDate = addDays(recCompleted, req.recurrenceInterval);
-      else expirationDate = undefined;
-      if (expirationDate && expirationDate < recCompleted) {
-        recError = "Expiration cannot be before completion.";
-        return;
-      }
-    }
-    await app.putRecord(
-      "employeeTrainingRecords",
-      {
-        ...rec,
-        dueDate: recDue || undefined,
-        completedDate: recCompleted || undefined,
-        expirationDate,
-        status,
-        lastVerifiedDate: recVerified || undefined,
-        updatedAt: nowTimestamp()
-      },
-      {
-        actionType: "updated",
-        summary: `Updated ${recordDialog.reqName} record for ${app.employeeName(rec.employeeId)}`
-      }
-    );
+    const { employeeId, req } = recordDialog;
+    const existing = app.employeeTrainingRecords.find((r) => r.employeeId === employeeId && r.trainingRequirementId === req.id);
+    const now = nowTimestamp();
+    const status = recCompleted ? "complete" : recStatus;
+    const record: EmployeeTrainingRecord = {
+      ...existing,
+      id: existing?.id ?? newId(),
+      employeeId,
+      trainingRequirementId: req.id,
+      dueDate: recDue || undefined,
+      completedDate: recCompleted || undefined,
+      expirationDate: recCompleted ? rollingExpiration(req, recCompleted) : undefined,
+      status,
+      lastVerifiedDate: recVerified || undefined,
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
+    await app.putRecord("employeeTrainingRecords", record, {
+      actionType: "updated",
+      summary: `Updated ${req.name} record for ${app.employeeName(employeeId)}`
+    });
     recordDialog = undefined;
-  }
-
-  type CellState = { label: string; cls: string; record?: EmployeeTrainingRecord };
-
-  function cell(employeeId: string, reqId: string): CellState {
-    const rec = app.employeeTrainingRecords.find((r) => r.employeeId === employeeId && r.trainingRequirementId === reqId);
-    if (!rec) return { label: "—", cls: "" };
-    if (rec.status === "not_applicable") return { label: "N/A", cls: "", record: rec };
-    if (rec.status === "waived") return { label: "Waived", cls: "", record: rec };
-    const due = rec.status === "complete" ? rec.expirationDate : rec.dueDate;
-    if (rec.status === "complete") {
-      if (due && compareDates(due, app.today) < 0) return { label: "Expired", cls: "overdue", record: rec };
-      if (due && daysBetween(app.today, due) <= app.settings.trainingWarningDays)
-        return { label: `Expires ${formatDate(due)}`, cls: "warning", record: rec };
-      return { label: "Complete", cls: "success", record: rec };
-    }
-    if (due && compareDates(due, app.today) < 0) return { label: "Overdue", cls: "overdue", record: rec };
-    if (due && daysBetween(app.today, due) <= app.settings.trainingWarningDays)
-      return { label: `Due ${formatDate(due)}`, cls: "warning", record: rec };
-    return { label: due ? `Due ${formatDate(due)}` : "Assigned", cls: "", record: rec };
   }
 </script>
 
@@ -174,69 +277,139 @@
   </div>
 
   <div class="toolbar">
-    <select bind:value={assignReqId} aria-label="Requirement to assign">
-      <option value="">Select requirement…</option>
-      {#each activeReqs as r (r.id)}<option value={r.id}>{r.name}</option>{/each}
-    </select>
-    <select bind:value={assignScope} aria-label="Assignment scope">
-      <option value="all">All active employees</option>
-      {#each app.competencies as c (c.id)}<option value={c.id}>Competency {c.code}</option>{/each}
-    </select>
-    <button type="button" onclick={() => void bulkAssign()} disabled={!assignReqId}>Assign</button>
-    <span class="spacer"></span>
     <button type="button" class="primary" onclick={() => openReqForm()}>Add Requirement</button>
+    <span class="spacer"></span>
+    {#if activeReqs.length > 0}
+      <button type="button" onclick={() => (showMatrix = !showMatrix)}>{showMatrix ? "Hide matrix" : "Show matrix"}</button>
+    {/if}
   </div>
 
   {#if activeReqs.length === 0}
-    <EmptyState message="No training requirements defined." hint="Add a requirement (for example, Annual Cybersecurity Awareness), then assign it to employees." />
+    <EmptyState
+      message="No training requirements defined."
+      hint="Add a requirement (for example, Annual Cybersecurity Awareness). It applies to every active employee unless you pick specific people."
+    />
   {:else}
     <h2>Requirements</h2>
     <table class="data" style="margin-bottom:1.2rem">
-      <thead><tr><th>Name</th><th>Category</th><th>Recurrence</th><th>Warning days</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Due</th><th>Applies to</th><th>Progress</th><th></th></tr></thead>
       <tbody>
-        {#each activeReqs as r (r.id)}
-          <tr>
-            <td>{r.name}</td>
-            <td>{r.category ?? ""}</td>
-            <td>{r.recurrenceType === "none" ? "One time" : r.recurrenceType === "annual" ? "Annual" : `Every ${r.recurrenceInterval} ${r.recurrenceType}`}</td>
-            <td>{r.warningDays.join(", ")}</td>
-            <td><button type="button" onclick={() => openReqForm(r)}>Edit</button></td>
+        {#each summaries as s (s.req.id)}
+          <tr class:selected-req={s.req.id === selectedReqId}>
+            <td>{s.req.name}</td>
+            <td>{scheduleText(s.req)}</td>
+            <td>{scopeText(s.req)}</td>
+            <td>
+              {s.done}/{s.total} complete
+              {#if s.overdue > 0}<span class="badge overdue" style="margin-left:.4rem">{s.overdue} overdue</span>{/if}
+            </td>
+            <td style="white-space:nowrap">
+              <button type="button" onclick={() => openRoster(s.req.id)}>{s.req.id === selectedReqId ? "Close" : "Track"}</button>
+              <button type="button" onclick={() => openReqForm(s.req)}>Edit</button>
+            </td>
           </tr>
         {/each}
       </tbody>
     </table>
 
-    <h2>Matrix</h2>
-    <p class="muted small">Click a cell to update the record. “—” means not assigned.</p>
-    <div style="overflow-x:auto">
-      <table class="data">
-        <thead>
-          <tr>
-            <th>Employee</th>
-            {#each activeReqs as r (r.id)}<th>{r.name}</th>{/each}
-          </tr>
-        </thead>
-        <tbody>
-          {#each app.activeEmployees as e (e.id)}
+    {#if selectedReq}
+      {@const summary = summaries.find((s) => s.req.id === selectedReq!.id)}
+      <section class="card roster">
+        <div class="roster-head">
+          <h2>{selectedReq.name}</h2>
+          <span class="muted">{scheduleText(selectedReq)} · {summary?.done ?? 0}/{summary?.total ?? 0} complete</span>
+        </div>
+        <div class="toolbar">
+          <label for="complete-date" class="muted small">Completion date</label>
+          <input id="complete-date" type="date" bind:value={completeDate} />
+          <button type="button" class="primary" disabled={checkedIds.length === 0} onclick={() => void markComplete(checkedIds)}>
+            Mark {checkedIds.length || "selected"} complete
+          </button>
+        </div>
+        <table class="data">
+          <thead>
             <tr>
-              <td>{e.displayName}</td>
-              {#each activeReqs as r (r.id)}
-                {@const c = cell(e.id, r.id)}
-                <td>
-                  {#if c.record}
-                    <button type="button" class="cell-btn" onclick={() => openRecord(c.record!, r.name)}>
-                      <span class="badge {c.cls}">{c.label}</span>
-                    </button>
-                  {:else}
-                    <span class="muted">—</span>
-                  {/if}
-                </td>
-              {/each}
+              <th style="width:2rem">
+                <input
+                  type="checkbox"
+                  aria-label="Select all employees who have not completed this training"
+                  checked={incompleteIds.length > 0 && checkedIds.length === incompleteIds.length}
+                  disabled={incompleteIds.length === 0}
+                  onchange={toggleCheckAll}
+                />
+              </th>
+              <th>Employee</th>
+              <th>Status</th>
+              <th>Verified</th>
+              <th></th>
             </tr>
-          {/each}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {#each roster as row (row.employee.id)}
+              <tr>
+                <td>
+                  <input
+                    type="checkbox"
+                    aria-label={`Select ${row.employee.displayName}`}
+                    checked={checkedIds.includes(row.employee.id)}
+                    onchange={() => toggleChecked(row.employee.id)}
+                  />
+                </td>
+                <td>{row.employee.displayName}</td>
+                <td><span class="badge {CELL[row.status.state].cls}">{statusText(row.status)}</span></td>
+                <td>{formatDate(row.record?.lastVerifiedDate)}</td>
+                <td style="white-space:nowrap">
+                  {#if !["complete", "waived", "not_applicable"].includes(row.status.state)}
+                    <button type="button" onclick={() => void markComplete([row.employee.id])}>Complete</button>
+                  {/if}
+                  <button type="button" onclick={() => openRecord(row.employee.id, selectedReq!)}>Details</button>
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </section>
+    {/if}
+
+    {#if showMatrix}
+      <h2>Matrix overview</h2>
+      <p class="muted small">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
+      <div style="overflow-x:auto">
+        <table class="data matrix">
+          <thead>
+            <tr>
+              <th>Employee</th>
+              {#each activeReqs as r (r.id)}<th>{r.name}</th>{/each}
+            </tr>
+          </thead>
+          <tbody>
+            {#each app.activeEmployees as e (e.id)}
+              <tr>
+                <td>{e.displayName}</td>
+                {#each activeReqs as r (r.id)}
+                  {@const row = matrixCells.get(`${e.id}|${r.id}`)}
+                  <td class="matrix-cell">
+                    {#if row}
+                      <button
+                        type="button"
+                        class="cell-btn"
+                        title={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
+                        aria-label={`${r.name} — ${e.displayName}: ${statusText(row.status)}`}
+                        onclick={() => openRecord(e.id, r)}
+                      >
+                        <span class="badge {CELL[row.status.state].cls}">{CELL[row.status.state].symbol}</span>
+                      </button>
+                    {:else}
+                      <span class="muted" aria-label="Not assigned"></span>
+                    {/if}
+                  </td>
+                {/each}
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
   {/if}
 </div>
 
@@ -250,32 +423,68 @@
     >
       <label for="tr-name">Name <span class="req">*</span></label>
       <input id="tr-name" type="text" bind:value={rName} maxlength="200" style="width:100%" />
-      {#if rError}<div class="field-error">{rError}</div>{/if}
+
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
         <div>
-          <label for="tr-cat">Category</label>
-          <input id="tr-cat" type="text" bind:value={rCategory} maxlength="100" style="width:100%" />
-        </div>
-        <div>
-          <label for="tr-rec">Recurrence</label>
-          <select id="tr-rec" bind:value={rRecurrence} style="width:100%">
-            <option value="none">One time</option>
-            <option value="annual">Annual</option>
-            <option value="months">Every N months</option>
-            <option value="days">Every N days</option>
+          <label for="tr-sched">Due schedule</label>
+          <select id="tr-sched" bind:value={rSchedule} style="width:100%">
+            <option value="annual">Annual — everyone due by the same date</option>
+            <option value="once">One-time</option>
+            <option value="rolling">Repeats — due again after each completion</option>
           </select>
         </div>
-        {#if rRecurrence === "months" || rRecurrence === "days"}
+        {#if rSchedule === "rolling"}
           <div>
-            <label for="tr-int">Interval (N)</label>
-            <input id="tr-int" type="number" min="1" bind:value={rInterval} style="width:100%" />
+            <label for="tr-int">Repeat every</label>
+            <div style="display:flex; gap:.4rem">
+              <input id="tr-int" type="number" min="1" bind:value={rInterval} style="width:5rem" />
+              <select bind:value={rUnit} aria-label="Interval unit">
+                <option value="months">months</option>
+                <option value="days">days</option>
+              </select>
+            </div>
+          </div>
+        {:else}
+          <div>
+            <label for="tr-due">
+              Due date {#if rSchedule === "annual"}<span class="req">*</span>{:else}<span class="field-hint">(optional)</span>{/if}
+            </label>
+            <input id="tr-due" type="date" bind:value={rDueDate} style="width:100%" />
+            {#if rSchedule === "annual"}
+              <div class="field-hint">Everyone is due by this date. Move it forward when the next cycle starts and all completions reset automatically.</div>
+            {/if}
           </div>
         {/if}
-        <div>
-          <label for="tr-warn">Warning days <span class="field-hint">(comma separated)</span></label>
-          <input id="tr-warn" type="text" bind:value={rWarning} style="width:100%" />
-        </div>
       </div>
+
+      <fieldset style="border:none; padding:0; margin:.6rem 0 0">
+        <legend>Applies to</legend>
+        <label style="display:inline-flex; align-items:center; gap:.35rem; margin-right:1rem">
+          <input type="radio" name="tr-scope" value="all" bind:group={rScope} /> All active employees
+        </label>
+        <label style="display:inline-flex; align-items:center; gap:.35rem">
+          <input type="radio" name="tr-scope" value="selected" bind:group={rScope} /> Selected employees
+        </label>
+      </fieldset>
+      {#if rScope === "selected"}
+        <div class="toolbar" style="margin:.4rem 0 .2rem">
+          {#each app.competencies as c (c.id)}
+            <button type="button" onclick={() => addCompetency(c.id)}>Add {c.code}</button>
+          {/each}
+          <button type="button" onclick={() => (rSelected = [])}>Clear</button>
+          <span class="muted small">{rSelected.length} selected</span>
+        </div>
+        <div class="employee-picker">
+          {#each app.activeEmployees as e (e.id)}
+            <label>
+              <input type="checkbox" checked={rSelected.includes(e.id)} onchange={() => toggleSelected(e.id)} />
+              {e.displayName}
+            </label>
+          {/each}
+        </div>
+      {/if}
+
+      {#if rError}<div class="field-error">{rError}</div>{/if}
       <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
         <button type="button" onclick={() => (reqFormOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
@@ -285,7 +494,7 @@
 {/if}
 
 {#if recordDialog}
-  <Dialog title={`${recordDialog.reqName} — ${app.employeeName(recordDialog.record.employeeId)}`} onclose={() => (recordDialog = undefined)}>
+  <Dialog title={`${recordDialog.req.name} — ${app.employeeName(recordDialog.employeeId)}`} onclose={() => (recordDialog = undefined)}>
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -302,7 +511,7 @@
           </select>
         </div>
         <div>
-          <label for="rec-due">Due date</label>
+          <label for="rec-due">Due date override <span class="field-hint">(this employee only)</span></label>
           <input id="rec-due" type="date" bind:value={recDue} style="width:100%" />
         </div>
         <div>
@@ -325,4 +534,12 @@
 
 <style>
   .cell-btn { border: none; background: none; padding: 0; cursor: pointer; }
+  .matrix-cell { text-align: center; }
+  .matrix th { font-size: 0.8rem; }
+  .roster { margin-bottom: 1.2rem; }
+  .roster-head { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
+  .roster-head h2 { margin: 0; }
+  .selected-req td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+  .employee-picker { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 0.8rem; }
+  .employee-picker label { display: flex; align-items: center; gap: 0.35rem; font-weight: normal; }
 </style>

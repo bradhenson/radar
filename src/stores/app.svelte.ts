@@ -5,6 +5,7 @@
 import type {
   ActivityEntry,
   AppSettings,
+  IsoDate,
   AttentionSnooze,
   AwardRecord,
   BoardColumnDefinition,
@@ -37,8 +38,16 @@ import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
+import { requirementAppliesTo, rollingExpiration, trainingStatus, type TrainingStatus } from "../domain/rules/training";
 
 export type SaveStatus = "saved" | "saving" | "error";
+
+export interface TrainingStatusRow {
+  requirement: TrainingRequirement;
+  employee: Employee;
+  record?: EmployeeTrainingRecord;
+  status: TrainingStatus;
+}
 
 export interface Toast {
   id: string;
@@ -105,6 +114,27 @@ class AppStore {
   );
 
   activeEmployees = $derived(this.employees.filter((e) => e.activeStatus === "active" && !e.isArchived));
+
+  // One derived roster row per (active requirement × applicable employee);
+  // every training view reads status from here so they cannot disagree.
+  trainingStatusList = $derived.by<TrainingStatusRow[]>(() => {
+    const recByKey = new Map(this.employeeTrainingRecords.map((r) => [`${r.employeeId}|${r.trainingRequirementId}`, r]));
+    const rows: TrainingStatusRow[] = [];
+    for (const requirement of this.trainingRequirements) {
+      if (!requirement.active) continue;
+      for (const employee of this.activeEmployees) {
+        if (!requirementAppliesTo(requirement, employee)) continue;
+        const record = recByKey.get(`${employee.id}|${requirement.id}`);
+        rows.push({
+          requirement,
+          employee,
+          record,
+          status: trainingStatus(requirement, record, this.today, this.settings.trainingWarningDays)
+        });
+      }
+    }
+    return rows;
+  });
   activeProjects = $derived(this.projects.filter((p) => p.status === "active" && !p.isArchived));
   boardColumnList = $derived(
     [...this.boardColumns].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
@@ -751,6 +781,48 @@ class AppStore {
       await this.putRecord("tasks", { ...before, updatedAt: nowTimestamp() }, { actionType: "reopened", summary: `Reopened "${before.title}"` });
     });
     return updated;
+  }
+
+  // --- training service ---------------------------------------------------------
+  /**
+   * Record a completion for one employee, creating the fact record on first
+   * touch. Returns the pre-mutation record (undefined when newly created) so
+   * callers can offer Undo.
+   */
+  async markTrainingComplete(employee: Employee, req: TrainingRequirement, completedDate: IsoDate): Promise<EmployeeTrainingRecord | undefined> {
+    const existing = this.employeeTrainingRecords.find(
+      (r) => r.employeeId === employee.id && r.trainingRequirementId === req.id
+    );
+    const before = existing ? ($state.snapshot(existing) as EmployeeTrainingRecord) : undefined;
+    const now = nowTimestamp();
+    const updated: EmployeeTrainingRecord = {
+      id: existing?.id ?? newId(),
+      employeeId: employee.id,
+      trainingRequirementId: req.id,
+      ...existing,
+      completedDate,
+      // Rolling requirements carry their expiration; fixed-date cycles are
+      // governed by the requirement's due date instead.
+      expirationDate: rollingExpiration(req, completedDate),
+      status: "complete",
+      createdAt: existing?.createdAt ?? now,
+      updatedAt: now
+    };
+    await this.putRecord("employeeTrainingRecords", updated, {
+      actionType: "completed",
+      summary: `Marked ${req.name} complete for ${employee.displayName}`
+    });
+    return before;
+  }
+
+  async undoTrainingComplete(req: TrainingRequirement, current: EmployeeTrainingRecord, before: EmployeeTrainingRecord | undefined): Promise<void> {
+    const restored: EmployeeTrainingRecord = before
+      ? { ...before, updatedAt: nowTimestamp() }
+      : { ...current, completedDate: undefined, expirationDate: undefined, status: "assigned", updatedAt: nowTimestamp() };
+    await this.putRecord("employeeTrainingRecords", restored, {
+      actionType: "updated",
+      summary: `Undid completion of ${req.name} for ${this.employeeName(current.employeeId)}`
+    });
   }
 
   // --- backup -----------------------------------------------------------------

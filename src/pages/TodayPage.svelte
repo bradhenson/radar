@@ -39,11 +39,11 @@
       if (l.startDate >= app.today && l.startDate <= horizon)
         events.push({ date: l.startDate, label: `${app.employeeName(l.employeeId)} leave begins`, kind: "Leave" });
     }
-    for (const r of app.employeeTrainingRecords) {
-      const d = r.status === "complete" ? r.expirationDate : r.dueDate;
+    for (const r of app.trainingStatusList) {
+      if (["not_applicable", "waived", "complete"].includes(r.status.state)) continue;
+      const d = r.status.dueDate;
       if (d && d >= app.today && d <= horizon) {
-        const req = app.trainingRequirements.find((q) => q.id === r.trainingRequirementId);
-        events.push({ date: d, label: `${req?.name ?? "Training"} — ${app.employeeName(r.employeeId)}`, kind: "Training" });
+        events.push({ date: d, label: `${r.requirement.name} — ${r.employee.displayName}`, kind: "Training" });
       }
     }
     for (const tw of app.teleworkRecords) {

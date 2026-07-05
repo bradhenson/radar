@@ -32,9 +32,9 @@ describe("backup round trip", () => {
   it("records accurate counts in integrity metadata", async () => {
     const snapshot = createSampleSnapshot();
     const pkg = createBackupPackage(snapshot);
-    expect(pkg.integrity.recordCounts.employees).toBe(4);
-    expect(pkg.integrity.recordCounts.tasks).toBe(5);
-    expect(pkg.integrity.recordCounts.meetingNotes).toBe(1);
+    expect(pkg.integrity.recordCounts.employees).toBe(snapshot.collections.employees.length);
+    expect(pkg.integrity.recordCounts.tasks).toBe(snapshot.collections.tasks.length);
+    expect(pkg.integrity.recordCounts.meetingNotes).toBe(snapshot.collections.meetingNotes.length);
     expect(pkg.format).toBe(BACKUP_FORMAT);
   });
 });
@@ -96,12 +96,13 @@ describe("backup validation rejects bad input", () => {
   it("normalizes settings, dropping unknown keys and wrong types", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     const data = pkg.data as unknown as Record<string, unknown>;
-    data.settings = { dueSoonDays: "nope", theme: "dark", evil: "<script>" };
+    data.settings = { dueSoonDays: "nope", theme: "dark", userDisplayName: "Sample Supervisor", evil: "<script>" };
     const r = parseAndValidateBackup(JSON.stringify(pkg));
     expect(r.valid).toBe(true);
     const settings = r.package!.data.settings;
     expect(settings.dueSoonDays).toBe(7); // fell back to default
     expect(settings.theme).toBe("dark"); // valid override kept
+    expect(settings.userDisplayName).toBe("Sample Supervisor");
     expect("evil" in settings).toBe(false);
   });
 });

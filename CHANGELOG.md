@@ -2,6 +2,27 @@
 
 ## Unreleased
 
+### Changed
+- Sample data now represents a larger supervisory workload: 40 fictional employees, 10 training
+  requirements, mostly supervisor-owned task cards, and broader performance input, leave,
+  telework, meeting, award, and check-in examples.
+- Training redesign: due dates and assignment now live on the requirement instead of on each
+  employee's record. An annual requirement holds one shared due date for everyone (move it
+  forward when the next cycle starts and completions reset automatically); a "repeats after
+  completion" schedule derives each person's expiration from their completion date. Requirements
+  apply to all active employees by default (new hires inherit them automatically) or to a
+  selected list of employees for one-off needs. The bulk-assign toolbar and the category field
+  are gone.
+- New per-requirement roster view (the "Track" button): employees sorted incomplete-first with
+  one-click "Complete", multi-select + shared completion date for bulk entry, and Undo. The
+  matrix is now an optional compact overview (symbol + color per cell, click to edit details);
+  per-employee due-date overrides, waivers, and verification dates remain in the details dialog.
+- Employee profiles, Reports, and the Today page derive training status from the same shared
+  rule, so an employee with no record still shows as due once a requirement applies to them.
+- When many employees are due for the same requirement, the attention list shows one aggregated
+  line (for example "Annual Cybersecurity Awareness — 12 employees") instead of one row per
+  person.
+
 ### Added
 - Calendar page (sidebar, between Board and Employees): a combined month view showing task due
   dates alongside leave days and situational telework days (matching the Telework page's
