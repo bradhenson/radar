@@ -13,6 +13,10 @@
   let confirmReset = $state(false);
   let confirmSample = $state(false);
   let fileInput: HTMLInputElement | undefined = $state();
+  let newBoardColumnName = $state("");
+  let boardColumnError = $state("");
+  let newCategoryName = $state("");
+  let categoryError = $state("");
 
   // Local editable copy of settings; saved on change.
   async function updateSetting<K extends keyof typeof app.settings>(key: K, value: (typeof app.settings)[K]) {
@@ -24,6 +28,82 @@
       const v = parseInt((e.currentTarget as HTMLInputElement).value, 10);
       if (Number.isFinite(v) && v >= 0) void updateSetting(key, v as never);
     };
+  }
+
+  async function addBoardColumn() {
+    try {
+      await app.createBoardColumn(newBoardColumnName);
+      newBoardColumnName = "";
+      boardColumnError = "";
+      app.toast("Board column added", "success");
+    } catch (e) {
+      boardColumnError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function renameBoardColumn(id: string, value: string) {
+    try {
+      await app.renameBoardColumn(id, value);
+      boardColumnError = "";
+    } catch (e) {
+      boardColumnError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function deleteBoardColumn(id: string) {
+    try {
+      await app.deleteBoardColumn(id);
+      boardColumnError = "";
+    } catch (e) {
+      boardColumnError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function moveBoardColumn(id: string, offset: -1 | 1) {
+    try {
+      await app.moveBoardColumn(id, offset);
+      boardColumnError = "";
+    } catch (e) {
+      boardColumnError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function addTaskCategory() {
+    try {
+      await app.createTaskCategory(newCategoryName);
+      newCategoryName = "";
+      categoryError = "";
+      app.toast("Task category added", "success");
+    } catch (e) {
+      categoryError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function renameTaskCategory(id: string, value: string) {
+    try {
+      await app.renameTaskCategory(id, value);
+      categoryError = "";
+    } catch (e) {
+      categoryError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function setCategoryArchived(id: string, archived: boolean) {
+    try {
+      await app.setTaskCategoryArchived(id, archived);
+      categoryError = "";
+    } catch (e) {
+      categoryError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  async function moveTaskCategory(id: string, offset: -1 | 1) {
+    try {
+      await app.moveTaskCategory(id, offset);
+      categoryError = "";
+    } catch (e) {
+      categoryError = e instanceof Error ? e.message : String(e);
+    }
   }
 
   async function exportBackup() {
@@ -75,10 +155,12 @@
   let health = $derived.by(() => {
     const empIds = new Set(app.employees.map((e) => e.id));
     const projIds = new Set(app.projects.map((p) => p.id));
+    const boardColumnIds = new Set(app.boardColumns.map((c) => c.id));
     const taskIds = new Set(app.tasks.map((t) => t.id));
     return {
       orphanTaskEmployee: app.tasks.filter((t) => t.employeeId && !empIds.has(t.employeeId)).length,
       orphanTaskProject: app.tasks.filter((t) => t.projectId && !projIds.has(t.projectId)).length,
+      orphanTaskBoardColumn: app.tasks.filter((t) => t.boardColumnId && !boardColumnIds.has(t.boardColumnId)).length,
       orphanNotes: app.taskNotes.filter((n) => !taskIds.has(n.taskId)).length,
       orphanChecklist: app.checklistItems.filter((c) => !taskIds.has(c.taskId)).length,
       orphanTraining: app.employeeTrainingRecords.filter((r) => !empIds.has(r.employeeId)).length
@@ -150,6 +232,136 @@
   </section>
 
   <section class="card" style="margin-bottom:1rem">
+    <h2>Board columns</h2>
+    <p class="small muted">
+      Board columns organize cards visually. Task progress is stored separately as the task status.
+    </p>
+    <form
+      class="settings-add"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void addBoardColumn();
+      }}
+    >
+      <input
+        type="text"
+        bind:value={newBoardColumnName}
+        maxlength="80"
+        placeholder="New board column"
+        aria-label="New board column name"
+      />
+      <button type="submit" class="primary">Add column</button>
+    </form>
+    {#if boardColumnError}<div class="field-error">{boardColumnError}</div>{/if}
+    <table class="data settings-table">
+      <thead>
+        <tr><th>Name</th><th>Tasks</th><th>Order</th><th></th></tr>
+      </thead>
+      <tbody>
+        {#each app.boardColumnList as column, i (column.id)}
+          <tr>
+            <td>
+              <input
+                type="text"
+                value={column.label}
+                maxlength="80"
+                aria-label={`Board column name ${column.label}`}
+                onchange={(e) => void renameBoardColumn(column.id, (e.currentTarget as HTMLInputElement).value)}
+              />
+            </td>
+            <td>{app.boardColumnTaskCount(column.id)}</td>
+            <td>
+              <div class="settings-actions">
+                <button type="button" onclick={() => void moveBoardColumn(column.id, -1)} disabled={i === 0}>Up</button>
+                <button type="button" onclick={() => void moveBoardColumn(column.id, 1)} disabled={i === app.boardColumnList.length - 1}>Down</button>
+              </div>
+            </td>
+            <td>
+              <button
+                type="button"
+                class="danger"
+                onclick={() => void deleteBoardColumn(column.id)}
+                disabled={app.boardColumnTaskCount(column.id) > 0 || app.activeBoardColumns.length <= 1}
+                title={app.boardColumnTaskCount(column.id) > 0 ? "Move all tasks out of this column before deleting it" : "Delete column"}
+              >Delete</button>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-bottom:1rem">
+    <h2>Task categories</h2>
+    <p class="small muted">
+      Active categories appear in task forms and board filters. Archived categories stay on existing tasks but are hidden
+      from new task choices.
+    </p>
+    <form
+      class="category-add"
+      onsubmit={(e) => {
+        e.preventDefault();
+        void addTaskCategory();
+      }}
+    >
+      <input
+        type="text"
+        bind:value={newCategoryName}
+        maxlength="80"
+        placeholder="New category"
+        aria-label="New task category name"
+      />
+      <button type="submit" class="primary">Add category</button>
+    </form>
+    {#if categoryError}<div class="field-error">{categoryError}</div>{/if}
+    <table class="data category-table">
+      <thead>
+        <tr><th>Name</th><th>Tasks</th><th>Status</th><th>Order</th><th></th></tr>
+      </thead>
+      <tbody>
+        {#each app.taskCategoryList as category, i (category.id)}
+          <tr class:archived={category.isArchived}>
+            <td>
+              <input
+                type="text"
+                value={category.label}
+                maxlength="80"
+                aria-label={`Task category name ${category.label}`}
+                onchange={(e) => void renameTaskCategory(category.id, (e.currentTarget as HTMLInputElement).value)}
+              />
+            </td>
+            <td>{app.taskCategoryUsage(category.id)}</td>
+            <td>
+              {#if category.isArchived}
+                <span class="badge">Archived</span>
+              {:else}
+                <span class="badge success">Active</span>
+              {/if}
+            </td>
+            <td>
+              <div class="category-actions">
+                <button type="button" onclick={() => void moveTaskCategory(category.id, -1)} disabled={i === 0}>Up</button>
+                <button type="button" onclick={() => void moveTaskCategory(category.id, 1)} disabled={i === app.taskCategoryList.length - 1}>Down</button>
+              </div>
+            </td>
+            <td>
+              {#if category.isArchived}
+                <button type="button" onclick={() => void setCategoryArchived(category.id, false)}>Restore</button>
+              {:else}
+                <button
+                  type="button"
+                  onclick={() => void setCategoryArchived(category.id, true)}
+                  disabled={app.activeTaskCategories.length <= 1}
+                >Archive</button>
+              {/if}
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </section>
+
+  <section class="card" style="margin-bottom:1rem">
     <h2>Database health</h2>
     <p>
       {#if healthIssues === 0}
@@ -159,9 +371,10 @@
       {/if}
     </p>
     {#if healthIssues > 0}
-      <ul class="small">
+        <ul class="small">
         {#if health.orphanTaskEmployee}<li>{health.orphanTaskEmployee} task(s) reference a missing employee</li>{/if}
         {#if health.orphanTaskProject}<li>{health.orphanTaskProject} task(s) reference a missing project</li>{/if}
+        {#if health.orphanTaskBoardColumn}<li>{health.orphanTaskBoardColumn} task(s) reference a missing board column</li>{/if}
         {#if health.orphanNotes}<li>{health.orphanNotes} note(s) reference a missing task</li>{/if}
         {#if health.orphanChecklist}<li>{health.orphanChecklist} checklist item(s) reference a missing task</li>{/if}
         {#if health.orphanTraining}<li>{health.orphanTraining} training record(s) reference a missing employee</li>{/if}
@@ -283,4 +496,36 @@
   }
   .settings-grid label { font-weight: 400; }
   .settings-grid input { width: 6rem; display: block; }
+  .settings-add {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin: .7rem 0;
+  }
+  .settings-add input {
+    min-width: min(100%, 18rem);
+  }
+  .category-add {
+    display: flex;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin: .7rem 0;
+  }
+  .category-add input {
+    min-width: min(100%, 18rem);
+  }
+  .settings-table input,
+  .category-table input {
+    width: 100%;
+    min-width: 12rem;
+  }
+  .category-table .archived {
+    opacity: .72;
+  }
+  .settings-actions,
+  .category-actions {
+    display: flex;
+    gap: .35rem;
+    flex-wrap: wrap;
+  }
 </style>

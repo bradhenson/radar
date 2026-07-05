@@ -126,7 +126,7 @@
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
             <td style="white-space:nowrap">
-              <button type="button" onclick={() => ui.openQuickAdd({ projectId: r.p.id, category: "project" })}>Add task</button>
+              <button type="button" onclick={() => ui.openNewTask({ projectId: r.p.id, category: "project" })}>Add task</button>
               <button type="button" onclick={() => openForm(r.p)}>Edit</button>
             </td>
           </tr>

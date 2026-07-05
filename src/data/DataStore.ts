@@ -8,6 +8,7 @@ import type {
   AppSettings,
   AttentionSnooze,
   AwardRecord,
+  BoardColumnDefinition,
   ChecklistItem,
   Competency,
   Employee,
@@ -19,6 +20,7 @@ import type {
   PerformanceInput,
   Project,
   Task,
+  TaskCategoryDefinition,
   TaskNote,
   TeleworkRecord,
   TrainingRequirement
@@ -29,6 +31,8 @@ export interface CollectionTypes {
   employees: Employee;
   projects: Project;
   tasks: Task;
+  boardColumns: BoardColumnDefinition;
+  taskCategories: TaskCategoryDefinition;
   taskNotes: TaskNote;
   checklistItems: ChecklistItem;
   performanceElements: PerformanceElement;
@@ -51,6 +55,8 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "employees",
   "projects",
   "tasks",
+  "boardColumns",
+  "taskCategories",
   "taskNotes",
   "checklistItems",
   "performanceElements",

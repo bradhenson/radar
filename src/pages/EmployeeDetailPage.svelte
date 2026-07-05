@@ -93,7 +93,7 @@
       {#if employee.activeStatus !== "active"}<span class="badge warning">{employee.activeStatus.replace("_", " ")}</span>{/if}
       <span class="spacer" style="flex:1"></span>
       <button type="button" onclick={() => (checkInOpen = true)}>Record check-in</button>
-      <button type="button" onclick={() => ui.openQuickAdd({ employeeId, competencyId: employee.competencyId })}>Add task</button>
+      <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
       <button type="button" onclick={() => (editOpen = true)}>Edit</button>
     </div>

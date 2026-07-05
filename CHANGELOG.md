@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.1.2 — 2026-07-04
+
+### Changed
+- Cleaner, Planner-style board cards: tags no longer appear on cards, and the redundant status
+  badge was removed (the column already conveys it). Cards show only the category label, title,
+  project, relevant date/priority/waiting chips, and assignee.
+- New "Show on card" option (task detail): choose to preview either the description (3-line
+  clamp) or the checklist directly on the card, Planner-style. Checklist items shown on a card
+  can be checked off in place without opening the task; progress (for example "2/3") moves to
+  the card footer while the preview is visible.
+- Sample data now demonstrates both previews.
+
 ## 0.1.1 — 2026-07-04
 
 ### Changed

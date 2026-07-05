@@ -3,7 +3,6 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "./router.svelte";
   import Toasts from "../components/common/Toasts.svelte";
-  import QuickAddTask from "../components/forms/QuickAddTask.svelte";
   import TaskDetail from "../components/forms/TaskDetail.svelte";
   import PerformanceInputForm from "../components/forms/PerformanceInputForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
@@ -73,11 +72,11 @@
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.quickAddOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask) return;
+    if (ui.newTaskOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask) return;
     switch (e.key.toLowerCase()) {
       case "n":
         e.preventDefault();
-        ui.openQuickAdd();
+        ui.openNewTask();
         break;
       case "p":
         e.preventDefault();
@@ -118,7 +117,7 @@
         <span class="brand-mark" aria-hidden="true">SA</span>
         <span>{app.settings.applicationName}</span>
       </span>
-      <button type="button" class="primary new-task-btn" onclick={() => ui.openQuickAdd()} title="Shortcut: N">
+      <button type="button" class="primary new-task-btn" onclick={() => ui.openNewTask()} title="Shortcut: N">
         <Icon name="plus" size={15} />
         New Task
       </button>
@@ -188,8 +187,8 @@
     </footer>
   </div>
 
-  {#if ui.quickAddOpen}
-    <QuickAddTask />
+  {#if ui.newTaskOpen}
+    <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
   {/if}
   {#if detailTask}
     {#key detailTask.id}

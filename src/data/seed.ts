@@ -2,7 +2,7 @@
 
 import type { DatabaseSnapshot } from "./DataStore";
 import { emptyCollections } from "./DataStore";
-import { DEFAULT_SETTINGS } from "../domain/models";
+import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, DEFAULT_TASK_CATEGORY_SEEDS } from "../domain/models";
 import { addDays, nowTimestamp, todayIso } from "../utils/dates";
 import { newId } from "../utils/ids";
 import { ORDER_GAP } from "../domain/rules/boardOrder";
@@ -12,6 +12,24 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   const today = todayIso();
   const c = emptyCollections();
   const stamp = { createdAt: now, updatedAt: now };
+
+  c.taskCategories.push(
+    ...DEFAULT_TASK_CATEGORY_SEEDS.map((category) => ({
+      id: category.id,
+      label: category.label,
+      sortOrder: category.sortOrder,
+      isArchived: false,
+      ...stamp
+    }))
+  );
+  c.boardColumns.push(
+    ...DEFAULT_BOARD_COLUMN_SEEDS.map((column) => ({
+      id: column.id,
+      label: column.label,
+      sortOrder: column.sortOrder,
+      ...stamp
+    }))
+  );
 
   const comp55140 = { id: newId(), code: "55140", name: "Competency 55140", active: true, ...stamp };
   const comp55230 = { id: newId(), code: "55230", name: "Competency 55230", active: true, ...stamp };
@@ -54,6 +72,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       id: newId(),
       title: "Review Project Lighthouse test schedule",
       status: "planned",
+      boardColumnId: "planned",
       priority: "high",
       category: "project",
       employeeId: alex.id,
@@ -70,6 +89,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       id: newId(),
       title: "Verify annual cybersecurity training",
       status: "waiting",
+      boardColumnId: "waiting",
       priority: "normal",
       category: "training",
       employeeId: jordan.id,
@@ -88,8 +108,9 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       id: newId(),
       title: "Prepare telework renewal follow-up",
       status: "inbox",
+      boardColumnId: "inbox",
       priority: "normal",
-      category: "telework",
+      category: "administrative",
       employeeId: casey.id,
       competencyId: comp55230.id,
       performanceInputCreated: false,
@@ -102,6 +123,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       id: newId(),
       title: "Capture Project Harbor customer recognition",
       status: "needs_review",
+      boardColumnId: "needs_review",
       priority: "normal",
       category: "performance",
       employeeId: taylor.id,
@@ -117,8 +139,9 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       id: newId(),
       title: "Weekly timekeeping review",
       status: "planned",
+      boardColumnId: "planned",
       priority: "normal",
-      category: "timekeeping",
+      category: "administrative",
       dueDate: addDays(today, 3),
       performanceInputCreated: false,
       tags: ["recurring"],
@@ -127,6 +150,24 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       ...stamp
     }
   );
+
+  // Demonstrate the Planner-style card previews.
+  const lighthouseTask = c.tasks[0]!;
+  lighthouseTask.showOnCard = "checklist";
+  ["Confirm lab availability", "Review test entrance criteria", "Update integrated schedule"].forEach((title, i) =>
+    c.checklistItems.push({
+      id: newId(),
+      taskId: lighthouseTask.id,
+      title,
+      isComplete: i === 0,
+      completedAt: i === 0 ? now : undefined,
+      order: i + 1
+    })
+  );
+  const teleworkTask = c.tasks[2]!;
+  teleworkTask.description =
+    "Current agreement expires this quarter. Confirm the renewal packet is started and the schedule summary is still accurate.";
+  teleworkTask.showOnCard = "description";
 
   c.performanceInputs.push({
     id: newId(),

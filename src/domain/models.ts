@@ -68,18 +68,24 @@ export type TaskStatus =
 
 export type TaskPriority = "low" | "normal" | "high" | "critical";
 
-export type TaskCategory =
-  | "project"
-  | "personnel"
-  | "performance"
-  | "training"
-  | "leave"
-  | "telework"
-  | "award"
-  | "timekeeping"
-  | "meeting"
-  | "administrative"
-  | "general";
+export type TaskCategory = string;
+
+export interface TaskCategoryDefinition {
+  id: Id;
+  label: string;
+  sortOrder: number;
+  isArchived: boolean;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
+export interface BoardColumnDefinition {
+  id: Id;
+  label: string;
+  sortOrder: number;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
 
 export type VerificationStatus = "not_required" | "unverified" | "verified" | "needs_recheck";
 
@@ -88,6 +94,7 @@ export interface Task {
   title: string;
   description?: string;
   status: TaskStatus;
+  boardColumnId?: Id;
   priority: TaskPriority;
   category: TaskCategory;
   employeeId?: Id;
@@ -108,6 +115,8 @@ export interface Task {
   recurrenceTemplateId?: Id;
   recurrenceInstanceKey?: string;
   performanceInputCreated: boolean;
+  /** Planner-style preview: show the description or the checklist on the board card. */
+  showOnCard?: "description" | "checklist";
   tags: string[];
   boardOrder: number;
   createdAt: IsoTimestamp;
@@ -341,7 +350,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
-  { value: "inbox", label: "Inbox" },
+  { value: "inbox", label: "Not Started" },
   { value: "planned", label: "Planned" },
   { value: "in_progress", label: "In Progress" },
   { value: "waiting", label: "Waiting" },
@@ -351,6 +360,15 @@ export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
 
 export const BOARD_STATUSES: TaskStatus[] = TASK_STATUSES.map((s) => s.value);
 
+export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: number }[] = [
+  { id: "inbox", label: "Inbox", sortOrder: 10 },
+  { id: "planned", label: "Planned", sortOrder: 20 },
+  { id: "in_progress", label: "In Progress", sortOrder: 30 },
+  { id: "waiting", label: "Waiting", sortOrder: 40 },
+  { id: "needs_review", label: "Needs Review", sortOrder: 50 },
+  { id: "complete", label: "Complete", sortOrder: 60 }
+];
+
 export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
   { value: "low", label: "Low" },
   { value: "normal", label: "Normal" },
@@ -358,19 +376,16 @@ export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
   { value: "critical", label: "Critical" }
 ];
 
-export const TASK_CATEGORIES: { value: TaskCategory; label: string }[] = [
-  { value: "project", label: "Project Work" },
-  { value: "personnel", label: "Personnel Action" },
-  { value: "performance", label: "Performance" },
-  { value: "training", label: "Training" },
-  { value: "leave", label: "Leave" },
-  { value: "telework", label: "Telework" },
-  { value: "award", label: "Award" },
-  { value: "timekeeping", label: "Timekeeping" },
-  { value: "meeting", label: "Meeting Follow-up" },
-  { value: "administrative", label: "Administrative" },
-  { value: "general", label: "General" }
+export const DEFAULT_TASK_CATEGORY_SEEDS: { id: TaskCategory; label: string; sortOrder: number }[] = [
+  { id: "general", label: "General", sortOrder: 10 },
+  { id: "project", label: "Project Work", sortOrder: 20 },
+  { id: "personnel", label: "Personnel", sortOrder: 30 },
+  { id: "performance", label: "Performance", sortOrder: 40 },
+  { id: "training", label: "Training", sortOrder: 50 },
+  { id: "administrative", label: "Administrative", sortOrder: 60 }
 ];
+
+export const TASK_CATEGORIES = DEFAULT_TASK_CATEGORY_SEEDS.map((c) => ({ value: c.id, label: c.label }));
 
 export const SOURCE_SYSTEMS = ["None", "Planner", "ERP", "SWAT", "Email", "Meeting", "Supervisor", "Employee", "Other"];
 

@@ -60,6 +60,8 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   competencies: ["id", "code"],
   projects: ["id", "name", "status"],
   tasks: ["id", "title", "status", "priority", "category"],
+  boardColumns: ["id", "label"],
+  taskCategories: ["id", "label"],
   taskNotes: ["id", "taskId", "body"],
   checklistItems: ["id", "taskId", "title"],
   performanceInputs: ["id", "employeeId", "inputDate", "actionOrAccomplishment"],

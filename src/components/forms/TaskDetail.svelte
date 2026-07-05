@@ -4,8 +4,6 @@
   import { app } from "../../stores/app.svelte";
   import { ui } from "../../stores/ui.svelte";
   import {
-    SOURCE_SYSTEMS,
-    TASK_CATEGORIES,
     TASK_PRIORITIES,
     TASK_STATUSES,
     statusLabel,
@@ -15,34 +13,52 @@
   import { newId } from "../../utils/ids";
   import { orderForAppend } from "../../domain/rules/boardOrder";
 
-  let { task }: { task: Task } = $props();
+  let {
+    task,
+    defaults = {},
+    onclose
+  }: { task?: Task; defaults?: Partial<Task>; onclose?: () => void } = $props();
+
+  function getInitialTask(): Task {
+    return task ?? app.createTask({ ...defaults, title: defaults.title ?? "" });
+  }
+
+  function hasExistingTask(): boolean {
+    return task !== undefined;
+  }
+
+  const initialTask = getInitialTask();
+  const isNewTask = !hasExistingTask();
 
   // Editable copy; persisted on Save.
-  let draft = $state({ ...task, tags: [...task.tags] });
-  let tagsText = $state(task.tags.join(", "));
+  let draft = $state({ ...initialTask, tags: [...initialTask.tags] });
+  let tagsText = $state(initialTask.tags.join(", "));
   let newNote = $state("");
   let newChecklistItem = $state("");
   let error = $state("");
   let saving = $state(false);
 
   let notes = $derived(
-    app.taskNotes.filter((n) => n.taskId === task.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+    isNewTask ? [] : app.taskNotes.filter((n) => n.taskId === initialTask.id).sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   );
   let checklist = $derived(
-    app.checklistItems.filter((c) => c.taskId === task.id).sort((a, b) => a.order - b.order)
+    isNewTask ? [] : app.checklistItems.filter((c) => c.taskId === initialTask.id).sort((a, b) => a.order - b.order)
   );
   let activity = $derived(
-    app.activityEntries
-      .filter((a) => a.entityType === "tasks" && a.entityId === task.id)
-      .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
-      .slice(0, 15)
+    isNewTask
+      ? []
+      : app.activityEntries
+          .filter((a) => a.entityType === "tasks" && a.entityId === initialTask.id)
+          .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+          .slice(0, 15)
   );
 
   type EditableTaskFields = ReturnType<typeof editableFieldsFromDraft>;
   type EditableTaskField = keyof EditableTaskFields;
 
   function close() {
-    ui.detailTaskId = undefined;
+    if (onclose) onclose();
+    else ui.detailTaskId = undefined;
   }
 
   function normalizedTags(): string[] {
@@ -58,6 +74,7 @@
       title: draft.title.trim(),
       description: draft.description?.trim() || undefined,
       status: draft.status,
+      boardColumnId: draft.boardColumnId || app.defaultBoardColumnId(),
       priority: draft.priority,
       category: draft.category,
       employeeId: draft.employeeId || undefined,
@@ -66,10 +83,9 @@
       startDate: draft.startDate || undefined,
       reminderDate: draft.reminderDate || undefined,
       followUpDate: draft.followUpDate || undefined,
-      sourceSystem: draft.sourceSystem === "None" ? undefined : draft.sourceSystem,
-      sourceReference: draft.sourceReference?.trim() || undefined,
       waitingReason: draft.waitingReason?.trim() || undefined,
       waitingOn: draft.waitingOn?.trim() || undefined,
+      showOnCard: draft.showOnCard,
       tags: normalizedTags()
     };
   }
@@ -79,6 +95,7 @@
       title: t.title.trim(),
       description: t.description?.trim() || undefined,
       status: t.status,
+      boardColumnId: app.taskBoardColumnId(t),
       priority: t.priority,
       category: t.category,
       employeeId: t.employeeId || undefined,
@@ -87,16 +104,15 @@
       startDate: t.startDate || undefined,
       reminderDate: t.reminderDate || undefined,
       followUpDate: t.followUpDate || undefined,
-      sourceSystem: t.sourceSystem === "None" ? undefined : t.sourceSystem,
-      sourceReference: t.sourceReference?.trim() || undefined,
       waitingReason: t.waitingReason?.trim() || undefined,
       waitingOn: t.waitingOn?.trim() || undefined,
+      showOnCard: t.showOnCard,
       tags: [...t.tags]
     };
   }
 
   let hasUnsavedChanges = $derived(
-    JSON.stringify(editableFieldsFromDraft()) !== JSON.stringify(editableFieldsFromTask(task))
+    JSON.stringify(editableFieldsFromDraft()) !== JSON.stringify(editableFieldsFromTask(initialTask))
   );
 
   function validateDraft(fields: ReturnType<typeof editableFieldsFromDraft>): boolean {
@@ -131,6 +147,7 @@
     title: "title",
     description: "description",
     status: "status",
+    boardColumnId: "board column",
     priority: "priority",
     category: "category",
     employeeId: "employee",
@@ -139,10 +156,9 @@
     startDate: "start date",
     reminderDate: "reminder date",
     followUpDate: "follow-up date",
-    sourceSystem: "source system",
-    sourceReference: "source reference",
     waitingReason: "waiting reason",
     waitingOn: "waiting on",
+    showOnCard: "show on card",
     tags: "tags"
   };
 
@@ -171,12 +187,12 @@
   }
 
   function taskChangeSummary(fields: EditableTaskFields, statusChanged: boolean): string {
-    const beforeFields = editableFieldsFromTask(task);
+    const beforeFields = editableFieldsFromTask(initialTask);
     const changedFields = (Object.keys(fields) as EditableTaskField[]).filter(
       (field) => fieldChanged(beforeFields[field], fields[field]) && !(statusChanged && field === "status")
     );
     if (statusChanged) {
-      const base = `Moved "${fields.title}" from ${statusLabel(task.status)} to ${statusLabel(fields.status)}`;
+      const base = `Changed status for "${fields.title}" from ${statusLabel(initialTask.status)} to ${statusLabel(fields.status)}`;
       return changedFields.length ? `${base}; also updated ${updatedFieldsSummary(changedFields)}` : base;
     }
     return `Updated task "${fields.title}": ${changedFieldsSummary(changedFields)}`;
@@ -191,26 +207,33 @@
       return true;
     }
 
-    const statusChanged = fields.status !== task.status;
+    const statusChanged = fields.status !== initialTask.status;
+    const boardColumnChanged = fields.boardColumnId !== app.taskBoardColumnId(initialTask);
     const updated: Task = {
-      ...task,
+      ...initialTask,
       ...fields
     };
-    if (statusChanged) {
+    if (isNewTask || boardColumnChanged) {
       updated.boardOrder = orderForAppend(
-        app.tasks.filter((t) => t.status === updated.status && !t.isArchived && t.id !== task.id).map((t) => t.boardOrder)
+        app.tasks
+          .filter((t) => app.taskBoardColumnId(t) === updated.boardColumnId && !t.isArchived && t.id !== initialTask.id)
+          .map((t) => t.boardOrder)
       );
-      if (updated.status === "waiting") updated.waitingSince = nowTimestamp();
-      if (updated.status === "complete" && task.status !== "complete") updated.completedDate = app.today;
-      if (updated.status !== "complete") updated.completedDate = undefined;
     }
+    if (updated.status === "waiting" && (isNewTask || initialTask.status !== "waiting")) updated.waitingSince = nowTimestamp();
+    if (updated.status === "complete" && (isNewTask || initialTask.status !== "complete")) updated.completedDate = app.today;
+    if (updated.status !== "complete") updated.completedDate = undefined;
     saving = true;
     try {
-      await app.updateTask(
-        updated,
-        taskChangeSummary(fields, statusChanged),
-        statusChanged ? "status_changed" : "updated"
-      );
+      if (isNewTask) {
+        await app.saveNewTask(updated);
+      } else {
+        await app.updateTask(
+          updated,
+          taskChangeSummary(fields, statusChanged),
+          statusChanged ? "status_changed" : "updated"
+        );
+      }
       if (statusChanged && updated.status === "complete" && updated.employeeId && !updated.performanceInputCreated) {
         ui.performancePromptTask = updated;
       }
@@ -238,7 +261,8 @@
   }
 
   async function completeNow() {
-    const updated = await app.completeTask(task);
+    if (isNewTask) return;
+    const updated = await app.completeTask(initialTask);
     if (updated.employeeId && !updated.performanceInputCreated) {
       ui.performancePromptTask = updated;
     }
@@ -246,7 +270,8 @@
   }
 
   async function archive() {
-    await app.updateTask({ ...task, isArchived: true }, `Archived "${task.title}"`, "archived");
+    if (isNewTask) return;
+    await app.updateTask({ ...initialTask, isArchived: true }, `Archived "${initialTask.title}"`, "archived");
     close();
   }
 
@@ -256,8 +281,8 @@
     const now = nowTimestamp();
     await app.putRecord(
       "taskNotes",
-      { id: newId(), taskId: task.id, body, noteType: "general", createdAt: now, updatedAt: now },
-      { actionType: "updated", summary: `Added note to "${task.title}"`, entityType: "tasks" }
+      { id: newId(), taskId: initialTask.id, body, noteType: "general", createdAt: now, updatedAt: now },
+      { actionType: "updated", summary: `Added note to "${initialTask.title}"`, entityType: "tasks" }
     );
     newNote = "";
   }
@@ -267,7 +292,7 @@
     if (!title) return;
     await app.putRecord("checklistItems", {
       id: newId(),
-      taskId: task.id,
+      taskId: initialTask.id,
       title,
       isComplete: false,
       order: checklist.length + 1
@@ -286,7 +311,7 @@
   }
 </script>
 
-<Dialog title="Task" wide onclose={() => void autosaveAndClose()}>
+<Dialog title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -299,12 +324,26 @@
 
     <label for="td-desc">Description</label>
     <textarea id="td-desc" bind:value={draft.description} rows="3" maxlength="10000" style="width:100%"></textarea>
+    <label class="show-on-card">
+      <input
+        type="checkbox"
+        checked={draft.showOnCard === "description"}
+        onchange={(e) => (draft.showOnCard = (e.currentTarget as HTMLInputElement).checked ? "description" : undefined)}
+      />
+      Show description on card
+    </label>
 
     <div class="grid">
       <div>
         <label for="td-status">Status</label>
         <select id="td-status" bind:value={draft.status} style="width:100%">
           {#each TASK_STATUSES as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
+        </select>
+      </div>
+      <div>
+        <label for="td-column">Board column</label>
+        <select id="td-column" bind:value={draft.boardColumnId} style="width:100%">
+          {#each app.boardColumnOptions(draft.boardColumnId) as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
         </select>
       </div>
       <div>
@@ -316,7 +355,7 @@
       <div>
         <label for="td-category">Category</label>
         <select id="td-category" bind:value={draft.category} style="width:100%">
-          {#each TASK_CATEGORIES as c (c.value)}<option value={c.value}>{c.label}</option>{/each}
+          {#each app.taskCategoryOptions(draft.category) as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
         </select>
       </div>
       <div>
@@ -346,16 +385,6 @@
         <input id="td-reminder" type="date" bind:value={draft.reminderDate} style="width:100%" />
       </div>
       <div>
-        <label for="td-source">Source system</label>
-        <select id="td-source" bind:value={draft.sourceSystem} style="width:100%">
-          {#each SOURCE_SYSTEMS as s (s)}<option value={s}>{s}</option>{/each}
-        </select>
-      </div>
-      <div>
-        <label for="td-sourceref">Source reference</label>
-        <input id="td-sourceref" type="text" bind:value={draft.sourceReference} maxlength="500" style="width:100%" />
-      </div>
-      <div>
         <label for="td-tags">Tags <span class="field-hint">(comma separated)</span></label>
         <input id="td-tags" type="text" bind:value={tagsText} style="width:100%" />
       </div>
@@ -376,11 +405,11 @@
     </div>
 
     <div style="display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap;">
-      <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
-      {#if task.status !== "complete"}
+      <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : isNewTask ? "Create task" : "Save"}</button>
+      {#if !isNewTask && initialTask.status !== "complete"}
         <button type="button" onclick={() => void completeNow()}>Complete</button>
       {/if}
-      {#if !task.isArchived}
+      {#if !isNewTask && !initialTask.isArchived}
         <button type="button" onclick={() => void archive()}>Archive</button>
       {/if}
       <span class="spacer" style="flex:1"></span>
@@ -388,63 +417,73 @@
     </div>
   </form>
 
-  <hr style="border:none; border-top:1px solid var(--border); margin:1rem 0" />
+  {#if !isNewTask}
+    <hr style="border:none; border-top:1px solid var(--border); margin:1rem 0" />
 
-  <div class="grid2">
-    <section>
-      <h3>Checklist {#if checklist.length}<span class="muted small">({checklist.filter((c) => c.isComplete).length} of {checklist.length} complete)</span>{/if}</h3>
-      <ul class="checklist">
-        {#each checklist as item (item.id)}
-          <li>
-            <label class="check-label">
-              <input type="checkbox" checked={item.isComplete} onchange={() => void toggleChecklist(item.id)} />
-              <span class:done={item.isComplete}>{item.title}</span>
-            </label>
-          </li>
-        {/each}
-      </ul>
-      <div style="display:flex; gap:.4rem;">
-        <input
-          type="text"
-          placeholder="Add checklist item"
-          bind:value={newChecklistItem}
-          maxlength="200"
-          style="flex:1"
-          onkeydown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              void addChecklistItem();
-            }
-          }}
-        />
-        <button type="button" onclick={() => void addChecklistItem()}>Add</button>
-      </div>
-    </section>
-
-    <section>
-      <h3>Notes</h3>
-      <div style="display:flex; gap:.4rem; margin-bottom:.5rem;">
-        <textarea placeholder="Add a note" bind:value={newNote} rows="2" maxlength="10000" style="flex:1"></textarea>
-        <button type="button" onclick={() => void addNote()}>Add</button>
-      </div>
-      {#each notes as note (note.id)}
-        <div class="note">
-          <div class="small muted">{formatTimestamp(note.createdAt)}</div>
-          <div style="white-space:pre-wrap">{note.body}</div>
+    <div class="grid2">
+      <section>
+        <h3>Checklist {#if checklist.length}<span class="muted small">({checklist.filter((c) => c.isComplete).length} of {checklist.length} complete)</span>{/if}</h3>
+        <label class="show-on-card">
+          <input
+            type="checkbox"
+            checked={draft.showOnCard === "checklist"}
+            onchange={(e) => (draft.showOnCard = (e.currentTarget as HTMLInputElement).checked ? "checklist" : undefined)}
+          />
+          Show checklist on card
+        </label>
+        <ul class="checklist">
+          {#each checklist as item (item.id)}
+            <li>
+              <label class="check-label">
+                <input type="checkbox" checked={item.isComplete} onchange={() => void toggleChecklist(item.id)} />
+                <span class:done={item.isComplete}>{item.title}</span>
+              </label>
+            </li>
+          {/each}
+        </ul>
+        <div style="display:flex; gap:.4rem;">
+          <input
+            type="text"
+            placeholder="Add checklist item"
+            bind:value={newChecklistItem}
+            maxlength="200"
+            style="flex:1"
+            onkeydown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void addChecklistItem();
+              }
+            }}
+          />
+          <button type="button" onclick={() => void addChecklistItem()}>Add</button>
         </div>
-      {/each}
-    </section>
-  </div>
+      </section>
 
-  {#if activity.length}
-    <section style="margin-top:1rem">
-      <h3>Recent activity</h3>
-      <ul class="activity">
-        {#each activity as entry (entry.id)}
-          <li><span class="muted small">{formatTimestamp(entry.timestamp)}</span> — {entry.summary}</li>
+      <section>
+        <h3>Notes</h3>
+        <div style="display:flex; gap:.4rem; margin-bottom:.5rem;">
+          <textarea placeholder="Add a note" bind:value={newNote} rows="2" maxlength="10000" style="flex:1"></textarea>
+          <button type="button" onclick={() => void addNote()}>Add</button>
+        </div>
+        {#each notes as note (note.id)}
+          <div class="note">
+            <div class="small muted">{formatTimestamp(note.createdAt)}</div>
+            <div style="white-space:pre-wrap">{note.body}</div>
+          </div>
         {/each}
-      </ul>
-    </section>
+      </section>
+    </div>
+
+    {#if activity.length}
+      <section style="margin-top:1rem">
+        <h3>Recent activity</h3>
+        <ul class="activity">
+          {#each activity as entry (entry.id)}
+            <li><span class="muted small">{formatTimestamp(entry.timestamp)}</span> — {entry.summary}</li>
+          {/each}
+        </ul>
+      </section>
+    {/if}
   {/if}
 </Dialog>
 
@@ -462,6 +501,15 @@
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr 1fr; }
     .grid2 { grid-template-columns: 1fr; }
+  }
+  .show-on-card {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    font-weight: 400;
+    font-size: .82rem;
+    color: var(--text-muted);
+    margin: .3rem 0 .4rem;
   }
   .checklist { list-style: none; padding: 0; margin: 0 0 .5rem; }
   .check-label { display: flex; gap: .45rem; align-items: baseline; font-weight: 400; margin: .15rem 0; }

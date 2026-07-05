@@ -90,7 +90,7 @@
   </div>
 
   <div class="toolbar">
-    <button type="button" class="primary" onclick={() => ui.openQuickAdd()}>New Task</button>
+    <button type="button" class="primary" onclick={() => ui.openNewTask()}>New Task</button>
     <button type="button" onclick={() => (ui.performanceFormPrefill = {})}>New Performance Input</button>
     <button type="button" onclick={() => router.go("training")}>Record Training</button>
     <button type="button" onclick={() => router.go("leave")}>Add Leave</button>

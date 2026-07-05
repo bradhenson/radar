@@ -1,7 +1,7 @@
 <script lang="ts">
   // Interactive report views (plan 12.11, 32) with CSV export for tasks.
   import { app } from "../stores/app.svelte";
-  import { categoryLabel, statusLabel, TASK_CATEGORIES } from "../domain/models";
+  import { statusLabel } from "../domain/models";
   import { addDays, compareDates, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
@@ -23,11 +23,13 @@
       .sort((a, b) => b.count - a.count);
   });
 
-  let byCategory = $derived(
-    TASK_CATEGORIES.map((c) => ({ label: c.label, count: openTasks.filter((t) => t.category === c.value).length })).filter(
-      (r) => r.count > 0
-    )
-  );
+  let byCategory = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const task of openTasks) counts.set(task.category, (counts.get(task.category) ?? 0) + 1);
+    return [...counts.entries()]
+      .map(([id, count]) => ({ id, label: app.taskCategoryLabel(id), count }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  });
 
   let trainingWindows = $derived.by(() => {
     return [30, 60, 90].map((days) => {
@@ -66,20 +68,19 @@
 
   function exportTaskCsv() {
     const csv = toCsv(
-      ["Task ID", "Title", "Status", "Priority", "Category", "Employee", "Competency", "Project", "Created", "Due", "Completed", "Source system", "Last verified", "Tags"],
+      ["Task ID", "Title", "Status", "Priority", "Category", "Employee", "Competency", "Project", "Created", "Due", "Completed", "Last verified", "Tags"],
       app.tasks.map((t) => [
         t.id,
         t.title,
         statusLabel(t.status),
         t.priority,
-        categoryLabel(t.category),
+        app.taskCategoryLabel(t.category),
         app.employeeName(t.employeeId),
         app.competencyCode(t.competencyId),
         app.projectName(t.projectId),
         t.createdAt.slice(0, 10),
         t.dueDate,
         t.completedDate,
-        t.sourceSystem,
         t.lastVerifiedDate,
         t.tags.join("; ")
       ])
