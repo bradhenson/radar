@@ -29,7 +29,10 @@ export class IndexedDbDataStore implements DataStore {
       req.onupgradeneeded = () => {
         const db = req.result;
         // Migration framework: switch on oldVersion as versions are added.
-        for (const name of COLLECTION_NAMES) {
+        // Retired stores stay in the list so an older copy of the app opening a
+        // freshly created database still finds every store it expects.
+        const RETIRED_STORES = ["taskCategories"];
+        for (const name of [...COLLECTION_NAMES, ...RETIRED_STORES]) {
           if (!db.objectStoreNames.contains(name)) {
             db.createObjectStore(name, { keyPath: "id" });
           }

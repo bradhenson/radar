@@ -5,25 +5,16 @@ import { emptyCollections } from "./DataStore";
 import {
   DEFAULT_BOARD_COLUMN_SEEDS,
   DEFAULT_SETTINGS,
-  DEFAULT_TASK_CATEGORY_SEEDS,
+  normalizeTaskStatus,
   type Employee,
   type Project,
   type Task,
   type TaskPriority,
-  type TaskStatus,
   type TrainingRequirement
 } from "../domain/models";
 import { addDays, nowTimestamp, todayIso } from "../utils/dates";
 import { newId } from "../utils/ids";
 import { ORDER_GAP } from "../domain/rules/boardOrder";
-
-const EXTRA_TASK_CATEGORIES = [
-  { id: "leave", label: "Leave", sortOrder: 70 },
-  { id: "telework", label: "Telework", sortOrder: 80 },
-  { id: "award", label: "Award", sortOrder: 90 },
-  { id: "timekeeping", label: "Timekeeping", sortOrder: 100 },
-  { id: "meeting", label: "Meeting Follow-up", sortOrder: 110 }
-];
 
 export function createSampleSnapshot(): DatabaseSnapshot {
   const now = nowTimestamp();
@@ -32,20 +23,6 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   const stamp = { createdAt: now, updatedAt: now };
   const atNoon = (date: string) => `${date}T12:00:00.000Z`;
 
-  c.taskCategories.push(
-    ...DEFAULT_TASK_CATEGORY_SEEDS.map((category) => ({
-      id: category.id,
-      label: category.label,
-      sortOrder: category.sortOrder,
-      isArchived: false,
-      ...stamp
-    })),
-    ...EXTRA_TASK_CATEGORIES.map((category) => ({
-      ...category,
-      isArchived: false,
-      ...stamp
-    }))
-  );
   c.boardColumns.push(
     ...DEFAULT_BOARD_COLUMN_SEEDS.map((column) => ({
       id: column.id,
@@ -174,21 +151,14 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     return order;
   };
 
-  function task(
-    title: string,
-    status: TaskStatus,
-    category: string,
-    priority: TaskPriority,
-    overrides: Partial<Task> = {}
-  ): Task {
-    const boardColumnId = overrides.boardColumnId ?? status;
+  function task(title: string, column: string, priority: TaskPriority, overrides: Partial<Task> = {}): Task {
+    const boardColumnId = overrides.boardColumnId ?? column;
     return {
       id: newId(),
       title,
-      status,
+      status: normalizeTaskStatus(column),
       boardColumnId,
       priority,
-      category,
       performanceInputCreated: false,
       tags: [],
       boardOrder: nextOrder(boardColumnId),
@@ -199,57 +169,57 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   }
 
   const tasks = [
-    task("Review weekly timekeeping exceptions", "planned", "timekeeping", "normal", {
+    task("Review weekly timekeeping exceptions", "planned", "normal", {
       dueDate: addDays(today, 2),
       description: "Supervisor-owned weekly review before timecards are certified.",
       showOnCard: "description"
     }),
-    task("Prepare Friday status rollup", "in_progress", "administrative", "normal", {
+    task("Prepare Friday status rollup", "in_progress", "normal", {
       dueDate: addDays(today, 5),
       projectId: projects.workforce.id,
       description: "Pull project, training, leave, and telework highlights into one weekly summary.",
       showOnCard: "description"
     }),
-    task("Update branch staffing summary", "planned", "personnel", "high", {
+    task("Update branch staffing summary", "planned", "high", {
       dueDate: addDays(today, 8),
       projectId: projects.workforce.id,
       description: "Refresh staffing changes, vacancies, and upcoming availability constraints."
     }),
-    task("Reconcile pending telework requests", "inbox", "telework", "normal", {
+    task("Reconcile pending telework requests", "inbox", "normal", {
       dueDate: addDays(today, 1),
       description: "Review pending situational requests and capture source references."
     }),
-    task("Compile performance input reminders", "planned", "performance", "normal", {
+    task("Compile performance input reminders", "planned", "normal", {
       dueDate: addDays(today, 6),
       description: "Check employees without recent inputs and identify accomplishments to capture."
     }),
-    task("Review customer demo logistics", "waiting", "project", "high", {
+    task("Review customer demo logistics", "waiting", "high", {
       projectId: projects.harbor.id,
       waitingOn: "Customer agenda confirmation",
       waitingReason: "Need final attendee list before assigning demo roles.",
       waitingSince: atNoon(addDays(today, -18)),
       sourceSystem: "Email"
     }),
-    task("Confirm leave coverage for next sprint", "planned", "leave", "normal", {
+    task("Confirm leave coverage for next sprint", "planned", "normal", {
       dueDate: addDays(today, 4),
       description: "Use the leave records and project staffing view to confirm coverage."
     }),
-    task("Refresh training exception list", "in_progress", "training", "normal", {
+    task("Refresh training exception list", "in_progress", "normal", {
       dueDate: addDays(today, 3),
       projectId: projects.training.id,
       showOnCard: "checklist"
     }),
-    task("Draft onboarding checklist for incoming employees", "inbox", "personnel", "normal", {
+    task("Draft onboarding checklist for incoming employees", "inbox", "normal", {
       dueDate: addDays(today, 14)
     }),
-    task("Review project risk register", "planned", "project", "normal", {
+    task("Review project risk register", "planned", "normal", {
       projectId: projects.lighthouse.id,
       dueDate: addDays(today, 10)
     }),
-    task("Archive completed meeting notes", "inbox", "meeting", "low", {
+    task("Archive completed meeting notes", "inbox", "low", {
       dueDate: addDays(today, 12)
     }),
-    task("Verify annual cybersecurity training record", "waiting", "training", "normal", {
+    task("Verify annual cybersecurity training record", "waiting", "normal", {
       employeeId: employees[2]!.id,
       competencyId: employees[2]!.competencyId,
       waitingOn: "Updated training transcript",
@@ -257,37 +227,37 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       waitingSince: atNoon(addDays(today, -16)),
       sourceSystem: "SWAT"
     }),
-    task("Prepare telework renewal follow-up", "needs_review", "telework", "normal", {
+    task("Prepare telework renewal follow-up", "needs_review", "normal", {
       employeeId: employees[10]!.id,
       competencyId: employees[10]!.competencyId,
       dueDate: addDays(today, 7),
       description: "Current agreement expires this quarter. Confirm the renewal packet is started and the schedule summary is accurate.",
       showOnCard: "description"
     }),
-    task("Capture Project Harbor customer recognition", "needs_review", "performance", "normal", {
+    task("Capture Project Harbor customer recognition", "needs_review", "normal", {
       employeeId: employees[23]!.id,
       projectId: projects.harbor.id,
       competencyId: employees[23]!.competencyId
     }),
-    task("Review Project Lighthouse test schedule", "planned", "project", "high", {
+    task("Review Project Lighthouse test schedule", "planned", "high", {
       employeeId: employees[0]!.id,
       projectId: projects.lighthouse.id,
       competencyId: employees[0]!.competencyId,
       dueDate: addDays(today, 7),
       showOnCard: "checklist"
     }),
-    task("Complete recognition package draft", "in_progress", "award", "normal", {
+    task("Complete recognition package draft", "in_progress", "normal", {
       employeeId: employees[7]!.id,
       projectId: projects.reporting.id,
       competencyId: employees[7]!.competencyId,
       dueDate: addDays(today, 9)
     }),
-    task("Close out completed sprint retrospective", "complete", "meeting", "normal", {
+    task("Close out completed sprint retrospective", "complete", "normal", {
       completedDate: addDays(today, -2),
       performanceInputCreated: true,
       projectId: projects.knowledge.id
     }),
-    task("Document automation win from reporting project", "complete", "performance", "normal", {
+    task("Document automation win from reporting project", "complete", "normal", {
       employeeId: employees[12]!.id,
       projectId: projects.reporting.id,
       competencyId: employees[12]!.competencyId,

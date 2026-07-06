@@ -5,9 +5,8 @@ import type { LeaveRecord, Task, TeleworkRecord } from "../../src/domain/models"
 function makeTask(partial: Partial<Task> & { id: string }): Task {
   return {
     title: partial.id,
-    status: "planned",
+    status: "open",
     priority: "normal",
-    category: "general",
     performanceInputCreated: false,
     tags: [],
     boardOrder: 0,

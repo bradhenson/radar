@@ -93,13 +93,11 @@
   }
 
   function createFollowUpTask(note: MeetingNote) {
-    const category = app.activeTaskCategories.find((c) => c.id === "meeting")?.id ?? app.defaultTaskCategoryId();
     ui.openNewTask({
       title: `Follow up: ${note.title}`,
       description: note.actionItems || note.notes,
       projectId: note.projectId,
-      employeeId: note.attendeeEmployeeIds[0],
-      category
+      employeeId: note.attendeeEmployeeIds[0]
     });
   }
 </script>

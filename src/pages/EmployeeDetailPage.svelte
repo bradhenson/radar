@@ -8,6 +8,7 @@
   import EmployeeProfileForm from "../components/forms/EmployeeProfileForm.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
@@ -19,6 +20,7 @@
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
   let tab = $state<"overview" | "profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
   let editOpen = $state(false);
+  let confirmDeleteOpen = $state(false);
   let profileOpen = $state(false);
   let checkInOpen = $state(false);
   let meetingNoteOpen = $state(false);
@@ -181,6 +183,33 @@
     });
   }
 
+  function deleteEmployeeMessage(name: string): string {
+    const counts = app.employeeLinkedRecordCounts(employeeId);
+    const owned: [number, string][] = [
+      [counts.performanceInputs, "performance inputs"],
+      [counts.trainingRecords, "training records"],
+      [counts.leaveRecords, "leave records"],
+      [counts.teleworkRecords, "telework records"],
+      [counts.awardRecords, "awards"],
+      [counts.interactions, "check-ins"],
+      [counts.notes, "notes"]
+    ];
+    const parts = owned.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    let message = `Permanently delete ${name}?`;
+    if (parts.length) message += ` This also permanently deletes their ${parts.join(", ")}.`;
+    if (counts.linkedTasks > 0) {
+      message += ` ${counts.linkedTasks} task(s) will be kept but no longer linked to an employee.`;
+    }
+    message += " This cannot be undone. Consider marking the employee inactive instead if you may need this history.";
+    return message;
+  }
+
+  async function deleteEmployeeNow() {
+    confirmDeleteOpen = false;
+    await app.deleteEmployee(employeeId);
+    router.go("employees");
+  }
+
   const TABS = [
     ["overview", "Overview"],
     ["profile", "Profile"],
@@ -214,6 +243,7 @@
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
       <button type="button" onclick={() => (meetingNoteOpen = true)}>Add meeting note</button>
       <button type="button" onclick={() => (editOpen = true)}>Edit</button>
+      <button type="button" class="danger" onclick={() => (confirmDeleteOpen = true)}>Delete</button>
     </div>
 
     <div class="summary-cards">
@@ -570,6 +600,16 @@
   {/if}
   {#if editingMeetingNote}
     <MeetingNoteForm note={editingMeetingNote} onclose={() => (editingMeetingNote = undefined)} />
+  {/if}
+  {#if confirmDeleteOpen}
+    <ConfirmDialog
+      title="Delete employee"
+      message={deleteEmployeeMessage(employee.displayName)}
+      confirmLabel="Delete employee"
+      danger
+      onconfirm={() => void deleteEmployeeNow()}
+      oncancel={() => (confirmDeleteOpen = false)}
+    />
   {/if}
 {/if}
 

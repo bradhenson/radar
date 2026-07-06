@@ -3,6 +3,14 @@
 ## Unreleased
 
 ### Changed
+- Task categories have been removed: the category field on tasks, the colored category chip on
+  board cards, the board's category filter, and the Task categories section in Settings are all
+  gone. Board columns and tags cover the same organizing needs with less bookkeeping. Existing
+  data and old backups still import cleanly; the stored category value is simply ignored.
+- Task status is simplified to Open, Waiting, and Complete (Cancelled is still recognized in
+  imported data). The old workflow-stage statuses — Not Started, Planned, In Progress, Needs
+  Review — duplicated the customizable board columns and are now collapsed into "Open"
+  automatically when existing data or a backup is loaded. Board column placement is unchanged.
 - Employee creation is now lighter-weight: competency is optional, and title/contact/IPT-style
   details live in the employee profile instead of the initial add dialog.
 - Employee directory and CSV export now use "Title" and "Integrated Product Team" terminology;
@@ -44,6 +52,12 @@
   person.
 
 ### Added
+- Employees can now be permanently deleted, from the employee page header or from the inactive
+  employees list in the Archive. Deletion asks for confirmation with an exact count of what goes
+  with it: the employee's performance inputs, training records, leave, telework, awards,
+  check-ins, and notes are deleted; tasks and meeting notes are kept but unlinked, and project
+  lead / training assignments are cleared. Marking an employee inactive remains the
+  recommendation when history might still be needed.
 - Employee notes: the Overview tab of each employee now has a Notes section for standing
   things to remember about the person (preferences, goals, constraints) — distinct from dated
   check-ins. Notes can be added, edited, and removed inline; removal archives the note with an

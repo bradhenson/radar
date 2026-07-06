@@ -22,7 +22,6 @@ import type {
   PerformanceInput,
   Project,
   Task,
-  TaskCategoryDefinition,
   TaskNote,
   TeleworkRecord,
   TrainingRequirement
@@ -34,7 +33,6 @@ export interface CollectionTypes {
   projects: Project;
   tasks: Task;
   boardColumns: BoardColumnDefinition;
-  taskCategories: TaskCategoryDefinition;
   taskNotes: TaskNote;
   checklistItems: ChecklistItem;
   performanceElements: PerformanceElement;
@@ -60,7 +58,6 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "projects",
   "tasks",
   "boardColumns",
-  "taskCategories",
   "taskNotes",
   "checklistItems",
   "performanceElements",

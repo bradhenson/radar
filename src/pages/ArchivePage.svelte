@@ -4,12 +4,13 @@
   import { app } from "../stores/app.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import type { MeetingNote } from "../domain/models";
+  import type { Employee, MeetingNote } from "../domain/models";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { statusLabel } from "../domain/models";
 
   let search = $state("");
   let pendingDeleteMeetingNote = $state<MeetingNote | undefined>(undefined);
+  let pendingDeleteEmployee = $state<Employee | undefined>(undefined);
 
   let archivedTasks = $derived(
     app.tasks
@@ -59,6 +60,32 @@
     await app.deleteRecord("meetingNotes", note.id, `Deleted meeting note "${note.title}"`);
     pendingDeleteMeetingNote = undefined;
     app.toast("Meeting note deleted", "success");
+  }
+
+  function deleteEmployeeMessage(employee: Employee): string {
+    const counts = app.employeeLinkedRecordCounts(employee.id);
+    const owned: [number, string][] = [
+      [counts.performanceInputs, "performance inputs"],
+      [counts.trainingRecords, "training records"],
+      [counts.leaveRecords, "leave records"],
+      [counts.teleworkRecords, "telework records"],
+      [counts.awardRecords, "awards"],
+      [counts.interactions, "check-ins"],
+      [counts.notes, "notes"]
+    ];
+    const parts = owned.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    let message = `Permanently delete ${employee.displayName}?`;
+    if (parts.length) message += ` This also permanently deletes their ${parts.join(", ")}.`;
+    if (counts.linkedTasks > 0) {
+      message += ` ${counts.linkedTasks} task(s) will be kept but no longer linked to an employee.`;
+    }
+    message += " This cannot be undone.";
+    return message;
+  }
+
+  async function deleteEmployee(employee: Employee) {
+    await app.deleteEmployee(employee);
+    pendingDeleteEmployee = undefined;
   }
 </script>
 
@@ -123,13 +150,18 @@
     <p class="muted">No inactive employees.</p>
   {:else}
     <table class="data">
-      <thead><tr><th>Name</th><th>Status</th><th>Competency</th></tr></thead>
+      <thead><tr><th>Name</th><th>Status</th><th>Competency</th><th></th></tr></thead>
       <tbody>
         {#each inactiveEmployees as e (e.id)}
           <tr>
             <td><a href={"#/employees/" + e.id}>{e.displayName}</a></td>
             <td>{e.activeStatus.replace("_", " ")}</td>
             <td>{app.competencyCode(e.competencyId)}</td>
+            <td>
+              <div class="row-actions">
+                <button type="button" class="danger" onclick={() => (pendingDeleteEmployee = e)}>Delete</button>
+              </div>
+            </td>
           </tr>
         {/each}
       </tbody>
@@ -145,6 +177,17 @@
     danger
     onconfirm={() => void deleteMeetingNote(pendingDeleteMeetingNote!)}
     oncancel={() => (pendingDeleteMeetingNote = undefined)}
+  />
+{/if}
+
+{#if pendingDeleteEmployee}
+  <ConfirmDialog
+    title="Delete employee"
+    message={deleteEmployeeMessage(pendingDeleteEmployee)}
+    confirmLabel="Delete employee"
+    danger
+    onconfirm={() => void deleteEmployee(pendingDeleteEmployee!)}
+    oncancel={() => (pendingDeleteEmployee = undefined)}
   />
 {/if}
 

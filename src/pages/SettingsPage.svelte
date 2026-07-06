@@ -19,8 +19,6 @@
   let competencyError = $state("");
   let newBoardColumnName = $state("");
   let boardColumnError = $state("");
-  let newCategoryName = $state("");
-  let categoryError = $state("");
 
   // Local editable copy of settings; saved on change.
   async function updateSetting<K extends keyof typeof app.settings>(key: K, value: (typeof app.settings)[K]) {
@@ -99,44 +97,6 @@
       boardColumnError = "";
     } catch (e) {
       boardColumnError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  async function addTaskCategory() {
-    try {
-      await app.createTaskCategory(newCategoryName);
-      newCategoryName = "";
-      categoryError = "";
-      app.toast("Task category added", "success");
-    } catch (e) {
-      categoryError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  async function renameTaskCategory(id: string, value: string) {
-    try {
-      await app.renameTaskCategory(id, value);
-      categoryError = "";
-    } catch (e) {
-      categoryError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  async function setCategoryArchived(id: string, archived: boolean) {
-    try {
-      await app.setTaskCategoryArchived(id, archived);
-      categoryError = "";
-    } catch (e) {
-      categoryError = e instanceof Error ? e.message : String(e);
-    }
-  }
-
-  async function moveTaskCategory(id: string, offset: -1 | 1) {
-    try {
-      await app.moveTaskCategory(id, offset);
-      categoryError = "";
-    } catch (e) {
-      categoryError = e instanceof Error ? e.message : String(e);
     }
   }
 
@@ -432,76 +392,6 @@
   </section>
 
   <section class="card" style="margin-bottom:1rem">
-    <h2>Task categories</h2>
-    <p class="small muted">
-      Active categories appear in task forms and board filters. Archived categories stay on existing tasks but are hidden
-      from new task choices.
-    </p>
-    <form
-      class="category-add"
-      onsubmit={(e) => {
-        e.preventDefault();
-        void addTaskCategory();
-      }}
-    >
-      <input
-        type="text"
-        bind:value={newCategoryName}
-        maxlength="80"
-        placeholder="New category"
-        aria-label="New task category name"
-      />
-      <button type="submit" class="primary">Add category</button>
-    </form>
-    {#if categoryError}<div class="field-error">{categoryError}</div>{/if}
-    <table class="data category-table">
-      <thead>
-        <tr><th>Name</th><th>Tasks</th><th>Status</th><th>Order</th><th></th></tr>
-      </thead>
-      <tbody>
-        {#each app.taskCategoryList as category, i (category.id)}
-          <tr class:archived={category.isArchived}>
-            <td>
-              <input
-                type="text"
-                value={category.label}
-                maxlength="80"
-                aria-label={`Task category name ${category.label}`}
-                onchange={(e) => void renameTaskCategory(category.id, (e.currentTarget as HTMLInputElement).value)}
-              />
-            </td>
-            <td>{app.taskCategoryUsage(category.id)}</td>
-            <td>
-              {#if category.isArchived}
-                <span class="badge">Archived</span>
-              {:else}
-                <span class="badge success">Active</span>
-              {/if}
-            </td>
-            <td>
-              <div class="category-actions">
-                <button type="button" onclick={() => void moveTaskCategory(category.id, -1)} disabled={i === 0}>Up</button>
-                <button type="button" onclick={() => void moveTaskCategory(category.id, 1)} disabled={i === app.taskCategoryList.length - 1}>Down</button>
-              </div>
-            </td>
-            <td>
-              {#if category.isArchived}
-                <button type="button" onclick={() => void setCategoryArchived(category.id, false)}>Restore</button>
-              {:else}
-                <button
-                  type="button"
-                  onclick={() => void setCategoryArchived(category.id, true)}
-                  disabled={app.activeTaskCategories.length <= 1}
-                >Archive</button>
-              {/if}
-            </td>
-          </tr>
-        {/each}
-      </tbody>
-    </table>
-  </section>
-
-  <section class="card" style="margin-bottom:1rem">
     <h2>Database health</h2>
     <p>
       {#if healthIssues === 0}
@@ -680,28 +570,14 @@
   .settings-add input {
     min-width: min(100%, 18rem);
   }
-  .category-add {
-    display: flex;
-    gap: .5rem;
-    flex-wrap: wrap;
-    margin: .7rem 0;
-  }
-  .category-add input {
-    min-width: min(100%, 18rem);
-  }
-  .settings-table input,
-  .category-table input {
+  .settings-table input {
     width: 100%;
     min-width: 12rem;
-  }
-  .category-table .archived {
-    opacity: .72;
   }
   .competency-table .inactive {
     opacity: .72;
   }
-  .settings-actions,
-  .category-actions {
+  .settings-actions {
     display: flex;
     gap: .35rem;
     flex-wrap: wrap;

@@ -13,9 +13,8 @@ function makeTask(overrides: Partial<Task>): Task {
   return {
     id: overrides.id ?? "t1",
     title: "Migrate lab network",
-    status: "planned",
+    status: "open",
     priority: "normal",
-    category: "general",
     performanceInputCreated: false,
     tags: [],
     boardOrder: 1000,

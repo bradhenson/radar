@@ -14,7 +14,6 @@
   let filterEmployee = $state("");
   let filterCompetency = $state("");
   let filterProject = $state("");
-  let filterCategory = $state("");
   let filterPriority = $state("");
   let hideComplete = $state(false);
 
@@ -33,7 +32,6 @@
       if (filterEmployee && t.employeeId !== filterEmployee) return false;
       if (filterCompetency && t.competencyId !== filterCompetency) return false;
       if (filterProject && t.projectId !== filterProject) return false;
-      if (filterCategory && t.category !== filterCategory) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -164,7 +162,6 @@
     filterEmployee = "";
     filterCompetency = "";
     filterProject = "";
-    filterCategory = "";
     filterPriority = "";
     hideComplete = false;
   }
@@ -244,7 +241,7 @@
   }
 
   let anyFilter = $derived(
-    Boolean(search || filterEmployee || filterCompetency || filterProject || filterCategory || filterPriority || hideComplete)
+    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || hideComplete)
   );
 </script>
 
@@ -281,10 +278,6 @@
     <select bind:value={filterProject} aria-label="Filter by project">
       <option value="">All projects</option>
       {#each app.activeProjects as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
-    </select>
-    <select bind:value={filterCategory} aria-label="Filter by category">
-      <option value="">All categories</option>
-      {#each app.taskCategoryOptions(filterCategory) as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
     </select>
     <select bind:value={filterPriority} aria-label="Filter by priority">
       <option value="">All priorities</option>
@@ -358,9 +351,6 @@
                 onclick={() => ui.openTaskDetail(task.id)}
                 onkeydown={(e) => onCardKeydown(e, task)}
               >
-                <div class="card-labels">
-                  <span class="label-chip label-{task.category}">{app.taskCategoryLabel(task.category)}</span>
-                </div>
                 <div class="card-title">{task.title}</div>
                 {#if task.projectId}
                   <div class="card-context">{app.projectName(task.projectId)}</div>
@@ -695,40 +685,6 @@
     z-index: 2;
   }
   .task-card.dragging { opacity: .4; }
-  .card-labels {
-    display: flex;
-    flex-wrap: wrap;
-    gap: .25rem;
-    padding-right: 3.5rem;
-    margin-bottom: .45rem;
-  }
-  .label-chip {
-    display: inline-flex;
-    align-items: center;
-    max-width: 100%;
-    min-height: 1rem;
-    padding: .05rem .38rem;
-    border-radius: 999px;
-    font-size: .68rem;
-    font-weight: 700;
-    line-height: 1.2;
-    color: #1f1f1f;
-    background: #e5e5e5;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-  .label-project { background: #cfe4ff; }
-  .label-personnel { background: #dff6dd; }
-  .label-performance { background: #e9d8fd; }
-  .label-training { background: #d2f4f8; }
-  .label-leave { background: #ffe5d0; }
-  .label-telework { background: #d6eaff; }
-  .label-award { background: #fff1ba; }
-  .label-timekeeping { background: #fde7e9; }
-  .label-meeting { background: #e1dfdd; }
-  .label-administrative { background: #e0e7ff; }
-  .label-general { background: #edebe9; }
   .card-title {
     font-weight: 650;
     line-height: 1.25;

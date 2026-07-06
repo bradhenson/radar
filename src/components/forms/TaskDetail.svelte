@@ -77,7 +77,6 @@
       status: draft.status,
       boardColumnId: draft.boardColumnId || app.defaultBoardColumnId(),
       priority: draft.priority,
-      category: draft.category,
       employeeId: draft.employeeId || undefined,
       projectId: draft.projectId || undefined,
       dueDate: draft.dueDate || undefined,
@@ -98,7 +97,6 @@
       status: t.status,
       boardColumnId: app.taskBoardColumnId(t),
       priority: t.priority,
-      category: t.category,
       employeeId: t.employeeId || undefined,
       projectId: t.projectId || undefined,
       dueDate: t.dueDate || undefined,
@@ -150,7 +148,6 @@
     status: "status",
     boardColumnId: "board column",
     priority: "priority",
-    category: "category",
     employeeId: "employee",
     projectId: "project",
     dueDate: "due date",
@@ -369,12 +366,6 @@
         <label for="td-priority">Priority</label>
         <select id="td-priority" bind:value={draft.priority} style="width:100%">
           {#each TASK_PRIORITIES as p (p.value)}<option value={p.value}>{p.label}</option>{/each}
-        </select>
-      </div>
-      <div>
-        <label for="td-category">Category</label>
-        <select id="td-category" bind:value={draft.category} style="width:100%">
-          {#each app.taskCategoryOptions(draft.category) as c (c.id)}<option value={c.id}>{c.label}</option>{/each}
         </select>
       </div>
       <div>

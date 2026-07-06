@@ -22,13 +22,11 @@ import type {
   PerformanceInput,
   Project,
   Task,
-  TaskCategoryDefinition,
   TaskNote,
-  TaskStatus,
   TeleworkRecord,
   TrainingRequirement
 } from "../domain/models";
-import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, DEFAULT_TASK_CATEGORY_SEEDS } from "../domain/models";
+import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeTaskStatus } from "../domain/models";
 import type { CollectionName, CollectionTypes, DataStore, DatabaseSnapshot, StoreMeta } from "../data/DataStore";
 import { COLLECTION_NAMES } from "../data/DataStore";
 import { IndexedDbDataStore } from "../data/IndexedDbDataStore";
@@ -67,7 +65,6 @@ class AppStore {
   projects = $state<Project[]>([]);
   tasks = $state<Task[]>([]);
   boardColumns = $state<BoardColumnDefinition[]>([]);
-  taskCategories = $state<TaskCategoryDefinition[]>([]);
   taskNotes = $state<TaskNote[]>([]);
   checklistItems = $state<ChecklistItem[]>([]);
   performanceElements = $state<PerformanceElement[]>([]);
@@ -146,10 +143,6 @@ class AppStore {
     [...this.boardColumns].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
   );
   activeBoardColumns = $derived(this.boardColumnList);
-  taskCategoryList = $derived(
-    [...this.taskCategories].sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
-  );
-  activeTaskCategories = $derived(this.taskCategoryList.filter((c) => !c.isArchived));
 
   employeeName(id: string | undefined): string {
     if (!id) return "";
@@ -192,34 +185,6 @@ class AppStore {
 
   competencyTaskCount(id: string): number {
     return this.tasks.filter((t) => t.competencyId === id && !t.isArchived).length;
-  }
-
-  taskCategoryLabel(id: string | undefined): string {
-    if (!id) return "";
-    return this.taskCategories.find((c) => c.id === id)?.label ?? this.legacyCategoryLabel(id);
-  }
-
-  taskCategoryOptions(currentCategory?: string): TaskCategoryDefinition[] {
-    const options = this.taskCategoryList.filter((c) => !c.isArchived || c.id === currentCategory);
-    if (currentCategory && !options.some((c) => c.id === currentCategory)) {
-      options.push({
-        id: currentCategory,
-        label: this.taskCategoryLabel(currentCategory),
-        sortOrder: Number.MAX_SAFE_INTEGER,
-        isArchived: false,
-        createdAt: "",
-        updatedAt: ""
-      });
-    }
-    return options;
-  }
-
-  taskCategoryUsage(id: string): number {
-    return this.tasks.filter((t) => t.category === id).length;
-  }
-
-  defaultTaskCategoryId(): string {
-    return this.activeTaskCategories.find((c) => c.id === "general")?.id ?? this.activeTaskCategories[0]?.id ?? "general";
   }
 
   boardColumnLabel(id: string | undefined): string {
@@ -296,7 +261,7 @@ class AppStore {
       await this.store.saveSettings(this.plainRecord(this.settings));
     }
     await this.ensureBoardColumns();
-    await this.ensureTaskCategories();
+    await this.migrateTaskStatuses();
   }
 
   private migrateSettings(settings: AppSettings): AppSettings {
@@ -314,7 +279,6 @@ class AppStore {
     this.projects = snapshot.collections.projects;
     this.tasks = snapshot.collections.tasks;
     this.boardColumns = snapshot.collections.boardColumns;
-    this.taskCategories = snapshot.collections.taskCategories;
     this.taskNotes = snapshot.collections.taskNotes;
     this.checklistItems = snapshot.collections.checklistItems;
     this.performanceElements = snapshot.collections.performanceElements;
@@ -344,25 +308,6 @@ class AppStore {
     return records.map((record) => this.plainRecord(record));
   }
 
-  private legacyCategoryLabel(id: string): string {
-    const known = new Map<string, string>([
-      ...DEFAULT_TASK_CATEGORY_SEEDS.map((c) => [c.id, c.label] as const),
-      ["leave", "Leave"],
-      ["telework", "Telework"],
-      ["award", "Award"],
-      ["timekeeping", "Timekeeping"],
-      ["meeting", "Meeting Follow-up"]
-    ]);
-    return (
-      known.get(id) ??
-      id
-        .split(/[-_]/)
-        .filter(Boolean)
-        .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-        .join(" ")
-    );
-  }
-
   private legacyBoardColumnLabel(id: string): string {
     return (
       DEFAULT_BOARD_COLUMN_SEEDS.find((c) => c.id === id)?.label ??
@@ -374,7 +319,7 @@ class AppStore {
     );
   }
 
-  private defaultBoardColumnIdForStatus(status: TaskStatus): string {
+  private defaultBoardColumnIdForStatus(status: string): string {
     return this.boardColumns.some((c) => c.id === status) ? status : this.defaultBoardColumnId();
   }
 
@@ -390,64 +335,6 @@ class AppStore {
     let suffix = 2;
     while (existing.has(`${base}-${suffix}`)) suffix += 1;
     return `${base}-${suffix}`;
-  }
-
-  private uniqueTaskCategoryId(label: string): string {
-    const base = label
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 48) || "category";
-    const existing = new Set(this.taskCategories.map((c) => c.id));
-    if (!existing.has(base)) return base;
-    let suffix = 2;
-    while (existing.has(`${base}-${suffix}`)) suffix += 1;
-    return `${base}-${suffix}`;
-  }
-
-  private async ensureTaskCategories(): Promise<void> {
-    const now = nowTimestamp();
-    const existing = new Map(this.taskCategories.map((c) => [c.id, c]));
-    const additions: TaskCategoryDefinition[] = [];
-    let nextOrder =
-      this.taskCategories.reduce((max, c) => Math.max(max, Number.isFinite(c.sortOrder) ? c.sortOrder : 0), 0) + 10;
-
-    for (const seed of DEFAULT_TASK_CATEGORY_SEEDS) {
-      if (!existing.has(seed.id)) {
-        const record: TaskCategoryDefinition = {
-          id: seed.id,
-          label: seed.label,
-          sortOrder: seed.sortOrder,
-          isArchived: false,
-          createdAt: now,
-          updatedAt: now
-        };
-        existing.set(record.id, record);
-        additions.push(record);
-      }
-    }
-
-    for (const task of this.tasks) {
-      if (task.category && !existing.has(task.category)) {
-        const record: TaskCategoryDefinition = {
-          id: task.category,
-          label: this.legacyCategoryLabel(task.category),
-          sortOrder: nextOrder,
-          isArchived: false,
-          createdAt: now,
-          updatedAt: now
-        };
-        nextOrder += 10;
-        existing.set(record.id, record);
-        additions.push(record);
-      }
-    }
-
-    for (const category of additions) {
-      await this.store.put("taskCategories", category);
-      this.taskCategories.push(category);
-    }
   }
 
   private async ensureBoardColumns(): Promise<void> {
@@ -483,6 +370,23 @@ class AppStore {
         const idx = this.tasks.findIndex((t) => t.id === task.id);
         if (idx >= 0) this.tasks[idx] = task;
       }
+    }
+  }
+
+  /**
+   * Collapse legacy workflow-stage statuses into "open" (see normalizeTaskStatus).
+   * Must run after ensureBoardColumns so tasks that still lacked a boardColumnId
+   * got their column derived from the original status first.
+   */
+  private async migrateTaskStatuses(): Promise<void> {
+    const migrated = this.tasks
+      .filter((task) => task.status !== normalizeTaskStatus(task.status))
+      .map((task) => ({ ...task, status: normalizeTaskStatus(task.status) }));
+    if (!migrated.length) return;
+    await this.store.bulkPut("tasks", this.plainRecords(migrated));
+    for (const task of migrated) {
+      const idx = this.tasks.findIndex((t) => t.id === task.id);
+      if (idx >= 0) this.tasks[idx] = task;
     }
   }
 
@@ -704,99 +608,16 @@ class AppStore {
     }
   }
 
-  // --- task category service --------------------------------------------------
-  async createTaskCategory(label: string): Promise<void> {
-    const trimmed = label.trim();
-    if (!trimmed) throw new Error("Category name is required.");
-    if (this.taskCategories.some((c) => c.label.toLowerCase() === trimmed.toLowerCase())) {
-      throw new Error("A category with that name already exists.");
-    }
-    const now = nowTimestamp();
-    const category: TaskCategoryDefinition = {
-      id: this.uniqueTaskCategoryId(trimmed),
-      label: trimmed,
-      sortOrder:
-        this.taskCategories.reduce((max, c) => Math.max(max, Number.isFinite(c.sortOrder) ? c.sortOrder : 0), 0) + 10,
-      isArchived: false,
-      createdAt: now,
-      updatedAt: now
-    };
-    await this.putRecord("taskCategories", category, {
-      actionType: "created",
-      summary: `Created task category "${category.label}"`
-    });
-  }
-
-  async renameTaskCategory(id: string, label: string): Promise<void> {
-    const trimmed = label.trim();
-    if (!trimmed) throw new Error("Category name is required.");
-    const category = this.taskCategories.find((c) => c.id === id);
-    if (!category) throw new Error("Category not found.");
-    if (this.taskCategories.some((c) => c.id !== id && c.label.toLowerCase() === trimmed.toLowerCase())) {
-      throw new Error("A category with that name already exists.");
-    }
-    if (category.label === trimmed) return;
-    await this.putRecord(
-      "taskCategories",
-      { ...category, label: trimmed, updatedAt: nowTimestamp() },
-      { actionType: "updated", summary: `Renamed task category "${category.label}" to "${trimmed}"` }
-    );
-  }
-
-  async setTaskCategoryArchived(id: string, isArchived: boolean): Promise<void> {
-    const category = this.taskCategories.find((c) => c.id === id);
-    if (!category) throw new Error("Category not found.");
-    if (category.isArchived === isArchived) return;
-    if (isArchived && this.activeTaskCategories.length <= 1) {
-      throw new Error("At least one active category is required.");
-    }
-    await this.putRecord(
-      "taskCategories",
-      { ...category, isArchived, updatedAt: nowTimestamp() },
-      {
-        actionType: isArchived ? "archived" : "restored",
-        summary: `${isArchived ? "Archived" : "Restored"} task category "${category.label}"`
-      }
-    );
-  }
-
-  async moveTaskCategory(id: string, offset: -1 | 1): Promise<void> {
-    const ordered = this.taskCategoryList;
-    const idx = ordered.findIndex((c) => c.id === id);
-    const other = ordered[idx + offset];
-    const current = ordered[idx];
-    if (!current || !other) return;
-
-    const moved: TaskCategoryDefinition = { ...current, sortOrder: other.sortOrder, updatedAt: nowTimestamp() };
-    const swapped: TaskCategoryDefinition = { ...other, sortOrder: current.sortOrder, updatedAt: nowTimestamp() };
-    this.saveStatus = "saving";
-    try {
-      await this.store.bulkPut("taskCategories", this.plainRecords([moved, swapped]));
-      for (const record of [moved, swapped]) {
-        const stateIdx = this.taskCategories.findIndex((c) => c.id === record.id);
-        if (stateIdx >= 0) this.taskCategories[stateIdx] = record;
-      }
-      await this.recordActivity("taskCategories", moved.id, "updated", `Reordered task category "${moved.label}"`);
-      await this.bumpChangeCount("updated");
-      this.saveStatus = "saved";
-    } catch (e) {
-      this.saveStatus = "error";
-      this.toast(`Save failed: ${e instanceof Error ? e.message : String(e)}`, "error");
-      throw e;
-    }
-  }
-
   // --- task service -----------------------------------------------------------
   createTask(partial: Partial<Task> & { title: string }): Task {
     const now = nowTimestamp();
-    const status = partial.status ?? "inbox";
+    const status = partial.status ?? "open";
     const boardColumnId = partial.boardColumnId ?? this.defaultBoardColumnId();
     return {
       id: newId(),
       status,
       boardColumnId,
       priority: "normal",
-      category: this.defaultTaskCategoryId(),
       performanceInputCreated: false,
       tags: [],
       boardOrder: orderForAppend(
@@ -825,18 +646,6 @@ class AppStore {
     await this.putRecord("tasks", updated, {
       actionType: "updated",
       summary: `Moved "${task.title}" from ${this.boardColumnLabel(prev)} to ${this.boardColumnLabel(boardColumnId)}`
-    });
-  }
-
-  async moveTask(task: Task, status: TaskStatus, boardOrder: number): Promise<void> {
-    const prev = task.status;
-    const updated: Task = { ...task, status, boardOrder, updatedAt: nowTimestamp() };
-    if (status === "waiting" && prev !== "waiting") updated.waitingSince = nowTimestamp();
-    if (status === "complete" && prev !== "complete") updated.completedDate = this.today;
-    if (status !== "complete") updated.completedDate = undefined;
-    await this.putRecord("tasks", updated, {
-      actionType: "status_changed",
-      summary: `Moved "${task.title}" from ${prev} to ${status}`
     });
   }
 
@@ -968,6 +777,128 @@ class AppStore {
       await this.bumpChangeCount("deleted");
       this.saveStatus = "saved";
       this.toast("Performance input deleted", "success");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
+  }
+
+  // --- employee service ---------------------------------------------------------
+  /** Everything deleteEmployee will remove or unlink, for the confirmation dialog. */
+  employeeLinkedRecordCounts(employeeId: string) {
+    return {
+      performanceInputs: this.performanceInputs.filter((r) => r.employeeId === employeeId).length,
+      trainingRecords: this.employeeTrainingRecords.filter((r) => r.employeeId === employeeId).length,
+      leaveRecords: this.leaveRecords.filter((r) => r.employeeId === employeeId).length,
+      teleworkRecords: this.teleworkRecords.filter((r) => r.employeeId === employeeId).length,
+      awardRecords: this.awardRecords.filter((r) => r.employeeId === employeeId).length,
+      interactions: this.employeeInteractions.filter((r) => r.employeeId === employeeId).length,
+      notes: this.employeeNotes.filter((r) => r.employeeId === employeeId).length,
+      linkedTasks: this.tasks.filter((t) => t.employeeId === employeeId).length
+    };
+  }
+
+  /**
+   * Permanently delete an employee together with the records that only exist
+   * for them (performance inputs, training, leave, telework, awards, check-ins,
+   * notes). Shared records survive: tasks and meeting notes are unlinked, and
+   * project lead / training-requirement assignments are cleared.
+   */
+  async deleteEmployee(employeeOrId: Employee | string): Promise<void> {
+    const employee =
+      typeof employeeOrId === "string" ? this.employees.find((e) => e.id === employeeOrId) : employeeOrId;
+    if (!employee) return;
+    this.saveStatus = "saving";
+    try {
+      const id = employee.id;
+      const name = employee.displayName;
+      const updatedAt = nowTimestamp();
+
+      const inputs = this.performanceInputs.filter((r) => r.employeeId === id);
+      const training = this.employeeTrainingRecords.filter((r) => r.employeeId === id);
+      const leave = this.leaveRecords.filter((r) => r.employeeId === id);
+      const telework = this.teleworkRecords.filter((r) => r.employeeId === id);
+      const awards = this.awardRecords.filter((r) => r.employeeId === id);
+      const interactions = this.employeeInteractions.filter((r) => r.employeeId === id);
+      const notes = this.employeeNotes.filter((r) => r.employeeId === id);
+
+      for (const r of inputs) await this.store.delete("performanceInputs", r.id);
+      for (const r of training) await this.store.delete("employeeTrainingRecords", r.id);
+      for (const r of leave) await this.store.delete("leaveRecords", r.id);
+      for (const r of telework) await this.store.delete("teleworkRecords", r.id);
+      for (const r of awards) await this.store.delete("awardRecords", r.id);
+      for (const r of interactions) await this.store.delete("employeeInteractions", r.id);
+      for (const r of notes) await this.store.delete("employeeNotes", r.id);
+
+      // Tasks survive but lose the employee link; a task whose only performance
+      // input was just deleted also gets its "input created" flag back (same
+      // rule as deletePerformanceInput).
+      const deletedInputIds = new Set(inputs.map((r) => r.id));
+      const taskIdsWithDeletedInputs = new Set(
+        inputs.map((r) => r.relatedTaskId).filter((tid): tid is string => Boolean(tid))
+      );
+      const survivingInputs = this.performanceInputs.filter((r) => r.employeeId !== id);
+      const keepInputFlag = (t: Task) =>
+        t.performanceInputCreated &&
+        (!taskIdsWithDeletedInputs.has(t.id) || survivingInputs.some((p) => p.relatedTaskId === t.id));
+      const updatedTasks = this.tasks
+        .filter((t) => t.employeeId === id || (t.performanceInputCreated && taskIdsWithDeletedInputs.has(t.id)))
+        .map((t) => ({
+          ...t,
+          employeeId: t.employeeId === id ? undefined : t.employeeId,
+          performanceInputCreated: keepInputFlag(t),
+          updatedAt
+        }));
+      for (const t of updatedTasks) await this.store.put("tasks", this.plainRecord(t));
+
+      const updatedAwards = this.awardRecords
+        .filter((a) => a.employeeId !== id && a.relatedPerformanceInputIds.some((i) => deletedInputIds.has(i)))
+        .map((a) => ({
+          ...a,
+          relatedPerformanceInputIds: a.relatedPerformanceInputIds.filter((i) => !deletedInputIds.has(i)),
+          updatedAt
+        }));
+      for (const a of updatedAwards) await this.store.put("awardRecords", this.plainRecord(a));
+
+      const updatedMeetings = this.meetingNotes
+        .filter((n) => n.attendeeEmployeeIds.includes(id))
+        .map((n) => ({ ...n, attendeeEmployeeIds: n.attendeeEmployeeIds.filter((e) => e !== id), updatedAt }));
+      for (const n of updatedMeetings) await this.store.put("meetingNotes", this.plainRecord(n));
+
+      const updatedProjects = this.projects
+        .filter((p) => p.leadEmployeeId === id)
+        .map((p) => ({ ...p, leadEmployeeId: undefined, updatedAt }));
+      for (const p of updatedProjects) await this.store.put("projects", this.plainRecord(p));
+
+      const updatedRequirements = this.trainingRequirements
+        .filter((r) => r.assignedEmployeeIds?.includes(id))
+        .map((r) => ({ ...r, assignedEmployeeIds: r.assignedEmployeeIds!.filter((e) => e !== id), updatedAt }));
+      for (const r of updatedRequirements) await this.store.put("trainingRequirements", this.plainRecord(r));
+
+      await this.store.delete("employees", id);
+
+      this.performanceInputs = survivingInputs;
+      this.employeeTrainingRecords = this.employeeTrainingRecords.filter((r) => r.employeeId !== id);
+      this.leaveRecords = this.leaveRecords.filter((r) => r.employeeId !== id);
+      this.teleworkRecords = this.teleworkRecords.filter((r) => r.employeeId !== id);
+      this.employeeInteractions = this.employeeInteractions.filter((r) => r.employeeId !== id);
+      this.employeeNotes = this.employeeNotes.filter((r) => r.employeeId !== id);
+      this.awardRecords = this.awardRecords
+        .filter((a) => a.employeeId !== id)
+        .map((a) => updatedAwards.find((u) => u.id === a.id) ?? a);
+      this.tasks = this.tasks.map((t) => updatedTasks.find((u) => u.id === t.id) ?? t);
+      this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
+      this.projects = this.projects.map((p) => updatedProjects.find((u) => u.id === p.id) ?? p);
+      this.trainingRequirements = this.trainingRequirements.map(
+        (r) => updatedRequirements.find((u) => u.id === r.id) ?? r
+      );
+      this.employees = this.employees.filter((e) => e.id !== id);
+
+      await this.recordActivity("employees", id, "deleted", `Deleted employee ${name} and their linked records`);
+      await this.bumpChangeCount("deleted");
+      this.saveStatus = "saved";
+      this.toast(`Deleted employee ${name}`, "success");
     } catch (e) {
       this.saveStatus = "error";
       this.toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");

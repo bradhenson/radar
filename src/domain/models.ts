@@ -79,27 +79,9 @@ export interface Project {
   isArchived: boolean;
 }
 
-export type TaskStatus =
-  | "inbox"
-  | "planned"
-  | "in_progress"
-  | "waiting"
-  | "needs_review"
-  | "complete"
-  | "cancelled";
+export type TaskStatus = "open" | "waiting" | "complete" | "cancelled";
 
 export type TaskPriority = "low" | "normal" | "high" | "critical";
-
-export type TaskCategory = string;
-
-export interface TaskCategoryDefinition {
-  id: Id;
-  label: string;
-  sortOrder: number;
-  isArchived: boolean;
-  createdAt: IsoTimestamp;
-  updatedAt: IsoTimestamp;
-}
 
 export interface BoardColumnDefinition {
   id: Id;
@@ -118,7 +100,6 @@ export interface Task {
   status: TaskStatus;
   boardColumnId?: Id;
   priority: TaskPriority;
-  category: TaskCategory;
   employeeId?: Id;
   projectId?: Id;
   competencyId?: Id;
@@ -424,15 +405,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
 };
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
-  { value: "inbox", label: "Not Started" },
-  { value: "planned", label: "Planned" },
-  { value: "in_progress", label: "In Progress" },
+  { value: "open", label: "Open" },
   { value: "waiting", label: "Waiting" },
-  { value: "needs_review", label: "Needs Review" },
   { value: "complete", label: "Complete" }
 ];
 
-export const BOARD_STATUSES: TaskStatus[] = TASK_STATUSES.map((s) => s.value);
+/**
+ * Collapse legacy workflow-stage statuses (inbox/planned/in_progress/needs_review) into
+ * "open". Workflow stages belong to the user-defined board columns; status only carries
+ * the states domain rules act on. Unknown values also normalize to "open" because every
+ * rule already treated them as an open task.
+ */
+export function normalizeTaskStatus(value: string): TaskStatus {
+  return value === "waiting" || value === "complete" || value === "cancelled" ? value : "open";
+}
 
 export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: number }[] = [
   { id: "inbox", label: "Inbox", sortOrder: 10 },
@@ -449,17 +435,6 @@ export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [
   { value: "high", label: "High" },
   { value: "critical", label: "Critical" }
 ];
-
-export const DEFAULT_TASK_CATEGORY_SEEDS: { id: TaskCategory; label: string; sortOrder: number }[] = [
-  { id: "general", label: "General", sortOrder: 10 },
-  { id: "project", label: "Project Work", sortOrder: 20 },
-  { id: "personnel", label: "Personnel", sortOrder: 30 },
-  { id: "performance", label: "Performance", sortOrder: 40 },
-  { id: "training", label: "Training", sortOrder: 50 },
-  { id: "administrative", label: "Administrative", sortOrder: 60 }
-];
-
-export const TASK_CATEGORIES = DEFAULT_TASK_CATEGORY_SEEDS.map((c) => ({ value: c.id, label: c.label }));
 
 export const SOURCE_SYSTEMS = ["None", "Planner", "ERP", "SWAT", "Email", "Meeting", "Supervisor", "Employee", "Other"];
 
@@ -504,12 +479,10 @@ export const AWARD_STATUSES = [
 ];
 
 export function statusLabel(status: TaskStatus): string {
+  if (status === "cancelled") return "Cancelled";
   return TASK_STATUSES.find((s) => s.value === status)?.label ?? status;
 }
 
-export function categoryLabel(category: TaskCategory): string {
-  return TASK_CATEGORIES.find((c) => c.value === category)?.label ?? category;
-}
 
 export function priorityLabel(priority: TaskPriority): string {
   return TASK_PRIORITIES.find((p) => p.value === priority)?.label ?? priority;
