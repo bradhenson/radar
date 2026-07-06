@@ -25,8 +25,3 @@ BACKUPS ARE ESSENTIAL
   file in an approved location. The Today page reminds you when a
   backup is overdue.
 - To restore: Settings > "Import backup..." and follow the preview.
-
-DATA USE NOTICE
-Use only for information authorized for local supervisory tracking.
-Do not enter classified information, credentials, medical details,
-Social Security numbers, or unnecessary personal information.

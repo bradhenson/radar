@@ -15,17 +15,38 @@ export interface Competency {
 }
 
 export type EmployeeActiveStatus = "active" | "temporary_inactive" | "departed" | "archived";
+export type ComputerAsset = "rdte" | "nmci";
+export type ClearanceLevel = "s" | "ts" | "ts_sci";
 
 export interface Employee {
   id: Id;
   displayName: string;
   preferredName?: string;
   sortName?: string;
-  competencyId: Id;
+  competencyId?: Id;
+  edipi?: string;
+  pernr?: string;
+  series?: string;
   workEmail?: string;
   positionTitle?: string;
   role?: string;
+  /** Integrated Product Team; legacy backups may still think of this as "team". */
   team?: string;
+  locationBuilding?: string;
+  locationCube?: string;
+  workPhone?: string;
+  personalPhone?: string;
+  iptLead?: string;
+  employeeProject?: string;
+  employeeProjectLead?: string;
+  computerAsset?: ComputerAsset;
+  govPhone?: boolean;
+  cswfCode?: string;
+  cswfLevel?: string;
+  financialStatementRequired?: boolean;
+  drugTestRequired?: boolean;
+  teleworkAgreementValidThrough?: IsoDate;
+  clearance?: ClearanceLevel;
   startDate?: IsoDate;
   evaluationCycleId?: Id;
   activeStatus: EmployeeActiveStatus;
@@ -443,6 +464,17 @@ export const MEETING_TYPES = ["Product team", "Project", "Staff", "Customer", "O
 export const LEAVE_TYPES = ["Annual", "Sick", "Comp Time", "Credit Hours", "Administrative", "Other", "Not specified"];
 
 export const TELEWORK_RECORD_TYPES = ["Agreement", "Routine request", "Situational request", "Renewal", "Modification", "Other"];
+
+export const COMPUTER_ASSET_OPTIONS: { value: ComputerAsset; label: string }[] = [
+  { value: "rdte", label: "RDT&E" },
+  { value: "nmci", label: "NMCI" }
+];
+
+export const CLEARANCE_OPTIONS: { value: ClearanceLevel; label: string }[] = [
+  { value: "s", label: "S" },
+  { value: "ts", label: "TS" },
+  { value: "ts_sci", label: "TS/SCI" }
+];
 
 export const AWARD_STATUSES = [
   "Idea",

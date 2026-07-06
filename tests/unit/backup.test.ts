@@ -66,6 +66,14 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors.some((e) => e.includes("displayName"))).toBe(true);
   });
 
+  it("allows employee records without a competency", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    delete (pkg.data.employees[0] as Record<string, unknown>).competencyId;
+    const r = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(r.valid).toBe(true);
+    expect(r.errors).toEqual([]);
+  });
+
   it("rejects duplicate ids", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     (pkg.data.tasks[1] as Record<string, unknown>).id = (pkg.data.tasks[0] as Record<string, unknown>).id;
@@ -80,6 +88,14 @@ describe("backup validation rejects bad input", () => {
     const r = parseAndValidateBackup(JSON.stringify(pkg));
     expect(r.valid).toBe(false);
     expect(r.errors.some((e) => e.includes("dueDate"))).toBe(true);
+  });
+
+  it("rejects invalid employee profile dates", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.employees[0] as Record<string, unknown>).teleworkAgreementValidThrough = "2026-02-30";
+    const r = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes("teleworkAgreementValidThrough"))).toBe(true);
   });
 
   it("warns (not errors) about missing collections and orphan references", () => {

@@ -7,7 +7,9 @@
   import { compareDates, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
-  import type { Employee } from "../domain/models";
+  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, type Employee } from "../domain/models";
+
+  const NO_COMPETENCY_FILTER = "__none";
 
   let search = $state("");
   let filterCompetency = $state("");
@@ -19,7 +21,8 @@
     app.employees
       .filter((e) => {
         if (!showInactive && (e.activeStatus !== "active" || e.isArchived)) return false;
-        if (filterCompetency && e.competencyId !== filterCompetency) return false;
+        if (filterCompetency === NO_COMPETENCY_FILTER && e.competencyId) return false;
+        if (filterCompetency && filterCompetency !== NO_COMPETENCY_FILTER && e.competencyId !== filterCompetency) return false;
         if (search && !e.displayName.toLowerCase().includes(search.toLowerCase())) return false;
         return true;
       })
@@ -43,14 +46,73 @@
       .sort((a, b) => a.e.displayName.localeCompare(b.e.displayName))
   );
 
+  function optionLabel(options: { value: string; label: string }[], value: string | undefined): string {
+    if (!value) return "";
+    return options.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function yesNo(value: boolean | undefined): string {
+    return value === undefined ? "" : value ? "Yes" : "No";
+  }
+
   function exportCsv() {
     const csv = toCsv(
-      ["Employee", "Competency", "Role", "Active status", "Open tasks", "Overdue tasks", "Training due", "Last performance input", "Last check-in"],
+      [
+        "Employee",
+        "Competency",
+        "Title",
+        "Active status",
+        "Integrated Product Team",
+        "IPT Lead",
+        "Project",
+        "Project Lead",
+        "Building",
+        "Cube",
+        "Work email",
+        "Work phone",
+        "Personal phone",
+        "EDIPI",
+        "PERNR",
+        "Series",
+        "Computer asset",
+        "Gov phone",
+        "CSWF code",
+        "CSWF level",
+        "Financial statement required",
+        "Drug test required",
+        "Telework agreement valid through",
+        "Clearance",
+        "Open tasks",
+        "Overdue tasks",
+        "Training due",
+        "Last performance input",
+        "Last check-in"
+      ],
       rows.map((r) => [
         r.e.displayName,
         app.competencyCode(r.e.competencyId),
         r.e.positionTitle,
         r.e.activeStatus,
+        r.e.team,
+        r.e.iptLead,
+        r.e.employeeProject,
+        r.e.employeeProjectLead,
+        r.e.locationBuilding,
+        r.e.locationCube,
+        r.e.workEmail,
+        r.e.workPhone,
+        r.e.personalPhone,
+        r.e.edipi,
+        r.e.pernr,
+        r.e.series,
+        optionLabel(COMPUTER_ASSET_OPTIONS, r.e.computerAsset),
+        yesNo(r.e.govPhone),
+        r.e.cswfCode,
+        r.e.cswfLevel,
+        yesNo(r.e.financialStatementRequired),
+        yesNo(r.e.drugTestRequired),
+        r.e.teleworkAgreementValidThrough,
+        optionLabel(CLEARANCE_OPTIONS, r.e.clearance),
         r.openCount,
         r.overdueCount,
         r.trainingDueCount,
@@ -72,6 +134,7 @@
     <input type="search" placeholder="Search employees" bind:value={search} aria-label="Search employees" />
     <select bind:value={filterCompetency} aria-label="Filter by competency">
       <option value="">All competencies</option>
+      <option value={NO_COMPETENCY_FILTER}>No competency</option>
       {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
     <label style="display:flex; align-items:center; gap:.35rem; font-weight:400; margin:0">
@@ -95,7 +158,7 @@
     <table class="data">
       <thead>
         <tr>
-          <th>Name</th><th>Competency</th><th>Role</th><th>Status</th><th>Open</th><th>Overdue</th>
+          <th>Name</th><th>Competency</th><th>Title</th><th>IPT</th><th>Status</th><th>Open</th><th>Overdue</th>
           <th>Training due</th><th>Upcoming leave</th><th>Last input</th><th></th>
         </tr>
       </thead>
@@ -105,6 +168,7 @@
             <td><button type="button" class="link" onclick={() => router.go("employees", r.e.id)}>{r.e.displayName}</button></td>
             <td>{app.competencyCode(r.e.competencyId)}</td>
             <td>{r.e.positionTitle ?? ""}</td>
+            <td>{r.e.team ?? ""}</td>
             <td>{r.e.activeStatus === "active" ? "Active" : r.e.activeStatus.replace("_", " ")}</td>
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>

@@ -7,22 +7,24 @@
 
   let { employee, onclose }: { employee?: Employee; onclose: () => void } = $props();
 
-  let displayName = $state(employee?.displayName ?? "");
-  let competencyId = $state(employee?.competencyId ?? app.activeCompetencies[0]?.id ?? "");
-  let positionTitle = $state(employee?.positionTitle ?? "");
-  let workEmail = $state(employee?.workEmail ?? "");
-  let team = $state(employee?.team ?? "");
-  let activeStatus = $state(employee?.activeStatus ?? "active");
+  let initialized = $state(false);
+  let displayName = $state("");
+  let competencyId = $state("");
+  let activeStatus = $state<Employee["activeStatus"]>("active");
   let error = $state("");
+
+  $effect(() => {
+    if (initialized) return;
+    displayName = employee?.displayName ?? "";
+    competencyId = employee?.competencyId ?? "";
+    activeStatus = employee?.activeStatus ?? "active";
+    initialized = true;
+  });
 
   async function save() {
     const name = displayName.trim();
     if (!name) {
       error = "Display name is required.";
-      return;
-    }
-    if (!competencyId) {
-      error = "Competency is required.";
       return;
     }
     const duplicate = app.employees.find(
@@ -33,12 +35,10 @@
     }
     const now = nowTimestamp();
     const record: Employee = {
+      ...employee,
       id: employee?.id ?? newId(),
       displayName: name,
-      competencyId,
-      positionTitle: positionTitle.trim() || undefined,
-      workEmail: workEmail.trim() || undefined,
-      team: team.trim() || undefined,
+      competencyId: competencyId || undefined,
       activeStatus,
       lastCheckInDate: employee?.lastCheckInDate,
       tags: employee?.tags ?? [],
@@ -67,15 +67,12 @@
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
       <div>
-        <label for="ef-comp">Competency <span class="req">*</span></label>
+        <label for="ef-comp">Competency</label>
         <select id="ef-comp" bind:value={competencyId} style="width:100%">
-          {#if app.competencyOptions(competencyId).length === 0}
-            <option value="">Add competencies in Settings</option>
-          {:else}
-            {#each app.competencyOptions(competencyId) as c (c.id)}
-              <option value={c.id}>{c.code}{#if !c.active} (inactive){/if}</option>
-            {/each}
-          {/if}
+          <option value="">No competency</option>
+          {#each app.competencyOptions(competencyId) as c (c.id)}
+            <option value={c.id}>{c.code}{#if !c.active} (inactive){/if}</option>
+          {/each}
         </select>
       </div>
       <div>
@@ -87,17 +84,7 @@
           <option value="archived">Archived</option>
         </select>
       </div>
-      <div>
-        <label for="ef-title">Position title</label>
-        <input id="ef-title" type="text" bind:value={positionTitle} maxlength="200" style="width:100%" />
-      </div>
-      <div>
-        <label for="ef-team">Team</label>
-        <input id="ef-team" type="text" bind:value={team} maxlength="200" style="width:100%" />
-      </div>
     </div>
-    <label for="ef-email">Work email <span class="field-hint">(only if authorized)</span></label>
-    <input id="ef-email" type="text" bind:value={workEmail} maxlength="200" style="width:100%" />
 
     <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
       <button type="button" onclick={onclose}>Cancel</button>

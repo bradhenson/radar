@@ -6,8 +6,8 @@ calendar planning, performance-input capture/editing, meeting notes, and trainin
 tracking — with **no server, no telemetry, and no runtime network access**. Built from the specification in
 `NIWC_Supervisor_Assistant_Project_Plan.txt`.
 
-> **Boundary:** this is a software project, not an authorization to store government information in
-> an unapproved application. Use invented or sanitized data until storage rules are confirmed.
+RADAR is intended to run in an environment authorized for the employee profile information tracked
+by the application. Repository fixtures, tests, screenshots, and sample data remain synthetic.
 
 ## Quick start (development machine)
 

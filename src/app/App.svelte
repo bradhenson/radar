@@ -195,10 +195,6 @@
       </main>
     </div>
 
-    <footer class="notice">
-      Use only for information authorized for local supervisory tracking. Do not enter classified information,
-      credentials, medical details, Social Security numbers, or unnecessary personal information.
-    </footer>
   </div>
 
   {#if ui.newTaskOpen}
@@ -398,20 +394,6 @@
   }
 
   main { flex: 1; min-width: 0; overflow-x: auto; }
-
-  .notice {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: .7rem;
-    padding: .28rem 1rem;
-    text-align: center;
-    z-index: 60;
-  }
 
   @media (max-width: 900px) {
     .sidenav { width: 10.5rem; }

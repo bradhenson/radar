@@ -551,10 +551,6 @@
       RADAR v{APPLICATION_VERSION} — Reporting, Administration, Delegation, Analytics & Review. No server, no
       telemetry, no network access. All data stays in this browser and in backups you export.
     </p>
-    <p class="small muted">
-      Use only for information authorized for local supervisory tracking. Do not enter classified information,
-      credentials, medical details, Social Security numbers, or unnecessary personal information.
-    </p>
   </section>
 </div>
 

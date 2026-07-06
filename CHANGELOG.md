@@ -3,6 +3,11 @@
 ## Unreleased
 
 ### Changed
+- Employee creation is now lighter-weight: competency is optional, and title/contact/IPT-style
+  details live in the employee profile instead of the initial add dialog.
+- Employee directory and CSV export now use "Title" and "Integrated Product Team" terminology;
+  the CSV export includes the new employee profile fields.
+- Removed the persistent data-use caution footer and matching About-page caution text.
 - Competencies are now configurable in Settings instead of being seeded as fixed first-run values.
   Active competencies appear in employee forms and training bulk-selection shortcuts; inactive
   competencies remain attached to existing records and can be reactivated.
@@ -39,6 +44,10 @@
   person.
 
 ### Added
+- Employee profiles now include a Profile tab for administrative and contact details: EDIPI,
+  PERNR, series, location, phones, employee-specific project and project lead, IPT lead,
+  computer asset, gov phone, CSWF data, financial statement/drug test flags, telework agreement
+  valid-through date, and clearance.
 - Calendar page (sidebar, between Board and Employees): a combined month view showing task due
   dates alongside leave days and situational telework days (matching the Telework page's
   calendar). Each layer — tasks, leave, telework — can be toggled independently (tasks on by

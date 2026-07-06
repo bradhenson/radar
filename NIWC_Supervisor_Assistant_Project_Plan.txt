@@ -25,8 +25,8 @@ July 5, 2026
 Intended user:
 A single supervisor managing approximately 40 employees across configurable organizational competencies.
 
-IMPORTANT BOUNDARY:
-This document is a software design and development plan, not an authorization to store government information in an unapproved application. Before real employee data is entered, the user must determine what information may be stored locally on an NMCI computer and where backup files may be saved. Initial development and testing should use invented or sanitized data.
+OPERATIONAL ASSUMPTION:
+RADAR is intended to run in an environment authorized for the employee profile information tracked by the application. Development, tests, fixtures, screenshots, and sample data remain invented or sanitized.
 
 ======================================================================
 CURRENT IMPLEMENTATION SNAPSHOT
@@ -444,11 +444,11 @@ All notes should be:
 
 The application should not encourage unstructured personal judgments.
 
-6.5 Data classification notice
+6.5 Data handling posture
 
-Display a persistent footer or About notice:
-
-“Use only for information authorized for local supervisory tracking. Do not enter classified information, credentials, medical details, Social Security numbers, or unnecessary personal information.”
+The operational environment is expected to be authorized for the employee profile information
+tracked by RADAR. The application does not display a persistent caution footer or About-panel
+data-use notice.
 
 6.6 No telemetry
 
@@ -1190,7 +1190,8 @@ Columns:
 
 - Name.
 - Competency.
-- Role.
+- Title.
+- Integrated Product Team.
 - Active status.
 - Open task count.
 - Overdue task count.
@@ -1214,10 +1215,33 @@ Header:
 
 - Name.
 - Competency.
-- Work role.
+- Title.
+- Integrated Product Team.
 - Active status.
-- Optional work email.
+- Optional profile details.
 - Quick actions.
+
+Profile tab:
+
+- EDIPI.
+- PERNR.
+- Series.
+- Title.
+- Location building and cube.
+- Work phone.
+- Personal phone.
+- Integrated Product Team.
+- IPT Lead.
+- Employee-specific project.
+- Employee-specific project lead.
+- Computer Asset.
+- Gov Phone.
+- CSWF Code.
+- CSWF Level.
+- Financial Statement Required.
+- Drug Test Required.
+- Telework Agreement valid-through date.
+- Clearance.
 
 Summary cards:
 
@@ -1807,7 +1831,6 @@ Required:
 
 - id.
 - displayName.
-- competencyId.
 - activeStatus.
 - createdAt.
 - updatedAt.
@@ -1815,10 +1838,29 @@ Required:
 Optional:
 
 - preferredName.
+- competencyId.
+- edipi.
+- pernr.
+- series.
 - workEmail.
 - positionTitle.
 - role.
-- team.
+- team (Integrated Product Team).
+- locationBuilding.
+- locationCube.
+- workPhone.
+- personalPhone.
+- iptLead.
+- employeeProject.
+- employeeProjectLead.
+- computerAsset.
+- govPhone.
+- cswfCode.
+- cswfLevel.
+- financialStatementRequired.
+- drugTestRequired.
+- teleworkAgreementValidThrough.
+- clearance.
 - startDate.
 - evaluationCycleId.
 - supervisorNotesSummary.
@@ -1840,9 +1882,9 @@ Values:
 
 Competencies are user-configurable records managed from Settings.
 
-Competency is stored as a reference rather than free text. Sample data may include example
-competencies such as 55140 and 55230, but a blank first-run database should not hard-code those
-values.
+When present, competency is stored as a reference rather than free text. Sample data may include
+example competencies such as 55140 and 55230, but a blank first-run database should not hard-code
+those values.
 
 15.4 Employee deletion
 
@@ -2700,7 +2742,14 @@ Columns:
 
 - Employee.
 - Competency.
-- Role.
+- Title.
+- Integrated Product Team.
+- IPT Lead.
+- Project.
+- Project Lead.
+- Location.
+- Phones.
+- Employee profile identifiers and requirement flags.
 - Active status.
 - Open tasks.
 - Overdue tasks.
@@ -2777,11 +2826,29 @@ interface Employee {
   displayName: string;
   preferredName?: string;
   sortName?: string;
-  competencyId: Id;
+  competencyId?: Id;
+  edipi?: string;
+  pernr?: string;
+  series?: string;
   workEmail?: string;
   positionTitle?: string;
   role?: string;
   team?: string;
+  locationBuilding?: string;
+  locationCube?: string;
+  workPhone?: string;
+  personalPhone?: string;
+  iptLead?: string;
+  employeeProject?: string;
+  employeeProjectLead?: string;
+  computerAsset?: "rdte" | "nmci";
+  govPhone?: boolean;
+  cswfCode?: string;
+  cswfLevel?: string;
+  financialStatementRequired?: boolean;
+  drugTestRequired?: boolean;
+  teleworkAgreementValidThrough?: IsoDate;
+  clearance?: "s" | "ts" | "ts_sci";
   startDate?: IsoDate;
   evaluationCycleId?: Id;
   activeStatus: "active" | "temporary_inactive" | "departed" | "archived";

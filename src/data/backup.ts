@@ -56,7 +56,7 @@ export interface BackupValidationResult {
 
 // Fields that must be non-empty strings on every record of a collection.
 const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
-  employees: ["id", "displayName", "competencyId", "activeStatus"],
+  employees: ["id", "displayName", "activeStatus"],
   competencies: ["id", "code"],
   projects: ["id", "name", "status"],
   tasks: ["id", "title", "status", "priority", "category"],
@@ -81,7 +81,7 @@ const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = 
 
 const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["startDate", "dueDate", "reminderDate", "followUpDate", "completedDate", "lastVerifiedDate"],
-  employees: ["startDate", "lastCheckInDate"],
+  employees: ["startDate", "lastCheckInDate", "teleworkAgreementValidThrough"],
   performanceInputs: ["inputDate"],
   trainingRequirements: ["dueDate"],
   employeeTrainingRecords: ["assignedDate", "dueDate", "completedDate", "expirationDate", "lastVerifiedDate"],

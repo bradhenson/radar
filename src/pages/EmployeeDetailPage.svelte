@@ -5,10 +5,11 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
+  import EmployeeProfileForm from "../components/forms/EmployeeProfileForm.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
+  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
@@ -16,8 +17,9 @@
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"overview" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
+  let tab = $state<"overview" | "profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
   let editOpen = $state(false);
+  let profileOpen = $state(false);
   let checkInOpen = $state(false);
   let meetingNoteOpen = $state(false);
   let editingMeetingNote = $state<MeetingNote | undefined>(undefined);
@@ -78,6 +80,19 @@
     return formatDate(t.effectiveDate ?? end);
   }
 
+  function optionLabel(options: { value: string; label: string }[], value: string | undefined): string {
+    if (!value) return "";
+    return options.find((option) => option.value === value)?.label ?? value;
+  }
+
+  function yesNo(value: boolean | undefined): string {
+    return value === undefined ? "" : value ? "Yes" : "No";
+  }
+
+  function profileValue(value: string | undefined): string {
+    return value?.trim() || "";
+  }
+
   async function saveCheckIn() {
     if (!employee) return;
     const now = nowTimestamp();
@@ -104,6 +119,7 @@
 
   const TABS = [
     ["overview", "Overview"],
+    ["profile", "Profile"],
     ["tasks", "Tasks"],
     ["performance", "Performance"],
     ["meetings", "Meetings"],
@@ -124,8 +140,9 @@
   <div class="page">
     <div class="page-header">
       <h1>{employee.displayName}</h1>
-      <span class="badge">{app.competencyCode(employee.competencyId)}</span>
+      {#if employee.competencyId}<span class="badge">{app.competencyCode(employee.competencyId)}</span>{/if}
       {#if employee.positionTitle}<span class="muted">{employee.positionTitle}</span>{/if}
+      {#if employee.team}<span class="muted">{employee.team}</span>{/if}
       {#if employee.activeStatus !== "active"}<span class="badge warning">{employee.activeStatus.replace("_", " ")}</span>{/if}
       <span class="spacer" style="flex:1"></span>
       <button type="button" onclick={() => (checkInOpen = true)}>Record check-in</button>
@@ -200,6 +217,58 @@
           </div>
         {/each}
       {/if}
+    {:else if tab === "profile"}
+      <div class="tab-title-row">
+        <h2>Profile details</h2>
+        <button type="button" onclick={() => (profileOpen = true)}>Edit profile</button>
+      </div>
+      <div class="profile-detail-grid">
+        <section class="profile-group">
+          <h3>Identity</h3>
+          <dl>
+            <div><dt>Title</dt><dd>{profileValue(employee.positionTitle)}</dd></div>
+            <div><dt>Series</dt><dd>{profileValue(employee.series)}</dd></div>
+            <div><dt>EDIPI</dt><dd>{profileValue(employee.edipi)}</dd></div>
+            <div><dt>PERNR</dt><dd>{profileValue(employee.pernr)}</dd></div>
+            <div><dt>Competency</dt><dd>{app.competencyCode(employee.competencyId)}</dd></div>
+          </dl>
+        </section>
+
+        <section class="profile-group">
+          <h3>Location and contact</h3>
+          <dl>
+            <div><dt>Building</dt><dd>{profileValue(employee.locationBuilding)}</dd></div>
+            <div><dt>Cube</dt><dd>{profileValue(employee.locationCube)}</dd></div>
+            <div><dt>Work email</dt><dd>{profileValue(employee.workEmail)}</dd></div>
+            <div><dt>Work phone</dt><dd>{profileValue(employee.workPhone)}</dd></div>
+            <div><dt>Personal phone</dt><dd>{profileValue(employee.personalPhone)}</dd></div>
+            <div><dt>Gov phone</dt><dd>{yesNo(employee.govPhone)}</dd></div>
+          </dl>
+        </section>
+
+        <section class="profile-group">
+          <h3>Organization and project</h3>
+          <dl>
+            <div><dt>Integrated Product Team</dt><dd>{profileValue(employee.team)}</dd></div>
+            <div><dt>IPT Lead</dt><dd>{profileValue(employee.iptLead)}</dd></div>
+            <div><dt>Project</dt><dd>{profileValue(employee.employeeProject)}</dd></div>
+            <div><dt>Project Lead</dt><dd>{profileValue(employee.employeeProjectLead)}</dd></div>
+          </dl>
+        </section>
+
+        <section class="profile-group">
+          <h3>Assets and requirements</h3>
+          <dl>
+            <div><dt>Computer Asset</dt><dd>{optionLabel(COMPUTER_ASSET_OPTIONS, employee.computerAsset)}</dd></div>
+            <div><dt>Clearance</dt><dd>{optionLabel(CLEARANCE_OPTIONS, employee.clearance)}</dd></div>
+            <div><dt>CSWF Code</dt><dd>{profileValue(employee.cswfCode)}</dd></div>
+            <div><dt>CSWF Level</dt><dd>{profileValue(employee.cswfLevel)}</dd></div>
+            <div><dt>Financial Statement Required</dt><dd>{yesNo(employee.financialStatementRequired)}</dd></div>
+            <div><dt>Drug Test Required</dt><dd>{yesNo(employee.drugTestRequired)}</dd></div>
+            <div><dt>Telework Agreement Valid Through</dt><dd>{formatDate(employee.teleworkAgreementValidThrough)}</dd></div>
+          </dl>
+        </section>
+      </div>
     {:else if tab === "tasks"}
       {#if tasks.length === 0}
         <EmptyState message="No tasks for this employee." hint="Use Add task above." />
@@ -338,6 +407,9 @@
   {#if editOpen}
     <EmployeeForm {employee} onclose={() => (editOpen = false)} />
   {/if}
+  {#if profileOpen}
+    <EmployeeProfileForm {employee} onclose={() => (profileOpen = false)} />
+  {/if}
   {#if checkInOpen}
     <Dialog title="Record check-in" onclose={() => (checkInOpen = false)}>
       <label for="ci-type">Interaction type</label>
@@ -367,6 +439,47 @@
   .tabs { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
   .tabs button { border: none; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: .4rem .7rem; }
   .tabs button.active { border-bottom-color: var(--accent); font-weight: 700; color: var(--accent); }
+  .tab-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
+  .tab-title-row h2 { margin: 0; }
+  .tab-title-row button { margin-left: auto; }
+  .profile-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .9rem 1rem;
+  }
+  .profile-group {
+    border-top: 1px solid var(--border);
+    padding-top: .75rem;
+  }
+  .profile-group dl {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: .4rem;
+    margin: .35rem 0 0;
+  }
+  .profile-group dl > div {
+    display: grid;
+    grid-template-columns: minmax(9rem, 38%) minmax(0, 1fr);
+    gap: .6rem;
+  }
+  .profile-group dt {
+    color: var(--text-muted);
+    font-size: .78rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+  }
+  .profile-group dd {
+    margin: 0;
+    min-height: 1.25rem;
+    overflow-wrap: anywhere;
+  }
   .activity-list { list-style: none; padding: 0; }
   .activity-list li { padding: .2rem 0; border-bottom: 1px solid var(--border); }
+  @media (max-width: 900px) {
+    .profile-detail-grid { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 560px) {
+    .profile-group dl > div { grid-template-columns: 1fr; gap: .1rem; }
+  }
 </style>

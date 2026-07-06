@@ -357,7 +357,7 @@ table.data tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 38
 }
 .toolbar .spacer { flex: 1; }
 
-.page { padding: 1.35rem 1.6rem 3.5rem; max-width: 1400px; }
+.page { padding: 1.35rem 1.6rem 2rem; max-width: 1400px; }
 .page-header {
   display: flex;
   align-items: baseline;
