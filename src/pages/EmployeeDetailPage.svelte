@@ -11,7 +11,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
-  import { compareDates, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
+  import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
 
   let { employeeId }: { employeeId: string } = $props();
@@ -85,12 +85,19 @@
     return options.find((option) => option.value === value)?.label ?? value;
   }
 
-  function yesNo(value: boolean | undefined): string {
-    return value === undefined ? "" : value ? "Yes" : "No";
-  }
-
   function profileValue(value: string | undefined): string {
     return value?.trim() || "";
+  }
+
+  // A telework agreement is flagged as expired (past) or expiring soon (within
+  // 30 days) so a lapsing agreement stands out instead of reading as plain text.
+  function teleworkExpiry(iso: string | undefined): { text: string; cls: string } | null {
+    if (!iso) return null;
+    const label = formatDate(iso);
+    const days = daysBetween(app.today, iso);
+    if (days < 0) return { text: `Expired ${label}`, cls: "overdue" };
+    if (days <= 30) return { text: `Expires ${label}`, cls: "warning" };
+    return { text: label, cls: "" };
   }
 
   async function saveCheckIn() {
@@ -222,50 +229,85 @@
         <h2>Profile details</h2>
         <button type="button" onclick={() => (profileOpen = true)}>Edit profile</button>
       </div>
+      {#snippet field(label: string, value: string)}
+        <div>
+          <dt>{label}</dt>
+          {#if value}<dd>{value}</dd>{:else}<dd class="empty">—</dd>{/if}
+        </div>
+      {/snippet}
+      {#snippet linkField(label: string, value: string, href: string)}
+        <div>
+          <dt>{label}</dt>
+          {#if value}<dd><a {href}>{value}</a></dd>{:else}<dd class="empty">—</dd>{/if}
+        </div>
+      {/snippet}
+      {#snippet flagField(label: string, value: boolean | undefined)}
+        <div>
+          <dt>{label}</dt>
+          <dd>
+            {#if value === undefined}<span class="empty">—</span>
+            {:else if value}<span class="badge flag-yes">Yes</span>
+            {:else}<span class="badge">No</span>{/if}
+          </dd>
+        </div>
+      {/snippet}
+      {#snippet badgeField(label: string, value: string)}
+        <div>
+          <dt>{label}</dt>
+          {#if value}<dd><span class="badge">{value}</span></dd>{:else}<dd class="empty">—</dd>{/if}
+        </div>
+      {/snippet}
+      {#snippet expiryField(label: string, status: { text: string; cls: string } | null)}
+        <div>
+          <dt>{label}</dt>
+          {#if status}<dd><span class="badge {status.cls}">{status.text}</span></dd>{:else}<dd class="empty">—</dd>{/if}
+        </div>
+      {/snippet}
+
       <div class="profile-detail-grid">
         <section class="profile-group">
           <h3>Identity</h3>
           <dl>
-            <div><dt>Title</dt><dd>{profileValue(employee.positionTitle)}</dd></div>
-            <div><dt>Series</dt><dd>{profileValue(employee.series)}</dd></div>
-            <div><dt>EDIPI</dt><dd>{profileValue(employee.edipi)}</dd></div>
-            <div><dt>PERNR</dt><dd>{profileValue(employee.pernr)}</dd></div>
-            <div><dt>Competency</dt><dd>{app.competencyCode(employee.competencyId)}</dd></div>
+            {@render field("Title", profileValue(employee.positionTitle))}
+            {@render field("Series", profileValue(employee.series))}
+            {@render field("EDIPI", profileValue(employee.edipi))}
+            {@render field("PERNR", profileValue(employee.pernr))}
+            {@render badgeField("Competency", app.competencyCode(employee.competencyId))}
           </dl>
         </section>
 
         <section class="profile-group">
           <h3>Location and contact</h3>
           <dl>
-            <div><dt>Building</dt><dd>{profileValue(employee.locationBuilding)}</dd></div>
-            <div><dt>Cube</dt><dd>{profileValue(employee.locationCube)}</dd></div>
-            <div><dt>Work email</dt><dd>{profileValue(employee.workEmail)}</dd></div>
-            <div><dt>Work phone</dt><dd>{profileValue(employee.workPhone)}</dd></div>
-            <div><dt>Personal phone</dt><dd>{profileValue(employee.personalPhone)}</dd></div>
-            <div><dt>Gov phone</dt><dd>{yesNo(employee.govPhone)}</dd></div>
+            {@render field("Building", profileValue(employee.locationBuilding))}
+            {@render field("Cube", profileValue(employee.locationCube))}
+            {@render linkField("Work email", profileValue(employee.workEmail), `mailto:${employee.workEmail}`)}
+            {@render linkField("Work phone", profileValue(employee.workPhone), `tel:${employee.workPhone}`)}
+            {@render linkField("Personal phone", profileValue(employee.personalPhone), `tel:${employee.personalPhone}`)}
+            {@render flagField("Government phone", employee.govPhone)}
           </dl>
         </section>
 
         <section class="profile-group">
           <h3>Organization and project</h3>
           <dl>
-            <div><dt>Integrated Product Team</dt><dd>{profileValue(employee.team)}</dd></div>
-            <div><dt>IPT Lead</dt><dd>{profileValue(employee.iptLead)}</dd></div>
-            <div><dt>Project</dt><dd>{profileValue(employee.employeeProject)}</dd></div>
-            <div><dt>Project Lead</dt><dd>{profileValue(employee.employeeProjectLead)}</dd></div>
+            {@render field("Integrated Product Team", profileValue(employee.team))}
+            {@render field("IPT Lead", profileValue(employee.iptLead))}
+            {@render field("Project", profileValue(employee.employeeProject))}
+            {@render field("Project Lead", profileValue(employee.employeeProjectLead))}
           </dl>
         </section>
 
         <section class="profile-group">
           <h3>Assets and requirements</h3>
           <dl>
-            <div><dt>Computer Asset</dt><dd>{optionLabel(COMPUTER_ASSET_OPTIONS, employee.computerAsset)}</dd></div>
-            <div><dt>Clearance</dt><dd>{optionLabel(CLEARANCE_OPTIONS, employee.clearance)}</dd></div>
-            <div><dt>CSWF Code</dt><dd>{profileValue(employee.cswfCode)}</dd></div>
-            <div><dt>CSWF Level</dt><dd>{profileValue(employee.cswfLevel)}</dd></div>
-            <div><dt>Financial Statement Required</dt><dd>{yesNo(employee.financialStatementRequired)}</dd></div>
-            <div><dt>Drug Test Required</dt><dd>{yesNo(employee.drugTestRequired)}</dd></div>
-            <div><dt>Telework Agreement Valid Through</dt><dd>{formatDate(employee.teleworkAgreementValidThrough)}</dd></div>
+            {@render badgeField("Computer Asset", optionLabel(COMPUTER_ASSET_OPTIONS, employee.computerAsset))}
+            {@render badgeField("Clearance", optionLabel(CLEARANCE_OPTIONS, employee.clearance))}
+            {@render field("CSWF Code", profileValue(employee.cswfCode))}
+            {@render field("CSWF Level", profileValue(employee.cswfLevel))}
+            {@render flagField("Financial Statement Required", employee.financialStatementRequired)}
+            {@render flagField("Drug Test Required", employee.drugTestRequired)}
+            {@render expiryField("Telework Agreement Valid Through", teleworkExpiry(employee.teleworkAgreementValidThrough))}
           </dl>
         </section>
       </div>
@@ -451,6 +493,15 @@
     border-top: 1px solid var(--border);
     padding-top: .75rem;
   }
+  /* Uppercase eyebrow for the section header; row labels stay quiet below it. */
+  .profile-group h3 {
+    font-size: .72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .07em;
+    color: var(--text-muted);
+    margin: 0 0 .15rem;
+  }
   .profile-group dl {
     display: grid;
     grid-template-columns: 1fr;
@@ -461,18 +512,25 @@
     display: grid;
     grid-template-columns: minmax(9rem, 38%) minmax(0, 1fr);
     gap: .6rem;
+    align-items: baseline;
   }
   .profile-group dt {
     color: var(--text-muted);
-    font-size: .78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: .06em;
+    font-size: .8rem;
+    font-weight: 500;
   }
   .profile-group dd {
     margin: 0;
     min-height: 1.25rem;
     overflow-wrap: anywhere;
+  }
+  .profile-group .empty {
+    color: var(--text-muted);
+  }
+  .profile-group .badge.flag-yes {
+    background: var(--accent-soft);
+    color: var(--accent);
+    border-color: transparent;
   }
   .activity-list { list-style: none; padding: 0; }
   .activity-list li { padding: .2rem 0; border-bottom: 1px solid var(--border); }
