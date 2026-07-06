@@ -1,6 +1,6 @@
 # Supervisor Assistant — coding agent working rules
 
-Read `NIWC_Supervisor_Assistant_Project_Plan.txt` before architectural changes. These rules come
+Read `Project_Plan.txt` before architectural changes. These rules come
 from plan section 38 and are binding for every change.
 
 ## Hard constraints
@@ -12,7 +12,7 @@ from plan section 38 and are binding for every change.
    module scripts do not load over `file://`.
 3. **All persistence goes through the `DataStore` interface** (`src/data/DataStore.ts`). Never
    call IndexedDB from UI components or pages.
-4. **No real employee names or government information** in code, tests, fixtures, screenshots,
+4. **No real employee names or sensitive information** in code, tests, fixtures, screenshots,
    or docs. Sample data is fictional (`src/data/seed.ts`).
 5. TypeScript strict mode; `npm run check` must report 0 errors.
 6. Treat imported data as untrusted: validate structurally (`src/data/backup.ts`) and always

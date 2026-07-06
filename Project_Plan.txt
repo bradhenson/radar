@@ -85,7 +85,7 @@ TABLE OF CONTENTS
 6. Operational and Security Boundaries
 7. Core User Workflows
 8. Recommended Technical Architecture
-9. NMCI Compatibility Spike
+9. Managed Browser Compatibility Spike
 10. Data Storage Strategy
 11. Application Information Architecture
 12. Detailed Screen Specifications
@@ -139,13 +139,13 @@ The application will focus on:
 - Fast capture of tasks, performance observations, and meeting notes.
 - Recurring reminders for routine supervisory responsibilities.
 - Local data storage with explicit export, backup, and recovery.
-- No required server, cloud account, external API, or software installation on the operational NMCI computer.
+- No required server, cloud account, external API, or software installation on the operational managed workstation.
 - No runtime internet dependency.
-- A production build that can be opened in an approved browser using local files, if NMCI browser policy permits.
+- A production build that can be opened in an approved browser using local files, if managed-browser policy permits.
 
-The software will be developed on a personal or approved development computer using modern development tools. Only the compiled, self-contained production files will be moved to the NMCI environment through an authorized process.
+The software will be developed on a personal or approved development computer using modern development tools. Only the compiled, self-contained production files will be moved to the managed environment through an authorized process.
 
-The first development activity will not be the full application. It will be a small compatibility test that verifies what the NMCI browser allows when opening a local web application. This test will determine:
+The first development activity will not be the full application. It will be a small compatibility test that verifies what the managed browser allows when opening a local web application. This test will determine:
 
 - Whether bundled JavaScript executes from a local file.
 - Whether IndexedDB is available and persists between browser sessions.
@@ -336,23 +336,23 @@ The initial version will not:
 - Replace official telework approval.
 - Replace official performance evaluation records.
 - Replace Planner for team collaboration.
-- Synchronize directly with Navy systems.
+- Synchronize directly with external systems.
 - Scrape browser pages.
 - Store passwords.
-- Store CAC credentials.
+- Store smart card credentials.
 - Require administrator rights.
 - Require a local service.
-- Require Node.js on NMCI.
-- Require Java on NMCI.
-- Require Python on NMCI.
+- Require Node.js in the managed environment.
+- Require Java in the managed environment.
+- Require Python in the managed environment.
 - Require a database server.
 - Require internet access.
 - Send email automatically.
 - generate background Windows notifications while closed.
 - Host multiple users.
 - Provide employee access.
-- Store classified information.
-- Intentionally store Controlled Unclassified Information unless an authorized determination and environment support it.
+- Store restricted information.
+- Intentionally store sensitive controlled information unless an authorized determination and environment support it.
 - Use generative AI in the operational version.
 - Upload data to an external AI service.
 - Store attachments in the first release.
@@ -379,7 +379,7 @@ Development should occur on a machine where the developer can use:
 
 6.2 Operational environment
 
-The target operational environment is an NMCI government computer with a managed browser, likely Microsoft Edge.
+The target operational environment is a managed workstation with a managed browser, likely Microsoft Edge.
 
 Assume:
 
@@ -392,23 +392,23 @@ Assume:
 - The application may be opened through a file path.
 - The browser may clear site data under some circumstances.
 - Download locations and removable media may be restricted.
-- Moving files to the NMCI computer must follow an approved process.
+- Moving files to the managed workstation must follow an approved process.
 
 6.3 Information minimization
 
 Do not store:
 
 - Social Security numbers.
-- DoD ID numbers unless specifically authorized and necessary.
+- Restricted identity numbers unless specifically authorized and necessary.
 - Home addresses.
 - Personal phone numbers.
 - Medical details.
 - Family details.
 - Leave medical explanations.
-- Security clearance details.
+- Sensitive access details.
 - Passwords.
 - Account credentials.
-- Classified information.
+- Restricted information.
 - Sensitive operational details unrelated to supervisory tracking.
 - Copies of official documents unless specifically authorized.
 - Full personnel files.
@@ -693,7 +693,7 @@ Possible implementations:
 - JsonFileDataStore, if a dependable file workflow becomes possible
 - MockDataStore for testing
 
-This separation is critical because NMCI policy may require a different storage strategy than the development computer.
+This separation is critical because managed-environment policy may require a different storage strategy than the development computer.
 
 8.7 Application state
 
@@ -730,7 +730,7 @@ Do not use array positions as identifiers.
 
 Primary browser target:
 
-- Current enterprise-managed Microsoft Edge available on the NMCI computer.
+- Current enterprise-managed Microsoft Edge available on the managed workstation.
 
 Secondary development targets:
 
@@ -740,7 +740,7 @@ Secondary development targets:
 The application does not need to support Internet Explorer.
 
 ======================================================================
-9. NMCI COMPATIBILITY SPIKE
+9. Managed Browser Compatibility Spike
 ======================================================================
 
 9.1 Purpose
@@ -782,7 +782,7 @@ Development computer:
 6. Confirm persisted test data.
 7. Export diagnostic report.
 
-NMCI computer:
+managed workstation:
 
 1. Transfer using an authorized process.
 2. Open index.html.
@@ -828,7 +828,7 @@ Use an explicit document workflow where the user opens a JSON data file, works i
 Outcome D:
 JavaScript or local files are blocked.
 
-The planned architecture is not viable in that environment. Reassess approved alternatives such as a static page hosted in an authorized location or a Navy-provided platform.
+The planned architecture is not viable in that environment. Reassess approved alternatives such as a static page hosted in an authorized location or a managed internal platform.
 
 ======================================================================
 10. DATA STORAGE STRATEGY
@@ -3589,7 +3589,7 @@ Automated end-to-end coverage is still planned. Local verification currently use
 tests, svelte-check, no-network scan, and targeted Playwright checks against the built or dev
 surface as needed.
 
-34.5 Manual NMCI tests
+34.5 Manual managed environment tests
 
 After each release candidate:
 
@@ -3641,7 +3641,7 @@ SupervisorAssistant/
             verify/
                 SKILL.md
     README.md
-    NIWC_Supervisor_Assistant_Project_Plan.txt
+    Project_Plan.txt
     CHANGELOG.md
     package.json
     package-lock.json
@@ -3776,13 +3776,13 @@ Status:
 Implemented.
 
 Goal:
-Determine whether the planned local browser approach works on NMCI.
+Determine whether the planned local browser approach works in a managed environment.
 
 Deliverables:
 
 - Environment test app.
 - Capability report.
-- NMCI test notes.
+- Managed-environment test notes.
 - Architecture decision record.
 
 Acceptance:
@@ -4004,7 +4004,7 @@ Deliverables:
 - Help documentation.
 - Version display.
 - Release package.
-- NMCI regression test.
+- Managed-environment regression test.
 
 Acceptance:
 
@@ -4145,7 +4145,7 @@ Deliverables:
 
 These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent repository instruction file.
 
-1. Read NIWC_Supervisor_Assistant_Project_Plan.txt before making architectural changes.
+1. Read Project_Plan.txt before making architectural changes.
 
 2. Do not add any runtime network dependency.
 
@@ -4159,7 +4159,7 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 7. Keep production assets usable from relative paths.
 
-8. Do not use real employee names or real government information in tests, fixtures, screenshots, or documentation.
+8. Do not use real employee names or real sensitive information in tests, fixtures, screenshots, or documentation.
 
 9. All persistent access must go through the DataStore interface.
 
@@ -4206,7 +4206,7 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 28. Do not rewrite working modules solely for style.
 
-29. When uncertain about NMCI compatibility, implement feature detection and a fallback.
+29. When uncertain about managed environment compatibility, implement feature detection and a fallback.
 
 30. Backup and restore are first-class features, not optional utilities.
 
@@ -4216,15 +4216,15 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 PROMPT 1: CREATE ENVIRONMENT TEST
 
-Read NIWC_Supervisor_Assistant_Project_Plan.txt, especially Sections 8 through 10. Create the smallest possible static browser application that tests local execution on an enterprise-managed Microsoft Edge browser. It must run without a server and without internet access. Test JavaScript execution, relative assets, IndexedDB create/write/read/persistence, JSON download, JSON import, drag-and-drop, clipboard availability, storage estimate availability, and File System Access API feature detection. Provide an on-screen results table and an Export Diagnostic Report button. Do not begin the main RADAR application yet. Add instructions for testing persistence after a complete browser restart.
+Read Project_Plan.txt, especially Sections 8 through 10. Create the smallest possible static browser application that tests local execution on an enterprise-managed Microsoft Edge browser. It must run without a server and without internet access. Test JavaScript execution, relative assets, IndexedDB create/write/read/persistence, JSON download, JSON import, drag-and-drop, clipboard availability, storage estimate availability, and File System Access API feature detection. Provide an on-screen results table and an Export Diagnostic Report button. Do not begin the main RADAR application yet. Add instructions for testing persistence after a complete browser restart.
 
 PROMPT 2: INITIALIZE APPLICATION
 
-Read NIWC_Supervisor_Assistant_Project_Plan.txt and the environment-test result. Initialize a Svelte, TypeScript, and Vite application using strict TypeScript. Create the layout, navigation shell, theme variables, DataStore interface, InMemoryDataStore, and IndexedDbDataStore. Configure a production build with relative assets and no external resources. Add unit-test setup and a script that scans the production output for external URLs. Do not build feature modules yet.
+Read Project_Plan.txt and the environment-test result. Initialize a Svelte, TypeScript, and Vite application using strict TypeScript. Create the layout, navigation shell, theme variables, DataStore interface, InMemoryDataStore, and IndexedDbDataStore. Configure a production build with relative assets and no external resources. Add unit-test setup and a script that scans the production output for external URLs. Do not build feature modules yet.
 
 PROMPT 3: IMPLEMENT EMPLOYEES
 
-Implement the Employee entity and employee management screens from NIWC_Supervisor_Assistant_Project_Plan.txt. Include list, add, edit, archive, validation, competency selection, search, and test fixtures. Route all persistence through DataStore. Do not permanently delete employees with related data. Add unit and component tests.
+Implement the Employee entity and employee management screens from Project_Plan.txt. Include list, add, edit, archive, validation, competency selection, search, and test fixtures. Route all persistence through DataStore. Do not permanently delete employees with related data. Add unit and component tests.
 
 PROMPT 4: IMPLEMENT CORE TASKS
 
@@ -4256,7 +4256,7 @@ Implement recurrence templates with simple daily, weekly, monthly, annual, and c
 
 PROMPT 11: RELEASE REVIEW
 
-Review the entire repository against NIWC_Supervisor_Assistant_Project_Plan.txt. Identify missing acceptance criteria, architecture violations, direct IndexedDB calls from UI, external network dependencies, unsafe HTML rendering, missing tests, inaccessible interactions, and destructive actions without recovery. Fix high-priority findings. Build a release folder and write README-RUN.txt for the operational user.
+Review the entire repository against Project_Plan.txt. Identify missing acceptance criteria, architecture violations, direct IndexedDB calls from UI, external network dependencies, unsafe HTML rendering, missing tests, inaccessible interactions, and destructive actions without recovery. Fix high-priority findings. Build a release folder and write README-RUN.txt for the operational user.
 
 ======================================================================
 40. FUTURE ENHANCEMENTS
@@ -4331,7 +4331,7 @@ Potential future development-only uses:
 
 Operational boundary:
 
-- Do not send government or employee data to an external AI service.
+- Do not send sensitive or employee data to an external AI service.
 - AI should not be a dependency.
 - The application must remain fully functional without AI.
 - Any future local AI feature would require separate approval and technical feasibility.
@@ -4356,7 +4356,7 @@ That would be a different product.
 ======================================================================
 
 RISK 1:
-NMCI blocks local JavaScript or storage.
+Managed environment blocks local JavaScript or storage.
 
 Mitigation:
 Run Phase 0 before full development. Preserve storage abstraction. Be prepared to use explicit JSON open/save workflow.
@@ -4451,7 +4451,7 @@ Phase 2 must deliver a usable employee list and kanban board before building spe
 
 These decisions should be revisited during operational validation. Current implementation status:
 
-1. Does IndexedDB persist reliably on the actual NMCI browser?
+1. Does IndexedDB persist reliably on the actual managed browser?
    - Still environment-specific. The environment test page and memory-only fallback exist.
 
 2. Can the application be opened from a local folder, approved network folder, or both?
@@ -4541,7 +4541,7 @@ A feature is done when:
 
 The first operational release is done when:
 
-- The NMCI compatibility test passes.
+- The managed environment compatibility test passes.
 - Core employees, tasks, Kanban Board, Calendar, Today dashboard, performance inputs, meetings,
   training, leave, telework, and backup work.
 - Data survives browser restart.
@@ -4655,7 +4655,7 @@ A browser-provided structured local database.
 Local first:
 An architecture where the application works primarily on the local computer without a network service.
 
-NMCI compatibility spike:
+Managed Browser Compatibility Spike:
 A small test application used to validate the operating environment before full implementation.
 
 Performance input:
@@ -4683,7 +4683,7 @@ The amount of time a task has remained in Waiting status.
 46. REFERENCE NOTES
 ======================================================================
 
-These references support the technical direction. They should not be treated as approval for use on NMCI.
+These references support the technical direction. They should not be treated as approval for use in a managed environment.
 
 IndexedDB API:
 https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API

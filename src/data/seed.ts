@@ -356,8 +356,8 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   const trainingRequirements = [
     req("Annual Cybersecurity Awareness", "annual", 21, "all"),
     req("Privacy and Records Management", "annual", 45, "all"),
-    req("Controlled Unclassified Information Handling", "annual", 12, "all"),
-    req("OPSEC Refresher", "annual", -7, "all"),
+    req("Confidential Information Handling", "annual", 12, "all"),
+    req("Operational Risk Awareness", "annual", -7, "all"),
     req("Safety and Emergency Procedures", "annual", 90, "all"),
     req("Records Retention Basics", "annual", 7, "all"),
     req("Travel Card Refresher", "none", 25, "selected", employeeIndexes([2, 7, 12, 17, 22, 27, 32, 37])),
@@ -401,14 +401,14 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     return indexes.map((i) => employees[i]!.id);
   }
 
-  const [cyberReq, privacyReq, cuiReq, opsecReq, safetyReq, recordsReq, travelReq, secureReq, labReq, accessReq] =
+  const [cyberReq, privacyReq, informationReq, riskReq, safetyReq, recordsReq, travelReq, secureReq, labReq, accessReq] =
     trainingRequirements;
 
   employees.forEach((employee, i) => {
     if (i % 5 !== 0) completeTraining(employee, cyberReq!, -35 - (i % 12));
     if (i % 3 === 0) completeTraining(employee, privacyReq!, -60 - (i % 20));
-    if (i % 4 !== 0) completeTraining(employee, cuiReq!, -20 - (i % 15));
-    if (i % 3 !== 1) completeTraining(employee, opsecReq!, -45 - (i % 18));
+    if (i % 4 !== 0) completeTraining(employee, informationReq!, -20 - (i % 15));
+    if (i % 3 !== 1) completeTraining(employee, riskReq!, -45 - (i % 18));
     if (i % 6 === 0) completeTraining(employee, safetyReq!, -15 - (i % 10));
     if (i % 2 === 0) completeTraining(employee, recordsReq!, -25 - (i % 12));
     if (i % 4 === 0) completeTraining(employee, accessReq!, -330 + (i % 18));

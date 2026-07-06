@@ -31,12 +31,12 @@ npm run build      # production build + single-file inline + no-network scan
 To deploy to the operational machine, transfer `dist/radar.html` through an authorized process and
 open it in the managed browser.
 
-## Phase 0 — environment test (run this on NMCI first)
+## Phase 0 — environment test (run this in a managed environment first)
 
 `environment-test/index.html` is a standalone page (no build step) that verifies what the managed
 browser allows: JavaScript from a local file, IndexedDB create/write/read, **persistence across a
 full browser restart**, JSON download/import, drag-and-drop, clipboard, and storage quota. It
-exports a diagnostic report. Run it on the NMCI machine **before** trusting the main app with real
+exports a diagnostic report. Run it on the managed workstation **before** trusting the main app with real
 tracking data, and choose the storage posture accordingly (plan section 9.5):
 
 - IndexedDB persists → use the app normally; export backups weekly.
