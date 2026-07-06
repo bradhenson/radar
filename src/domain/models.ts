@@ -172,7 +172,6 @@ export interface PerformanceInput {
   situationOrContext?: string;
   actionOrAccomplishment: string;
   result?: string;
-  impact?: string;
   performanceElementId?: Id;
   projectId?: Id;
   relatedTaskId?: Id;

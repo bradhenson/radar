@@ -323,7 +323,7 @@
           <div class="card" style="margin-bottom:.5rem">
             <div class="small muted">{formatDate(p.inputDate)}</div>
             <div>{p.actionOrAccomplishment}</div>
-            {#if p.impact}<div class="small muted">Impact: {p.impact}</div>{/if}
+            {#if p.result}<div class="small muted">Result / Impact: {p.result}</div>{/if}
           </div>
         {/each}
       {/if}
@@ -469,8 +469,7 @@
             </div>
             {#if p.situationOrContext}<div><strong>Context:</strong> {p.situationOrContext}</div>{/if}
             <div><strong>Action:</strong> {p.actionOrAccomplishment}</div>
-            {#if p.result}<div><strong>Result:</strong> {p.result}</div>{/if}
-            {#if p.impact}<div><strong>Impact:</strong> {p.impact}</div>{/if}
+            {#if p.result}<div><strong>Result / Impact:</strong> {p.result}</div>{/if}
           </div>
         {/each}
       {/if}

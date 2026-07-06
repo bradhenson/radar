@@ -2,6 +2,7 @@
   // Performance inputs review (plan 12.6, 17): filters, coverage, text export.
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import { daysBetween, formatDate } from "../utils/dates";
   import { downloadText, backupFilename } from "../utils/download";
@@ -9,6 +10,7 @@
   let filterEmployee = $state("");
   let filterStatus = $state("");
   let filterMissing = $state("");
+  let coverageOpen = $state(false);
 
   let inputs = $derived(
     app.performanceInputs
@@ -17,7 +19,6 @@
         if (filterEmployee && p.employeeId !== filterEmployee) return false;
         if (filterStatus && p.inputStatus !== filterStatus) return false;
         if (filterMissing === "result" && p.result) return false;
-        if (filterMissing === "impact" && p.impact) return false;
         return true;
       })
       .sort((a, b) => (a.inputDate < b.inputDate ? 1 : -1))
@@ -46,8 +47,7 @@
           count: list.length,
           last,
           age: last ? daysBetween(last, app.today) : undefined,
-          missingResult: list.filter((p) => !p.result).length,
-          missingImpact: list.filter((p) => !p.impact).length
+          missingResult: list.filter((p) => !p.result).length
         };
       })
       .sort((a, b) => a.e.displayName.localeCompare(b.e.displayName))
@@ -62,8 +62,7 @@
         if (p.projectId) lines.push(`Project: ${app.projectName(p.projectId)}`);
         if (p.situationOrContext) lines.push(`Context: ${p.situationOrContext}`);
         lines.push(`Action: ${p.actionOrAccomplishment}`);
-        if (p.result) lines.push(`Result: ${p.result}`);
-        if (p.impact) lines.push(`Impact: ${p.impact}`);
+        if (p.result) lines.push(`Result / Impact: ${p.result}`);
         lines.push(`Status: ${p.inputStatus}`, "");
       }
     }
@@ -100,40 +99,15 @@
     </select>
     <select bind:value={filterMissing} aria-label="Filter by missing detail">
       <option value="">All inputs</option>
-      <option value="result">Missing result</option>
-      <option value="impact">Missing impact</option>
+      <option value="result">Missing result / impact</option>
     </select>
     <span class="spacer"></span>
     <button type="button" onclick={exportText} disabled={inputs.length === 0}>Export text</button>
+    <button type="button" onclick={() => (coverageOpen = true)}>Coverage</button>
     <button type="button" class="primary" onclick={() => (ui.performanceFormPrefill = { employeeId: filterEmployee || undefined })}>
       New Performance Input
     </button>
   </div>
-
-  <h2>Coverage</h2>
-  <table class="data" style="margin-bottom:1.2rem">
-    <thead><tr><th>Employee</th><th>Inputs</th><th>Most recent</th><th>Missing result</th><th>Missing impact</th></tr></thead>
-    <tbody>
-      {#each coverage as c (c.e.id)}
-        <tr>
-          <td>{c.e.displayName}</td>
-          <td>{c.count}</td>
-          <td>
-            {#if c.last}
-              {formatDate(c.last)}
-              {#if c.age !== undefined && c.age >= app.settings.performanceInputReminderDays}
-                <span class="badge warning">{c.age}d ago</span>
-              {/if}
-            {:else}
-              <span class="badge warning">none</span>
-            {/if}
-          </td>
-          <td>{c.missingResult}</td>
-          <td>{c.missingImpact}</td>
-        </tr>
-      {/each}
-    </tbody>
-  </table>
 
   <h2>Inputs by employee</h2>
   {#if byEmployee.length === 0}
@@ -160,10 +134,36 @@
           </div>
           {#if p.situationOrContext}<div><strong>Context:</strong> {p.situationOrContext}</div>{/if}
           <div><strong>Action:</strong> {p.actionOrAccomplishment}</div>
-          {#if p.result}<div><strong>Result:</strong> {p.result}</div>{:else}<div class="muted small">Result not recorded.</div>{/if}
-          {#if p.impact}<div><strong>Impact:</strong> {p.impact}</div>{:else}<div class="muted small">Impact not recorded.</div>{/if}
+          {#if p.result}<div><strong>Result / Impact:</strong> {p.result}</div>{:else}<div class="muted small">Result / impact not recorded.</div>{/if}
         </div>
       {/each}
     {/each}
   {/if}
 </div>
+
+{#if coverageOpen}
+  <Dialog title="Performance Coverage" wide onclose={() => (coverageOpen = false)}>
+    <table class="data">
+      <thead><tr><th>Employee</th><th>Inputs</th><th>Most recent</th><th>Missing result / impact</th></tr></thead>
+      <tbody>
+        {#each coverage as c (c.e.id)}
+          <tr>
+            <td>{c.e.displayName}</td>
+            <td>{c.count}</td>
+            <td>
+              {#if c.last}
+                {formatDate(c.last)}
+                {#if c.age !== undefined && c.age >= app.settings.performanceInputReminderDays}
+                  <span class="badge warning">{c.age}d ago</span>
+                {/if}
+              {:else}
+                <span class="badge warning">none</span>
+              {/if}
+            </td>
+            <td>{c.missingResult}</td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  </Dialog>
+{/if}

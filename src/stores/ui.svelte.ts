@@ -14,6 +14,12 @@ class UiState {
   performanceFormPrefill = $state<Partial<PerformanceInput> | undefined>(undefined);
   /** Existing performance input open for editing; undefined = closed. */
   performanceFormInput = $state<PerformanceInput | undefined>(undefined);
+  /**
+   * Task id for the "archive this task?" prompt shown after a performance
+   * input is saved for a completed task. An id (not a Task snapshot) so the
+   * prompt always acts on the current record.
+   */
+  archivePromptTaskId = $state<string | undefined>(undefined);
 
   closePerformanceForm(): void {
     this.performanceFormPrefill = undefined;

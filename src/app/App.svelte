@@ -5,6 +5,7 @@
   import Toasts from "../components/common/Toasts.svelte";
   import TaskDetail from "../components/forms/TaskDetail.svelte";
   import PerformanceInputForm from "../components/forms/PerformanceInputForm.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import Icon from "../components/common/Icon.svelte";
   import TodayPage from "../pages/TodayPage.svelte";
@@ -73,11 +74,29 @@
 
   let detailTask = $derived(ui.detailTaskId ? app.tasks.find((t) => t.id === ui.detailTaskId) : undefined);
 
+  // Current record for the post-input "archive this task?" prompt; resolved by
+  // id so the archive acts on the latest task state, never a stale snapshot.
+  let archivePromptTask = $derived(
+    ui.archivePromptTaskId ? app.tasks.find((t) => t.id === ui.archivePromptTaskId && !t.isArchived) : undefined
+  );
+
+  async function archivePromptedTask() {
+    const task = archivePromptTask;
+    ui.archivePromptTaskId = undefined;
+    if (!task) return;
+    await app.updateTask({ ...task, isArchived: true }, `Archived "${task.title}"`, "archived");
+    app.toast(`Archived "${task.title}"`, "success", async () => {
+      const current = app.tasks.find((t) => t.id === task.id);
+      if (current) await app.updateTask({ ...current, isArchived: false }, `Restored "${task.title}"`, "restored");
+    });
+  }
+
   function globalKeydown(e: KeyboardEvent) {
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.newTaskOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask) return;
+    if (ui.newTaskOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask || ui.archivePromptTaskId)
+      return;
     switch (e.key.toLowerCase()) {
       case "n":
         e.preventDefault();
@@ -234,6 +253,15 @@
       input={ui.performanceFormInput}
       prefill={ui.performanceFormPrefill ?? {}}
       onclose={() => ui.closePerformanceForm()}
+    />
+  {/if}
+  {#if archivePromptTask}
+    <ConfirmDialog
+      title="Archive task?"
+      message={`The performance input is saved. Archive "${archivePromptTask.title}" to move it off the board? You can restore it from the Archive page.`}
+      confirmLabel="Archive task"
+      onconfirm={() => void archivePromptedTask()}
+      oncancel={() => (ui.archivePromptTaskId = undefined)}
     />
   {/if}
   <Toasts />

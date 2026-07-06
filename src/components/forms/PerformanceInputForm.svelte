@@ -1,5 +1,5 @@
 <script lang="ts">
-  // Structured Context / Action / Result / Impact capture (plan 17.4).
+  // Structured Context / Action / Result & Impact capture (plan 17.4).
   // Creates a new input (optionally prefilled) or edits an existing one; either
   // way, task details can be imported into the empty fields (plan 17.5).
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
@@ -9,8 +9,10 @@
   import { statusLabel } from "../../domain/models";
   import {
     mergeTaskImportIntoDraft,
-    performanceInputPrefillFromTask
+    performanceInputPrefillFromTask,
+    shouldOfferTaskArchive
   } from "../../domain/rules/performanceImport";
+  import { ui } from "../../stores/ui.svelte";
   import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
   import { newId } from "../../utils/ids";
 
@@ -29,7 +31,6 @@
   let situationOrContext = $state(base.situationOrContext ?? "");
   let actionOrAccomplishment = $state(base.actionOrAccomplishment ?? "");
   let result = $state(base.result ?? "");
-  let impact = $state(base.impact ?? "");
   let projectId = $state(base.projectId ?? "");
   let performanceElementId = $state(base.performanceElementId ?? "");
   let recognitionPotential = $state(base.recognitionPotential ?? false);
@@ -72,7 +73,6 @@
         situationOrContext,
         actionOrAccomplishment,
         result,
-        impact,
         projectId
       },
       taskPrefill
@@ -85,7 +85,6 @@
     situationOrContext = merged.situationOrContext;
     actionOrAccomplishment = merged.actionOrAccomplishment;
     result = merged.result;
-    impact = merged.impact;
     projectId = merged.projectId;
     if (!relatedTaskId) relatedTaskId = task.id;
     if (!source || source === "Supervisor") source = taskPrefill.source;
@@ -114,7 +113,6 @@
       situationOrContext: situationOrContext.trim() || undefined,
       actionOrAccomplishment: actionOrAccomplishment.trim(),
       result: result.trim() || undefined,
-      impact: impact.trim() || undefined,
       projectId: projectId || undefined,
       performanceElementId: performanceElementId || undefined,
       relatedTaskId,
@@ -141,6 +139,10 @@
       const task = app.tasks.find((t) => t.id === relatedTaskId);
       if (task && !task.performanceInputCreated) {
         await app.putRecord("tasks", { ...task, performanceInputCreated: true });
+      }
+      // The task's work is captured; offer to move it off the board.
+      if (!input && task && shouldOfferTaskArchive(task)) {
+        ui.archivePromptTaskId = task.id;
       }
     }
     app.toast("Performance input saved", "success");
@@ -221,11 +223,11 @@
     <textarea id="pi-action" bind:value={actionOrAccomplishment} rows="2" maxlength="10000" style="width:100%"></textarea>
     {#if error}<div class="field-error">{error}</div>{/if}
 
-    <label for="pi-result">Result <span class="field-hint">What happened because of the action?</span></label>
-    <textarea id="pi-result" bind:value={result} rows="2" maxlength="10000" style="width:100%"></textarea>
-
-    <label for="pi-impact">Impact <span class="field-hint">Why did the result matter (project, cost, schedule, quality, readiness, workforce)?</span></label>
-    <textarea id="pi-impact" bind:value={impact} rows="2" maxlength="10000" style="width:100%"></textarea>
+    <label for="pi-result-impact">
+      Result / Impact
+      <span class="field-hint">What happened, and why did it matter (project, cost, schedule, quality, readiness, workforce)?</span>
+    </label>
+    <textarea id="pi-result-impact" bind:value={result} rows="3" maxlength="10000" style="width:100%"></textarea>
 
     <label class="check-inline">
       <input type="checkbox" bind:checked={recognitionPotential} />

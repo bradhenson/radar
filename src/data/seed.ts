@@ -309,14 +309,6 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     "The blocker was cleared before it affected the customer commitment.",
     "Leadership had a clear picture of risks, owners, and next steps."
   ];
-  const impacts = [
-    "Reduced schedule risk and preserved customer confidence.",
-    "Improved quality and reduced rework for the team.",
-    "Helped sustain mission delivery during a high-tempo period.",
-    "Strengthened collaboration across competencies.",
-    "Improved readiness and made follow-up actions visible."
-  ];
-
   employees.slice(0, 26).forEach((employee, i) => {
     c.performanceInputs.push({
       id: newId(),
@@ -325,7 +317,6 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       situationOrContext: contexts[i % contexts.length]!,
       actionOrAccomplishment: actions[i % actions.length]!,
       result: i % 7 === 0 ? undefined : results[i % results.length]!,
-      impact: i % 5 === 0 ? undefined : impacts[i % impacts.length]!,
       performanceElementId: c.performanceElements[i % c.performanceElements.length]!.id,
       projectId: Object.values(projects)[i % Object.values(projects).length]!.id,
       evaluationCycleId: cycle.id,

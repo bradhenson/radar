@@ -75,7 +75,7 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
 - **Employees**: directory with workload columns, configurable competencies, CSV export, 360°
   profile (tasks, performance, meeting notes, training, leave, telework, awards, activity),
   check-in recording.
-- **Performance**: Context/Action/Result/Impact capture, edit existing inputs, import from tasks,
+- **Performance**: Context/Action/Result & Impact capture, edit existing inputs, import from tasks,
   completion-to-input conversion prompt, coverage table, text export for evaluation preparation.
 - **Meetings**: product-team meeting note capture with linked employees/projects, discussion
   notes, action items, CSV export, archive/restore, and follow-up task creation.

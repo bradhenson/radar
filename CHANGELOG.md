@@ -52,6 +52,10 @@
   person.
 
 ### Added
+- Completing the performance-input loop: after saving a new performance input created from a
+  completed task, the app now offers to archive that task (Undo available). Together with the
+  existing completion prompt, the flow is complete task → create prefilled performance input →
+  archive the task, each step confirmed and skippable.
 - Employees can now be permanently deleted, from the employee page header or from the inactive
   employees list in the Archive. Deletion asks for confirmation with an exact count of what goes
   with it: the employee's performance inputs, training records, leave, telework, awards,

@@ -37,6 +37,15 @@ export function performanceInputPrefillFromTask(task: Task, ctx: TaskImportConte
   };
 }
 
+/**
+ * After a new performance input is saved for a task, decide whether to offer
+ * archiving that task: only finished work still visible on the board — never
+ * open/waiting tasks, and never tasks already archived.
+ */
+export function shouldOfferTaskArchive(task: Task): boolean {
+  return task.status === "complete" && !task.isArchived;
+}
+
 /** The free-form fields a task import can fill in the performance input form. */
 export interface PerformanceInputDraftFields {
   employeeId: string;
@@ -44,7 +53,6 @@ export interface PerformanceInputDraftFields {
   situationOrContext: string;
   actionOrAccomplishment: string;
   result: string;
-  impact: string;
   projectId: string;
 }
 
@@ -59,8 +67,7 @@ const FIELD_LABELS: Record<keyof PerformanceInputDraftFields, string> = {
   inputDate: "Date",
   situationOrContext: "Context",
   actionOrAccomplishment: "Action",
-  result: "Result",
-  impact: "Impact",
+  result: "Result / Impact",
   projectId: "Project"
 };
 
@@ -80,7 +87,6 @@ export function mergeTaskImportIntoDraft(
     situationOrContext: prefill.situationOrContext,
     actionOrAccomplishment: prefill.actionOrAccomplishment,
     result: prefill.result,
-    impact: prefill.impact,
     projectId: prefill.projectId
   };
   const merged = { ...draft };
@@ -89,7 +95,7 @@ export function mergeTaskImportIntoDraft(
     const value = incoming[key];
     if (!value) continue;
     if (draft[key].trim()) {
-      if (draft[key].trim() !== value.trim()) skipped.push(FIELD_LABELS[key]);
+      if (draft[key].trim() !== value.trim() && !skipped.includes(FIELD_LABELS[key])) skipped.push(FIELD_LABELS[key]);
       continue;
     }
     merged[key] = value;

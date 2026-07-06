@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   mergeTaskImportIntoDraft,
   performanceInputPrefillFromTask,
+  shouldOfferTaskArchive,
   type PerformanceInputDraftFields
 } from "../../src/domain/rules/performanceImport";
 import type { ChecklistItem, Task, TaskNote } from "../../src/domain/models";
@@ -55,7 +56,6 @@ function emptyDraft(overrides: Partial<PerformanceInputDraftFields> = {}): Perfo
     situationOrContext: "",
     actionOrAccomplishment: "",
     result: "",
-    impact: "",
     projectId: "",
     ...overrides
   };
@@ -135,7 +135,6 @@ describe("mergeTaskImportIntoDraft", () => {
       situationOrContext: "Context from task",
       actionOrAccomplishment: "Action from task",
       result: "Result from task",
-      impact: "",
       projectId: "p1"
     });
     expect(skipped).toEqual([]);
@@ -164,5 +163,21 @@ describe("mergeTaskImportIntoDraft", () => {
   it("ignores fields the task does not provide", () => {
     const { merged } = mergeTaskImportIntoDraft(emptyDraft(), { relatedTaskId: "t1" });
     expect(merged).toEqual(emptyDraft());
+  });
+});
+
+describe("shouldOfferTaskArchive", () => {
+  it("offers archiving for a completed, unarchived task", () => {
+    expect(shouldOfferTaskArchive(makeTask({ status: "complete", completedDate: TODAY }))).toBe(true);
+  });
+
+  it("does not offer archiving for open, waiting, or cancelled tasks", () => {
+    expect(shouldOfferTaskArchive(makeTask({ status: "open" }))).toBe(false);
+    expect(shouldOfferTaskArchive(makeTask({ status: "waiting" }))).toBe(false);
+    expect(shouldOfferTaskArchive(makeTask({ status: "cancelled" }))).toBe(false);
+  });
+
+  it("does not offer archiving for an already archived task", () => {
+    expect(shouldOfferTaskArchive(makeTask({ status: "complete", isArchived: true }))).toBe(false);
   });
 });
