@@ -169,7 +169,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   }
 
   const tasks = [
-    task("Review weekly timekeeping exceptions", "planned", "normal", {
+    task("Review weekly timekeeping exceptions", "inbox", "normal", {
       dueDate: addDays(today, 2),
       description: "Supervisor-owned weekly review before timecards are certified.",
       showOnCard: "description"
@@ -180,7 +180,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       description: "Pull project, training, leave, and telework highlights into one weekly summary.",
       showOnCard: "description"
     }),
-    task("Update branch staffing summary", "planned", "high", {
+    task("Update branch staffing summary", "inbox", "high", {
       dueDate: addDays(today, 8),
       projectId: projects.workforce.id,
       description: "Refresh staffing changes, vacancies, and upcoming availability constraints."
@@ -189,7 +189,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       dueDate: addDays(today, 1),
       description: "Review pending situational requests and capture source references."
     }),
-    task("Compile performance input reminders", "planned", "normal", {
+    task("Compile performance input reminders", "inbox", "normal", {
       dueDate: addDays(today, 6),
       description: "Check employees without recent inputs and identify accomplishments to capture."
     }),
@@ -200,7 +200,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       waitingSince: atNoon(addDays(today, -18)),
       sourceSystem: "Email"
     }),
-    task("Confirm leave coverage for next sprint", "planned", "normal", {
+    task("Confirm leave coverage for next sprint", "inbox", "normal", {
       dueDate: addDays(today, 4),
       description: "Use the leave records and project staffing view to confirm coverage."
     }),
@@ -212,7 +212,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     task("Draft onboarding checklist for incoming employees", "inbox", "normal", {
       dueDate: addDays(today, 14)
     }),
-    task("Review project risk register", "planned", "normal", {
+    task("Review project risk register", "inbox", "normal", {
       projectId: projects.lighthouse.id,
       dueDate: addDays(today, 10)
     }),
@@ -227,19 +227,19 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       waitingSince: atNoon(addDays(today, -16)),
       sourceSystem: "SWAT"
     }),
-    task("Prepare telework renewal follow-up", "needs_review", "normal", {
+    task("Prepare telework renewal follow-up", "in_progress", "normal", {
       employeeId: employees[10]!.id,
       competencyId: employees[10]!.competencyId,
       dueDate: addDays(today, 7),
       description: "Current agreement expires this quarter. Confirm the renewal packet is started and the schedule summary is accurate.",
       showOnCard: "description"
     }),
-    task("Capture Project Harbor customer recognition", "needs_review", "normal", {
+    task("Capture Project Harbor customer recognition", "in_progress", "normal", {
       employeeId: employees[23]!.id,
       projectId: projects.harbor.id,
       competencyId: employees[23]!.competencyId
     }),
-    task("Review Project Lighthouse test schedule", "planned", "high", {
+    task("Review Project Lighthouse test schedule", "inbox", "high", {
       employeeId: employees[0]!.id,
       projectId: projects.lighthouse.id,
       competencyId: employees[0]!.competencyId,

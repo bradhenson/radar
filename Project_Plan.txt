@@ -1127,10 +1127,8 @@ Kanban Board.
 Default columns:
 
 - Inbox.
-- Planned.
 - In Progress.
 - Waiting.
-- Needs Review.
 - Complete.
 
 Board toolbar:

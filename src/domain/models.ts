@@ -421,11 +421,9 @@ export function normalizeTaskStatus(value: string): TaskStatus {
 
 export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: number }[] = [
   { id: "inbox", label: "Inbox", sortOrder: 10 },
-  { id: "planned", label: "Planned", sortOrder: 20 },
-  { id: "in_progress", label: "In Progress", sortOrder: 30 },
-  { id: "waiting", label: "Waiting", sortOrder: 40 },
-  { id: "needs_review", label: "Needs Review", sortOrder: 50 },
-  { id: "complete", label: "Complete", sortOrder: 60 }
+  { id: "in_progress", label: "In Progress", sortOrder: 20 },
+  { id: "waiting", label: "Waiting", sortOrder: 30 },
+  { id: "complete", label: "Complete", sortOrder: 40 }
 ];
 
 export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [

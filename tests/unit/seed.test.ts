@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createSampleSnapshot } from "../../src/data/seed";
+import { DEFAULT_BOARD_COLUMN_SEEDS } from "../../src/domain/models";
 
 describe("sample seed data", () => {
   it("covers a realistic supervisor workload", () => {
@@ -17,6 +18,9 @@ describe("sample seed data", () => {
     expect(c.awardRecords.length).toBeGreaterThanOrEqual(5);
     expect(c.employeeNotes.length).toBeGreaterThanOrEqual(3);
     expect(c.employeeNotes.every((note) => c.employees.some((employee) => employee.id === note.employeeId))).toBe(true);
+    expect(DEFAULT_BOARD_COLUMN_SEEDS.map((column) => column.id)).toEqual(["inbox", "in_progress", "waiting", "complete"]);
+    expect(c.boardColumns.map((column) => column.id)).toEqual(["inbox", "in_progress", "waiting", "complete"]);
+    expect(c.tasks.every((task) => c.boardColumns.some((column) => column.id === task.boardColumnId))).toBe(true);
 
     const employeeLinkedTasks = c.tasks.filter((task) => task.employeeId).length;
     const supervisorOwnedTasks = c.tasks.length - employeeLinkedTasks;
