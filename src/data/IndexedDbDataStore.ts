@@ -12,7 +12,7 @@ import {
 } from "./DataStore";
 
 const DB_NAME = "supervisor-assistant";
-const DB_VERSION = 4;
+const DB_VERSION = 5; // v5: employeeNotes object store
 const META_STORE = "app_meta"; // holds settings + store metadata by key
 
 export class IndexedDbDataStore implements DataStore {

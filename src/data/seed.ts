@@ -568,6 +568,17 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     }
   });
 
+  c.employeeNotes.push(
+    empNote(employees[0]!, "Prefers written taskers over verbal; follow hallway requests with a short email."),
+    empNote(employees[0]!, "Working toward a systems engineering certification; interested in stretch assignments."),
+    empNote(employees[10]!, "Handles school drop-off in the mornings; avoid scheduling meetings before 0900."),
+    empNote(employees[23]!, "Strong customer-brief skills; good candidate to lead the next demo.")
+  );
+
+  function empNote(employee: Employee, noteText: string) {
+    return { id: newId(), employeeId: employee.id, noteText, isArchived: false, ...stamp };
+  }
+
   return {
     collections: c,
     settings: { ...DEFAULT_SETTINGS, userDisplayName: "Sample Supervisor" },

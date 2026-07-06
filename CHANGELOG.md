@@ -44,6 +44,11 @@
   person.
 
 ### Added
+- Employee notes: the Overview tab of each employee now has a Notes section for standing
+  things to remember about the person (preferences, goals, constraints) — distinct from dated
+  check-ins. Notes can be added, edited, and removed inline; removal archives the note with an
+  Undo toast, and all changes appear in the employee's activity log. Notes are included in
+  backup export/import and in the sample data.
 - Employee profiles now include a Profile tab for administrative and contact details: EDIPI,
   PERNR, series, location, phones, employee-specific project and project lead, IPT lead,
   computer asset, gov phone, CSWF data, financial statement/drug test flags, telework agreement

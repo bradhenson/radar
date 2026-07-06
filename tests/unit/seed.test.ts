@@ -15,6 +15,8 @@ describe("sample seed data", () => {
     expect(c.teleworkRecords.length).toBeGreaterThanOrEqual(10);
     expect(c.meetingNotes.length).toBeGreaterThanOrEqual(5);
     expect(c.awardRecords.length).toBeGreaterThanOrEqual(5);
+    expect(c.employeeNotes.length).toBeGreaterThanOrEqual(3);
+    expect(c.employeeNotes.every((note) => c.employees.some((employee) => employee.id === note.employeeId))).toBe(true);
 
     const employeeLinkedTasks = c.tasks.filter((task) => task.employeeId).length;
     const supervisorOwnedTasks = c.tasks.length - employeeLinkedTasks;

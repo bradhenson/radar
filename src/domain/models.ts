@@ -35,6 +35,7 @@ export interface Employee {
   locationBuilding?: string;
   locationCube?: string;
   workPhone?: string;
+  workCellPhone?: string;
   personalPhone?: string;
   iptLead?: string;
   employeeProject?: string;
@@ -328,6 +329,20 @@ export interface EmployeeInteraction {
   relatedTaskId?: Id;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
+}
+
+/**
+ * Standing supervisor note about an employee — durable context to remember
+ * (preferences, goals, constraints). Dated events belong in
+ * EmployeeInteraction instead.
+ */
+export interface EmployeeNote {
+  id: Id;
+  employeeId: Id;
+  noteText: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
 }
 
 export interface MeetingNote {

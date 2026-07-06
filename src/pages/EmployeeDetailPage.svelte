@@ -9,7 +9,7 @@
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type MeetingNote } from "../domain/models";
+  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
@@ -26,6 +26,10 @@
   let checkInType = $state(INTERACTION_TYPES[1] ?? "Informal check-in");
   let checkInSummary = $state("");
   let checkInFollowUp = $state(false);
+  let noteFormOpen = $state(false);
+  let noteDraft = $state("");
+  let editingNoteId = $state<string | undefined>(undefined);
+  let editNoteDraft = $state("");
 
   let tasks = $derived(app.tasks.filter((t) => t.employeeId === employeeId && !t.isArchived));
   let openTasks = $derived(tasks.filter((t) => t.status !== "complete" && t.status !== "cancelled"));
@@ -61,13 +65,19 @@
       .filter((note) => !note.isArchived && note.attendeeEmployeeIds.includes(employeeId))
       .sort((a, b) => (a.meetingDate < b.meetingDate ? 1 : -1))
   );
+  let employeeNotes = $derived(
+    app.employeeNotes
+      .filter((note) => note.employeeId === employeeId && !note.isArchived)
+      .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
+  );
   let activity = $derived(
     app.activityEntries
       .filter(
         (a) =>
           (a.entityType === "employees" && a.entityId === employeeId) ||
           tasks.some((t) => t.id === a.entityId) ||
-          (a.entityType === "meetingNotes" && meetingNotes.some((note) => note.id === a.entityId))
+          (a.entityType === "meetingNotes" && meetingNotes.some((note) => note.id === a.entityId)) ||
+          (a.entityType === "employeeNotes" && app.employeeNotes.some((note) => note.employeeId === employeeId && note.id === a.entityId))
       )
       .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
       .slice(0, 30)
@@ -124,6 +134,53 @@
     app.toast("Check-in recorded", "success");
   }
 
+  async function addEmployeeNote() {
+    const noteText = noteDraft.trim();
+    if (!employee || !noteText) return;
+    const now = nowTimestamp();
+    await app.putRecord(
+      "employeeNotes",
+      { id: newId(), employeeId, noteText, createdAt: now, updatedAt: now, isArchived: false },
+      { actionType: "created", summary: `Added note for ${employee.displayName}` }
+    );
+    noteDraft = "";
+    noteFormOpen = false;
+  }
+
+  function startNoteEdit(note: EmployeeNote) {
+    editingNoteId = note.id;
+    editNoteDraft = note.noteText;
+  }
+
+  async function saveNoteEdit(note: EmployeeNote) {
+    const noteText = editNoteDraft.trim();
+    if (!employee || !noteText) return;
+    await app.putRecord(
+      "employeeNotes",
+      { ...note, noteText, updatedAt: nowTimestamp() },
+      { actionType: "updated", summary: `Updated note for ${employee.displayName}` }
+    );
+    editingNoteId = undefined;
+  }
+
+  // Notes are archived, never deleted (working rule 7); the toast offers Undo.
+  async function removeEmployeeNote(note: EmployeeNote) {
+    if (!employee) return;
+    const name = employee.displayName;
+    await app.putRecord(
+      "employeeNotes",
+      { ...note, isArchived: true, updatedAt: nowTimestamp() },
+      { actionType: "archived", summary: `Removed note for ${name}` }
+    );
+    app.toast("Note removed", "success", () => {
+      void app.putRecord(
+        "employeeNotes",
+        { ...note, isArchived: false, updatedAt: nowTimestamp() },
+        { actionType: "restored", summary: `Restored note for ${name}` }
+      );
+    });
+  }
+
   const TABS = [
     ["overview", "Overview"],
     ["profile", "Profile"],
@@ -173,7 +230,45 @@
     </nav>
 
     {#if tab === "overview"}
-      <h2>Open work</h2>
+      <div class="notes-header">
+        <h2>Notes</h2>
+        {#if !noteFormOpen}
+          <button type="button" onclick={() => (noteFormOpen = true)}>Add note</button>
+        {/if}
+      </div>
+      {#if employeeNotes.length === 0 && !noteFormOpen}
+        <p class="muted">Nothing captured yet. Use notes for things to remember about {employee.displayName} — preferences, goals, constraints.</p>
+      {/if}
+      {#each employeeNotes as note (note.id)}
+        <div class="card" style="margin-bottom:.5rem">
+          {#if editingNoteId === note.id}
+            <textarea bind:value={editNoteDraft} rows="3" maxlength="10000" style="width:100%" aria-label="Edit note"></textarea>
+            <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
+              <button type="button" onclick={() => (editingNoteId = undefined)}>Cancel</button>
+              <button type="button" class="primary" disabled={!editNoteDraft.trim()} onclick={() => void saveNoteEdit(note)}>Save</button>
+            </div>
+          {:else}
+            <div style="display:flex; gap:.5rem; align-items:flex-start">
+              <div style="flex:1; min-width:0">
+                <div style="white-space:pre-wrap">{note.noteText}</div>
+                <div class="small muted">Added {formatTimestamp(note.createdAt)}{note.updatedAt !== note.createdAt ? " · edited" : ""}</div>
+              </div>
+              <button type="button" onclick={() => startNoteEdit(note)}>Edit</button>
+              <button type="button" onclick={() => void removeEmployeeNote(note)}>Remove</button>
+            </div>
+          {/if}
+        </div>
+      {/each}
+      {#if noteFormOpen}
+        <div class="card" style="margin-bottom:.5rem">
+          <textarea bind:value={noteDraft} rows="3" maxlength="10000" style="width:100%" aria-label="New note" placeholder="Something to remember about {employee.displayName}"></textarea>
+          <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
+            <button type="button" onclick={() => { noteFormOpen = false; noteDraft = ""; }}>Cancel</button>
+            <button type="button" class="primary" disabled={!noteDraft.trim()} onclick={() => void addEmployeeNote()}>Add note</button>
+          </div>
+        </div>
+      {/if}
+      <h2 style="margin-top:1rem">Open work</h2>
       {#if openTasks.length === 0}
         <p class="muted">No open tasks.</p>
       {:else}
@@ -283,7 +378,8 @@
             {@render field("Cube", profileValue(employee.locationCube))}
             {@render linkField("Work email", profileValue(employee.workEmail), `mailto:${employee.workEmail}`)}
             {@render linkField("Work phone", profileValue(employee.workPhone), `tel:${employee.workPhone}`)}
-            {@render linkField("Personal phone", profileValue(employee.personalPhone), `tel:${employee.personalPhone}`)}
+            {@render linkField("Work cell phone", profileValue(employee.workCellPhone), `tel:${employee.workCellPhone}`)}
+            {@render linkField("Personal cell phone", profileValue(employee.personalPhone), `tel:${employee.personalPhone}`)}
             {@render flagField("Government phone", employee.govPhone)}
           </dl>
         </section>
@@ -482,6 +578,8 @@
   .tabs button { border: none; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: .4rem .7rem; }
   .tabs button.active { border-bottom-color: var(--accent); font-weight: 700; color: var(--accent); }
   .tab-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
+  .notes-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }
+  .notes-header h2 { margin: 0 auto 0 0; }
   .tab-title-row h2 { margin: 0; }
   .tab-title-row button { margin-left: auto; }
   .profile-detail-grid {

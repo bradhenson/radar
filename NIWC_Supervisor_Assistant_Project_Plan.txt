@@ -1849,6 +1849,7 @@ Optional:
 - locationBuilding.
 - locationCube.
 - workPhone.
+- workCellPhone.
 - personalPhone.
 - iptLead.
 - employeeProject.
@@ -2837,6 +2838,7 @@ interface Employee {
   locationBuilding?: string;
   locationCube?: string;
   workPhone?: string;
+  workCellPhone?: string;
   personalPhone?: string;
   iptLead?: string;
   employeeProject?: string;

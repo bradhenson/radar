@@ -13,6 +13,7 @@ import type {
   Competency,
   Employee,
   EmployeeInteraction,
+  EmployeeNote,
   EmployeeTrainingRecord,
   EvaluationCycle,
   LeaveRecord,
@@ -45,6 +46,7 @@ export interface CollectionTypes {
   teleworkRecords: TeleworkRecord;
   awardRecords: AwardRecord;
   employeeInteractions: EmployeeInteraction;
+  employeeNotes: EmployeeNote;
   meetingNotes: MeetingNote;
   activityEntries: ActivityEntry;
   attentionSnoozes: AttentionSnooze;
@@ -70,6 +72,7 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "teleworkRecords",
   "awardRecords",
   "employeeInteractions",
+  "employeeNotes",
   "meetingNotes",
   "activityEntries",
   "attentionSnoozes"

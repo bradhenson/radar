@@ -71,6 +71,7 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   teleworkRecords: ["id", "employeeId", "recordType", "status"],
   awardRecords: ["id", "employeeId", "title", "status"],
   employeeInteractions: ["id", "employeeId", "interactionDate", "interactionType"],
+  employeeNotes: ["id", "employeeId", "noteText"],
   meetingNotes: ["id", "meetingDate", "title", "meetingType"],
   activityEntries: ["id", "entityType", "entityId", "actionType", "timestamp"]
 };

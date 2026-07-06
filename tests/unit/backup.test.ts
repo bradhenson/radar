@@ -74,6 +74,14 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors).toEqual([]);
   });
 
+  it("rejects employee notes missing their text", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.employeeNotes[0] as Record<string, unknown>).noteText = "";
+    const r = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes("noteText"))).toBe(true);
+  });
+
   it("rejects duplicate ids", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     (pkg.data.tasks[1] as Record<string, unknown>).id = (pkg.data.tasks[0] as Record<string, unknown>).id;

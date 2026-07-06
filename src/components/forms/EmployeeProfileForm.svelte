@@ -21,6 +21,7 @@
   let locationBuilding = $state("");
   let locationCube = $state("");
   let workPhone = $state("");
+  let workCellPhone = $state("");
   let personalPhone = $state("");
   let team = $state("");
   let iptLead = $state("");
@@ -45,6 +46,7 @@
     locationBuilding = employee.locationBuilding ?? "";
     locationCube = employee.locationCube ?? "";
     workPhone = employee.workPhone ?? "";
+    workCellPhone = employee.workCellPhone ?? "";
     personalPhone = employee.personalPhone ?? "";
     team = employee.team ?? "";
     iptLead = employee.iptLead ?? "";
@@ -72,6 +74,7 @@
       locationBuilding: clean(locationBuilding),
       locationCube: clean(locationCube),
       workPhone: clean(workPhone),
+      workCellPhone: clean(workCellPhone),
       personalPhone: clean(personalPhone),
       team: clean(team),
       iptLead: clean(iptLead),
@@ -144,7 +147,11 @@
           <input id="ep-work-phone" type="text" bind:value={workPhone} maxlength="50" />
         </div>
         <div class="field">
-          <label for="ep-personal-phone">Personal phone</label>
+          <label for="ep-work-cell-phone">Work cell phone</label>
+          <input id="ep-work-cell-phone" type="text" bind:value={workCellPhone} maxlength="50" />
+        </div>
+        <div class="field">
+          <label for="ep-personal-phone">Personal cell phone</label>
           <input id="ep-personal-phone" type="text" bind:value={personalPhone} maxlength="50" />
         </div>
         <div class="field">

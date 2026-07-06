@@ -13,6 +13,7 @@ import type {
   Competency,
   Employee,
   EmployeeInteraction,
+  EmployeeNote,
   EmployeeTrainingRecord,
   EvaluationCycle,
   LeaveRecord,
@@ -78,6 +79,7 @@ class AppStore {
   teleworkRecords = $state<TeleworkRecord[]>([]);
   awardRecords = $state<AwardRecord[]>([]);
   employeeInteractions = $state<EmployeeInteraction[]>([]);
+  employeeNotes = $state<EmployeeNote[]>([]);
   meetingNotes = $state<MeetingNote[]>([]);
   activityEntries = $state<ActivityEntry[]>([]);
   attentionSnoozes = $state<AttentionSnooze[]>([]);
@@ -324,6 +326,7 @@ class AppStore {
     this.teleworkRecords = snapshot.collections.teleworkRecords;
     this.awardRecords = snapshot.collections.awardRecords;
     this.employeeInteractions = snapshot.collections.employeeInteractions;
+    this.employeeNotes = snapshot.collections.employeeNotes;
     this.meetingNotes = snapshot.collections.meetingNotes;
     this.activityEntries = snapshot.collections.activityEntries;
     this.attentionSnoozes = snapshot.collections.attentionSnoozes;
