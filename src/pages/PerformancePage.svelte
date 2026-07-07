@@ -128,7 +128,7 @@
           <div class="small muted" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap">
             <button
               type="button"
-              class="link"
+              class="link cell-link"
               aria-label={`Edit performance input from ${formatDate(p.inputDate)}`}
               onclick={(ev) => {
                 ev.stopPropagation();
