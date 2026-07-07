@@ -4,18 +4,23 @@
   import { router } from "../app/router.svelte";
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { compareDates, formatDate } from "../utils/dates";
+  import { compareDates, daysBetween, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, type Employee } from "../domain/models";
 
   const NO_COMPETENCY_FILTER = "__none";
+  const STALE_INPUT_DAYS = 30;
+
+  type SortKey = "name" | "competency" | "open" | "overdue" | "training" | "lastInput";
 
   let search = $state("");
   let filterCompetency = $state("");
   let showInactive = $state(false);
   let formOpen = $state(false);
   let editing = $state<Employee | undefined>(undefined);
+  let sortKey = $state<SortKey>("name");
+  let sortAsc = $state(true);
 
   let rows = $derived(
     app.employees
@@ -41,10 +46,67 @@
         const upcomingLeave = app.leaveRecords.find(
           (l) => l.employeeId === e.id && !["cancelled", "complete"].includes(l.status) && compareDates(l.endDate, app.today) >= 0
         );
-        return { e, openCount: open.length, overdueCount: overdue.length, trainingDueCount: trainingDue.length, lastInput, upcomingLeave };
+        const onLeaveNow = Boolean(upcomingLeave && compareDates(upcomingLeave.startDate, app.today) <= 0);
+        const staleInput = !lastInput || daysBetween(lastInput, app.today) > STALE_INPUT_DAYS;
+        return {
+          e,
+          openCount: open.length,
+          overdueCount: overdue.length,
+          trainingDueCount: trainingDue.length,
+          lastInput,
+          upcomingLeave,
+          onLeaveNow,
+          staleInput
+        };
       })
-      .sort((a, b) => a.e.displayName.localeCompare(b.e.displayName))
   );
+
+  let stats = $derived({
+    overdue: rows.reduce((n, r) => n + r.overdueCount, 0),
+    trainingDue: rows.reduce((n, r) => n + r.trainingDueCount, 0),
+    staleInput: rows.filter((r) => r.staleInput).length,
+    onLeave: rows.filter((r) => r.onLeaveNow).length
+  });
+
+  let sorted = $derived.by(() => {
+    const dir = sortAsc ? 1 : -1;
+    const cmp = (a: (typeof rows)[number], b: (typeof rows)[number]): number => {
+      switch (sortKey) {
+        case "competency":
+          return app.competencyCode(a.e.competencyId).localeCompare(app.competencyCode(b.e.competencyId));
+        case "open":
+          return a.openCount - b.openCount;
+        case "overdue":
+          return a.overdueCount - b.overdueCount;
+        case "training":
+          return a.trainingDueCount - b.trainingDueCount;
+        case "lastInput":
+          return (a.lastInput ?? "").localeCompare(b.lastInput ?? "");
+        default:
+          return a.e.displayName.localeCompare(b.e.displayName);
+      }
+    };
+    return [...rows].sort((a, b) => cmp(a, b) * dir || a.e.displayName.localeCompare(b.e.displayName));
+  });
+
+  function setSort(key: SortKey) {
+    if (sortKey === key) {
+      sortAsc = !sortAsc;
+    } else {
+      sortKey = key;
+      // Numeric columns start with the biggest problems on top.
+      sortAsc = key === "name" || key === "competency";
+    }
+  }
+
+  function ariaSort(key: SortKey): "ascending" | "descending" | undefined {
+    return sortKey === key ? (sortAsc ? "ascending" : "descending") : undefined;
+  }
+
+  function statusLabel(status: Employee["activeStatus"]): string {
+    const text = status.replace(/_/g, " ");
+    return text.charAt(0).toUpperCase() + text.slice(1);
+  }
 
   function optionLabel(options: { value: string; label: string }[], value: string | undefined): string {
     if (!value) return "";
@@ -89,7 +151,7 @@
         "Last performance input",
         "Last check-in"
       ],
-      rows.map((r) => [
+      sorted.map((r) => [
         r.e.displayName,
         app.competencyCode(r.e.competencyId),
         r.e.positionTitle,
@@ -126,10 +188,39 @@
   }
 </script>
 
+{#snippet sortHeader(key: SortKey, label: string)}
+  <button type="button" class="th-sort" onclick={() => setSort(key)}>
+    {label}<span class="sort-arrow" aria-hidden="true">{sortKey === key ? (sortAsc ? "▲" : "▼") : ""}</span>
+  </button>
+{/snippet}
+
+{#snippet textOrDash(value: string | undefined)}
+  {#if value}{value}{:else}<span class="muted">—</span>{/if}
+{/snippet}
+
 <div class="page">
   <div class="page-header">
     <h1>Employees</h1>
     <span class="muted">{rows.length} shown</span>
+  </div>
+
+  <div class="summary-cards">
+    <div class="stat" class:alert={stats.overdue > 0}>
+      <div class="num">{stats.overdue}</div>
+      <div class="lbl">Overdue tasks</div>
+    </div>
+    <div class="stat" class:warn={stats.trainingDue > 0}>
+      <div class="num">{stats.trainingDue}</div>
+      <div class="lbl">Training due</div>
+    </div>
+    <div class="stat" class:warn={stats.staleInput > 0}>
+      <div class="num">{stats.staleInput}</div>
+      <div class="lbl">No input {STALE_INPUT_DAYS}+ days</div>
+    </div>
+    <div class="stat">
+      <div class="num">{stats.onLeave}</div>
+      <div class="lbl">On leave now</div>
+    </div>
   </div>
 
   <div class="toolbar">
@@ -160,27 +251,73 @@
     <table class="data">
       <thead>
         <tr>
-          <th>Name</th><th>Competency</th><th>Title</th><th>IPT</th><th>Status</th><th>Open</th><th>Overdue</th>
-          <th>Training due</th><th>Upcoming leave</th><th>Last input</th><th></th>
+          <th aria-sort={ariaSort("name")}>{@render sortHeader("name", "Name")}</th>
+          <th aria-sort={ariaSort("competency")}>{@render sortHeader("competency", "Competency")}</th>
+          <th>Title</th>
+          <th>IPT</th>
+          <th>Status</th>
+          <th class="num" aria-sort={ariaSort("open")}>{@render sortHeader("open", "Open")}</th>
+          <th class="num" aria-sort={ariaSort("overdue")}>{@render sortHeader("overdue", "Overdue")}</th>
+          <th class="num" aria-sort={ariaSort("training")}>{@render sortHeader("training", "Training due")}</th>
+          <th>Upcoming leave</th>
+          <th aria-sort={ariaSort("lastInput")}>{@render sortHeader("lastInput", "Last input")}</th>
+          <th></th>
         </tr>
       </thead>
       <tbody>
-        {#each rows as r (r.e.id)}
-          <tr>
-            <td><button type="button" class="link" onclick={() => router.go("employees", r.e.id)}>{r.e.displayName}</button></td>
-            <td>{app.competencyCode(r.e.competencyId)}</td>
-            <td>{r.e.positionTitle ?? ""}</td>
-            <td>{r.e.team ?? ""}</td>
-            <td>{r.e.activeStatus === "active" ? "Active" : r.e.activeStatus.replace("_", " ")}</td>
-            <td>{r.openCount}</td>
-            <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
-            <td>{#if r.trainingDueCount}<span class="badge warning">{r.trainingDueCount}</span>{:else}0{/if}</td>
-            <td>{r.upcomingLeave ? `${formatDate(r.upcomingLeave.startDate)} – ${formatDate(r.upcomingLeave.endDate)}` : ""}</td>
-            <td>{formatDate(r.lastInput)}</td>
+        {#each sorted as r (r.e.id)}
+          <!-- Row click is a mouse convenience; the name link is the keyboard path. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+          <tr onclick={() => router.go("employees", r.e.id)}>
             <td>
               <button
                 type="button"
-                onclick={() => {
+                class="link"
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  router.go("employees", r.e.id);
+                }}>{r.e.displayName}</button
+              >
+            </td>
+            <td>{@render textOrDash(app.competencyCode(r.e.competencyId))}</td>
+            <td>{@render textOrDash(r.e.positionTitle)}</td>
+            <td>{@render textOrDash(r.e.team)}</td>
+            <td>
+              <span class="badge" class:success={r.e.activeStatus === "active"}>{statusLabel(r.e.activeStatus)}</span>
+            </td>
+            <td class="num" class:muted={r.openCount === 0}>{r.openCount}</td>
+            <td class="num" class:muted={r.overdueCount === 0}>
+              {#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}
+            </td>
+            <td class="num" class:muted={r.trainingDueCount === 0}>
+              {#if r.trainingDueCount}<span class="badge warning">{r.trainingDueCount}</span>{:else}0{/if}
+            </td>
+            <td>
+              {#if r.upcomingLeave}
+                {#if r.onLeaveNow}
+                  <span class="badge warning">On leave</span>
+                  <span class="small muted">until {formatDate(r.upcomingLeave.endDate)}</span>
+                {:else}
+                  {formatDate(r.upcomingLeave.startDate)} – {formatDate(r.upcomingLeave.endDate)}
+                {/if}
+              {:else}
+                <span class="muted">—</span>
+              {/if}
+            </td>
+            <td>
+              {#if !r.lastInput}
+                <span class="badge warning">None</span>
+              {:else if r.staleInput}
+                <span class="badge warning">{formatDate(r.lastInput)}</span>
+              {:else}
+                {formatDate(r.lastInput)}
+              {/if}
+            </td>
+            <td>
+              <button
+                type="button"
+                onclick={(ev) => {
+                  ev.stopPropagation();
                   editing = r.e;
                   formOpen = true;
                 }}>Edit</button
@@ -196,3 +333,40 @@
 {#if formOpen}
   <EmployeeForm employee={editing} onclose={() => (formOpen = false)} />
 {/if}
+
+<style>
+  th .th-sort {
+    font: inherit;
+    font-weight: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+    color: inherit;
+    background: none;
+    border: none;
+    box-shadow: none;
+    padding: 0;
+    min-height: 0;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+  }
+  th .th-sort:hover {
+    background: none;
+    color: var(--text);
+  }
+  .sort-arrow {
+    font-size: 0.55rem;
+    min-width: 0.7rem;
+  }
+  th.num,
+  td.num {
+    text-align: right;
+  }
+  td.num {
+    font-variant-numeric: tabular-nums;
+  }
+  tbody tr {
+    cursor: pointer;
+  }
+</style>

@@ -3,6 +3,13 @@
 ## Unreleased
 
 ### Changed
+- Employee directory refresh: summary tiles at the top (overdue tasks, training due, employees
+  with no performance input in 30+ days, on leave now — all reflecting the current filters),
+  sortable columns (Name, Competency, Open, Overdue, Training due, Last input; numeric columns
+  sort worst-first on first click), status shown as a badge, an "On leave" badge when leave is
+  in progress, stale or missing performance-input dates highlighted, right-aligned numeric
+  columns, em-dashes for empty cells, and click-anywhere rows to open the employee detail page
+  (the name link remains the keyboard path). CSV export follows the on-screen sort order.
 - Task categories have been removed: the category field on tasks, the colored category chip on
   board cards, the board's category filter, and the Task categories section in Settings are all
   gone. Board columns and tags cover the same organizing needs with less bookkeeping. Existing
