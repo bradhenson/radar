@@ -361,7 +361,10 @@ table.data tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 38
   align-items: center;
   margin-bottom: 1rem;
 }
-.toolbar .spacer { flex: 1; }
+/* Pushes the items after it to the far end of a flex row (toolbars, dialog
+   footers). Without this a bare .spacer collapses to zero width and instead
+   just doubles the gap next to it. */
+.spacer { flex: 1; }
 
 .page { padding: 1.35rem 1.6rem 2rem; max-width: 1400px; }
 .page-header {

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+- Dialog footers with a Delete button (Leave, Situational Telework, Projects) no longer show an
+  uneven gap next to Delete. The layout spacer only pushed content apart inside toolbars, so in
+  those footers it collapsed and merely doubled the gap beside Delete; it now separates Delete to
+  the far left consistently, matching the Awards dialog.
+
 ### Added
 - Projects can now be deleted, from either the row Delete button or the Edit Project dialog. A
   confirmation dialog lists how many tasks, meeting notes, and performance inputs reference the
