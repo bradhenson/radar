@@ -4,6 +4,7 @@
   import { app } from "../stores/app.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import type { Employee, MeetingNote } from "../domain/models";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { statusLabel } from "../domain/models";
@@ -110,8 +111,8 @@
             <td>{formatDate(t.completedDate)}</td>
             <td>
               <div class="row-actions">
-                <button type="button" onclick={() => void restoreTask(t.id)}>Restore</button>
-                <button type="button" class="danger" onclick={() => void deleteTask(t.id)}>Delete</button>
+                <button type="button" class="icon-btn" aria-label="Restore task" title="Restore" onclick={() => void restoreTask(t.id)}><Icon name="unarchive" size={16} /></button>
+                <button type="button" class="icon-btn danger" aria-label="Delete task" title="Delete" onclick={() => void deleteTask(t.id)}><Icon name="trash" size={16} /></button>
               </div>
             </td>
           </tr>
@@ -135,8 +136,8 @@
             <td>{app.projectName(note.projectId)}</td>
             <td>
               <div class="row-actions">
-                <button type="button" onclick={() => void restoreMeetingNote(note.id)}>Restore</button>
-                <button type="button" class="danger" onclick={() => (pendingDeleteMeetingNote = note)}>Delete</button>
+                <button type="button" class="icon-btn" aria-label="Restore meeting note" title="Restore" onclick={() => void restoreMeetingNote(note.id)}><Icon name="unarchive" size={16} /></button>
+                <button type="button" class="icon-btn danger" aria-label="Delete meeting note" title="Delete" onclick={() => (pendingDeleteMeetingNote = note)}><Icon name="trash" size={16} /></button>
               </div>
             </td>
           </tr>
@@ -159,7 +160,7 @@
             <td>{app.competencyCode(e.competencyId)}</td>
             <td>
               <div class="row-actions">
-                <button type="button" class="danger" onclick={() => (pendingDeleteEmployee = e)}>Delete</button>
+                <button type="button" class="icon-btn danger" aria-label="Delete employee" title="Delete" onclick={() => (pendingDeleteEmployee = e)}><Icon name="trash" size={16} /></button>
               </div>
             </td>
           </tr>

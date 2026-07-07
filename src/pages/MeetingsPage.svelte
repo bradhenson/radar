@@ -3,6 +3,7 @@
   import { ui } from "../stores/ui.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../domain/models";
   import { formatDate, nowTimestamp } from "../utils/dates";
@@ -164,8 +165,8 @@
             <span class="badge">{note.meetingType}</span>
             {#if note.projectId}<span class="muted">{app.projectName(note.projectId)}</span>{/if}
             <span class="spacer"></span>
-            <button type="button" onclick={(ev) => { ev.stopPropagation(); void archive(note); }}>Archive</button>
-            <button type="button" class="danger" onclick={(ev) => { ev.stopPropagation(); requestDelete(note); }}>Delete</button>
+            <button type="button" class="icon-btn" aria-label="Archive meeting note" title="Archive" onclick={(ev) => { ev.stopPropagation(); void archive(note); }}><Icon name="archive" size={16} /></button>
+            <button type="button" class="icon-btn danger" aria-label="Delete meeting note" title="Delete" onclick={(ev) => { ev.stopPropagation(); requestDelete(note); }}><Icon name="trash" size={16} /></button>
           </div>
 
           <h2 class="meeting-title">{note.title}</h2>

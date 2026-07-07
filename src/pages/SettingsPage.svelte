@@ -3,6 +3,7 @@
   import { app } from "../stores/app.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import { APPLICATION_VERSION, parseAndValidateBackup, type BackupValidationResult } from "../data/backup";
   import { COLOR_THEMES } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
@@ -379,11 +380,12 @@
             <td>
               <button
                 type="button"
-                class="danger"
+                class="icon-btn danger"
+                aria-label="Delete column"
                 onclick={() => void deleteBoardColumn(column.id)}
                 disabled={app.boardColumnTaskCount(column.id) > 0 || app.activeBoardColumns.length <= 1}
                 title={app.boardColumnTaskCount(column.id) > 0 ? "Move all tasks out of this column before deleting it" : "Delete column"}
-              >Delete</button>
+              ><Icon name="trash" size={16} /></button>
             </td>
           </tr>
         {/each}

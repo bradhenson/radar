@@ -4,6 +4,7 @@
   import { router } from "../app/router.svelte";
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import { compareDates, daysBetween, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
@@ -316,11 +317,14 @@
             <td>
               <button
                 type="button"
+                class="icon-btn"
+                aria-label="Edit employee"
+                title="Edit"
                 onclick={(ev) => {
                   ev.stopPropagation();
                   editing = r.e;
                   formOpen = true;
-                }}>Edit</button
+                }}><Icon name="edit" size={16} /></button
               >
             </td>
           </tr>

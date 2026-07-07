@@ -8,6 +8,12 @@
   those footers it collapsed and merely doubled the gap beside Delete; it now separates Delete to
   the far left consistently, matching the Awards dialog.
 
+### Changed
+- Row and dialog action buttons for Edit, Delete, Archive, Restore, and Remove are now icon
+  buttons (pencil / trash / archive box / restore) instead of text, for a cleaner, more compact
+  look. Each keeps an accessible label and a hover tooltip, and the destructive ones stay neutral
+  until hovered so lists aren't a wall of red. Labelled "Add …" actions remain text buttons.
+
 ### Added
 - Projects can now be deleted, from either the row Delete button or the Edit Project dialog. A
   confirmation dialog lists how many tasks, meeting notes, and performance inputs reference the

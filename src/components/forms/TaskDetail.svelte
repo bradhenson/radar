@@ -1,6 +1,7 @@
 <script lang="ts">
   // Full task editor with notes, checklist, and activity (plan 12.2, 14).
   import Dialog from "../common/Dialog.svelte";
+  import Icon from "../common/Icon.svelte";
   import { app } from "../../stores/app.svelte";
   import { ui } from "../../stores/ui.svelte";
   import {
@@ -420,12 +421,10 @@
         <button type="button" onclick={() => void completeNow()}>Complete</button>
       {/if}
       {#if !isNewTask && !initialTask.isArchived}
-        <button type="button" onclick={() => void archive()}>Archive</button>
+        <button type="button" class="icon-btn" aria-label="Archive task" title="Archive" onclick={() => void archive()}><Icon name="archive" size={17} /></button>
       {/if}
       {#if !isNewTask}
-        <button type="button" class="danger" disabled={saving || deleting} onclick={() => void deleteTask()}>
-          {deleting ? "Deleting..." : "Delete"}
-        </button>
+        <button type="button" class="icon-btn danger" disabled={saving || deleting} aria-label="Delete task" title={deleting ? "Deleting…" : "Delete"} onclick={() => void deleteTask()}><Icon name="trash" size={17} /></button>
       {/if}
       <span class="spacer"></span>
       <button type="button" onclick={discardAndClose} title="Close without saving changes">Cancel</button>

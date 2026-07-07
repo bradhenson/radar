@@ -5,6 +5,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
   import type { Project, ProjectStatus } from "../domain/models";
@@ -197,11 +198,13 @@
                 >
                 <button
                   type="button"
-                  class="danger"
+                  class="icon-btn danger"
+                  aria-label="Delete project"
+                  title="Delete"
                   onclick={(ev) => {
                     ev.stopPropagation();
                     requestDelete(r.p);
-                  }}>Delete</button
+                  }}><Icon name="trash" size={16} /></button
                 >
               </div>
             </td>
@@ -309,7 +312,7 @@
       <textarea id="pf-desc" bind:value={fDesc} rows="3" maxlength="10000" style="width:100%"></textarea>
       <div style="display:flex; gap:.5rem; align-items:center; margin-top:1rem;">
         {#if editing}
-          <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>
+          <button type="button" class="icon-btn danger" aria-label="Delete project" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
         {/if}
         <span class="spacer"></span>
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>

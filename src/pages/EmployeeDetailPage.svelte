@@ -10,6 +10,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
@@ -242,8 +243,8 @@
       <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
       <button type="button" onclick={() => (meetingNoteOpen = true)}>Add meeting note</button>
-      <button type="button" onclick={() => (editOpen = true)}>Edit</button>
-      <button type="button" class="danger" onclick={() => (confirmDeleteOpen = true)}>Delete</button>
+      <button type="button" class="icon-btn" aria-label="Edit employee" title="Edit" onclick={() => (editOpen = true)}><Icon name="edit" size={17} /></button>
+      <button type="button" class="icon-btn danger" aria-label="Delete employee" title="Delete" onclick={() => (confirmDeleteOpen = true)}><Icon name="trash" size={17} /></button>
     </div>
 
     <div class="summary-cards">
@@ -283,8 +284,8 @@
                 <div style="white-space:pre-wrap">{note.noteText}</div>
                 <div class="small muted">Added {formatTimestamp(note.createdAt)}{note.updatedAt !== note.createdAt ? " · edited" : ""}</div>
               </div>
-              <button type="button" onclick={() => startNoteEdit(note)}>Edit</button>
-              <button type="button" onclick={() => void removeEmployeeNote(note)}>Remove</button>
+              <button type="button" class="icon-btn" aria-label="Edit note" title="Edit" onclick={() => startNoteEdit(note)}><Icon name="edit" size={16} /></button>
+              <button type="button" class="icon-btn danger" aria-label="Remove note" title="Remove" onclick={() => void removeEmployeeNote(note)}><Icon name="trash" size={16} /></button>
             </div>
           {/if}
         </div>
@@ -352,7 +353,7 @@
     {:else if tab === "profile"}
       <div class="tab-title-row">
         <h2>Profile details</h2>
-        <button type="button" onclick={() => (profileOpen = true)}>Edit profile</button>
+        <button type="button" class="icon-btn" aria-label="Edit profile" title="Edit profile" onclick={() => (profileOpen = true)}><Icon name="edit" size={17} /></button>
       </div>
       {#snippet field(label: string, value: string)}
         <div>
@@ -486,7 +487,7 @@
             <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
               <strong>{note.title}</strong>
               <span class="spacer"></span>
-              <button type="button" onclick={() => (editingMeetingNote = note)}>Edit</button>
+              <button type="button" class="icon-btn" aria-label="Edit meeting note" title="Edit" onclick={() => (editingMeetingNote = note)}><Icon name="edit" size={16} /></button>
             </div>
             {#if note.notes}<div><strong>Discussion:</strong> {note.notes}</div>{/if}
             {#if note.actionItems}<div><strong>Action items:</strong> {note.actionItems}</div>{/if}

@@ -5,6 +5,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -126,11 +127,13 @@
               <div class="row-actions">
                 <button
                   type="button"
-                  class="danger"
+                  class="icon-btn danger"
+                  aria-label="Delete award"
+                  title="Delete"
                   onclick={(ev) => {
                     ev.stopPropagation();
                     requestDelete(a);
-                  }}>Delete</button
+                  }}><Icon name="trash" size={16} /></button
                 >
               </div>
             </td>
@@ -177,7 +180,7 @@
       <textarea id="aw-notes" bind:value={fNotes} rows="3" maxlength="10000" style="width:100%"></textarea>
       <div class="dialog-actions">
         {#if editing}
-          <button type="button" class="danger delete-action" onclick={() => requestDelete(editing!)}>Delete</button>
+          <button type="button" class="icon-btn danger delete-action" aria-label="Delete award" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
         {/if}
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>

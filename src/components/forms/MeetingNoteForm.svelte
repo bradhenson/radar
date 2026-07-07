@@ -1,6 +1,7 @@
 <script lang="ts">
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
+  import Icon from "../common/Icon.svelte";
   import { app } from "../../stores/app.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../../domain/models";
   import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
@@ -164,7 +165,7 @@
           {#each linkedEmployees as employee (employee.id)}
             <span class="employee-chip">
               {employee.displayName}
-              <button type="button" aria-label={`Remove ${employee.displayName}`} onclick={() => removeEmployee(employee.id)}>Remove</button>
+              <button type="button" class="chip-remove" aria-label={`Remove ${employee.displayName}`} title="Remove" onclick={() => removeEmployee(employee.id)}><Icon name="close" size={13} /></button>
             </span>
           {/each}
         </div>
@@ -181,7 +182,7 @@
 
     <div class="form-actions">
       {#if isEditing}
-        <button type="button" class="danger delete-action" disabled={saving} onclick={() => (confirmDelete = true)}>Delete</button>
+        <button type="button" class="icon-btn danger delete-action" disabled={saving} aria-label="Delete meeting note" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
       {/if}
       <button type="button" onclick={onclose}>Cancel</button>
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
@@ -243,11 +244,21 @@
     font-size: .82rem;
     font-weight: 600;
   }
-  .employee-chip button {
+  .employee-chip button.chip-remove {
+    display: inline-grid;
+    place-items: center;
     min-height: 1.45rem;
-    padding: .05rem .35rem;
-    font-size: .72rem;
+    width: 1.45rem;
+    padding: 0;
+    color: var(--text-muted);
+    background: transparent;
+    border-color: transparent;
     box-shadow: none;
+  }
+  .employee-chip button.chip-remove:hover {
+    color: var(--danger);
+    background: var(--overdue-bg);
+    border-color: transparent;
   }
   .linked-empty {
     margin: .35rem 0 0;

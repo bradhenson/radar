@@ -5,6 +5,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import type { LeaveRecord, LeaveStatus } from "../domain/models";
   import { LEAVE_TYPES } from "../domain/models";
   import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -216,11 +217,13 @@
                 <div class="row-actions">
                   <button
                     type="button"
-                    class="danger"
+                    class="icon-btn danger"
+                    aria-label="Delete leave"
+                    title="Delete"
                     onclick={(ev) => {
                       ev.stopPropagation();
                       requestDelete(l);
-                    }}>Delete</button
+                    }}><Icon name="trash" size={16} /></button
                   >
                 </div>
               </td>
@@ -330,7 +333,7 @@
       <input id="lf-note" type="text" bind:value={fNote} maxlength="500" style="width:100%" />
       <div class="dialog-actions">
         {#if editing}
-          <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>
+          <button type="button" class="icon-btn danger" aria-label="Delete leave" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
         {/if}
         <span class="spacer"></span>
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>

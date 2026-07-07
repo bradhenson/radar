@@ -4,6 +4,7 @@
   // way, task details can be imported into the empty fields (plan 17.5).
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
+  import Icon from "../common/Icon.svelte";
   import { app } from "../../stores/app.svelte";
   import type { PerformanceInput, Task } from "../../domain/models";
   import { statusLabel } from "../../domain/models";
@@ -236,7 +237,7 @@
 
     <div class="dialog-actions">
       {#if input}
-        <button type="button" class="danger delete-action" onclick={() => (confirmDelete = true)}>Delete</button>
+        <button type="button" class="icon-btn danger delete-action" aria-label="Delete performance input" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
       {/if}
       <button type="button" onclick={onclose}>Cancel</button>
       <button type="submit" class="primary">Save</button>
