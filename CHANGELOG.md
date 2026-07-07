@@ -9,6 +9,10 @@
   the far left consistently, matching the Awards dialog.
 
 ### Changed
+- Meeting notes now auto-save when you dismiss the dialog (click outside it, press Escape, or use
+  the ✕) instead of discarding your edits, as long as a title is present and something changed. If
+  the title is still empty the dialog stays open with the "Title is required" message so nothing is
+  lost. The **Cancel** button remains the explicit way to discard changes.
 - Row and dialog action buttons for Edit, Delete, Archive, Restore, and Remove are now icon
   buttons (pencil / trash / archive box / restore) instead of text, for a cleaner, more compact
   look. Each keeps an accessible label and a hover tooltip, and the destructive ones stay neutral

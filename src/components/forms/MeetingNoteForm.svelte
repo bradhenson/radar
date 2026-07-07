@@ -13,22 +13,47 @@
     onclose
   }: { note?: MeetingNote; prefill?: Partial<MeetingNote>; onclose: () => void } = $props();
 
+  let isEditing = $derived(note !== undefined);
+
   function initialSource(): Partial<MeetingNote> {
     return note ?? prefill;
   }
 
-  let isEditing = $derived(note !== undefined);
-  let title = $state(initialSource().title ?? "");
-  let meetingDate = $state(initialSource().meetingDate ?? todayIso());
-  let meetingType = $state(initialSource().meetingType ?? "Product team");
-  let projectId = $state(initialSource().projectId ?? "");
-  let attendeeEmployeeIds = $state<string[]>([...(initialSource().attendeeEmployeeIds ?? [])]);
+  // Snapshot of the values the form opened with. It seeds the fields and lets
+  // us tell whether anything changed when the dialog is dismissed.
+  const initial = {
+    title: initialSource().title ?? "",
+    meetingDate: initialSource().meetingDate ?? todayIso(),
+    meetingType: initialSource().meetingType ?? "Product team",
+    projectId: initialSource().projectId ?? "",
+    attendeeEmployeeIds: [...(initialSource().attendeeEmployeeIds ?? [])],
+    notes: initialSource().notes ?? "",
+    actionItems: initialSource().actionItems ?? ""
+  };
+
+  let title = $state(initial.title);
+  let meetingDate = $state(initial.meetingDate);
+  let meetingType = $state(initial.meetingType);
+  let projectId = $state(initial.projectId);
+  let attendeeEmployeeIds = $state<string[]>([...initial.attendeeEmployeeIds]);
   let selectedEmployeeId = $state("");
-  let notes = $state(initialSource().notes ?? "");
-  let actionItems = $state(initialSource().actionItems ?? "");
+  let notes = $state(initial.notes);
+  let actionItems = $state(initial.actionItems);
   let error = $state("");
   let saving = $state(false);
   let confirmDelete = $state(false);
+
+  // Has the user changed anything worth persisting?
+  let isDirty = $derived(
+    title !== initial.title ||
+      meetingDate !== initial.meetingDate ||
+      meetingType !== initial.meetingType ||
+      projectId !== initial.projectId ||
+      notes !== initial.notes ||
+      actionItems !== initial.actionItems ||
+      attendeeEmployeeIds.length !== initial.attendeeEmployeeIds.length ||
+      attendeeEmployeeIds.some((id) => !initial.attendeeEmployeeIds.includes(id))
+  );
 
   let linkedEmployees = $derived(
     attendeeEmployeeIds
@@ -95,6 +120,19 @@
     }
   }
 
+  // Dismissing the dialog (backdrop click, Escape, or the ✕) saves in-progress
+  // work instead of throwing it away. Cancel stays the explicit discard path.
+  async function requestClose() {
+    if (saving) return;
+    if (!isDirty) {
+      onclose();
+      return;
+    }
+    // save() closes on success. If a required field is missing it surfaces the
+    // error and keeps the dialog open, so the notes aren't silently lost.
+    await save();
+  }
+
   async function deleteNote() {
     if (!note || saving) return;
     saving = true;
@@ -111,7 +149,7 @@
   }
 </script>
 
-<Dialog title={isEditing ? "Meeting Note" : "New Meeting Note"} wide {onclose}>
+<Dialog title={isEditing ? "Meeting Note" : "New Meeting Note"} wide onclose={requestClose}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -184,7 +222,7 @@
       {#if isEditing}
         <button type="button" class="icon-btn danger delete-action" disabled={saving} aria-label="Delete meeting note" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
       {/if}
-      <button type="button" onclick={onclose}>Cancel</button>
+      <button type="button" onclick={onclose} title="Close without saving changes">Cancel</button>
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
     </div>
   </form>
