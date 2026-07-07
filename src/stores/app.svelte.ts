@@ -906,6 +906,61 @@ class AppStore {
     }
   }
 
+  // --- project service ----------------------------------------------------------
+  /** Records that reference a project and will be unlinked when it is deleted. */
+  projectLinkedRecordCounts(projectId: string) {
+    return {
+      tasks: this.tasks.filter((t) => t.projectId === projectId).length,
+      meetingNotes: this.meetingNotes.filter((n) => n.projectId === projectId).length,
+      performanceInputs: this.performanceInputs.filter((p) => p.projectId === projectId).length
+    };
+  }
+
+  /**
+   * Permanently delete a project. Tasks, meeting notes, and performance inputs
+   * that referenced it survive but are unlinked (their projectId is cleared),
+   * so nothing is left pointing at a project that no longer exists.
+   */
+  async deleteProject(projectOrId: Project | string): Promise<void> {
+    const project = typeof projectOrId === "string" ? this.projects.find((p) => p.id === projectOrId) : projectOrId;
+    if (!project) return;
+    this.saveStatus = "saving";
+    try {
+      const id = project.id;
+      const name = project.name;
+      const updatedAt = nowTimestamp();
+
+      const updatedTasks = this.tasks.filter((t) => t.projectId === id).map((t) => ({ ...t, projectId: undefined, updatedAt }));
+      for (const t of updatedTasks) await this.store.put("tasks", this.plainRecord(t));
+
+      const updatedMeetings = this.meetingNotes
+        .filter((n) => n.projectId === id)
+        .map((n) => ({ ...n, projectId: undefined, updatedAt }));
+      for (const n of updatedMeetings) await this.store.put("meetingNotes", this.plainRecord(n));
+
+      const updatedInputs = this.performanceInputs
+        .filter((p) => p.projectId === id)
+        .map((p) => ({ ...p, projectId: undefined, updatedAt }));
+      for (const p of updatedInputs) await this.store.put("performanceInputs", this.plainRecord(p));
+
+      await this.store.delete("projects", id);
+
+      this.tasks = this.tasks.map((t) => updatedTasks.find((u) => u.id === t.id) ?? t);
+      this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
+      this.performanceInputs = this.performanceInputs.map((p) => updatedInputs.find((u) => u.id === p.id) ?? p);
+      this.projects = this.projects.filter((p) => p.id !== id);
+
+      await this.recordActivity("projects", id, "deleted", `Deleted project ${name}`);
+      await this.bumpChangeCount("deleted");
+      this.saveStatus = "saved";
+      this.toast(`Deleted project ${name}`, "success");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Delete failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
+  }
+
   // --- training service ---------------------------------------------------------
   /**
    * Record a completion for one employee, creating the fact record on first

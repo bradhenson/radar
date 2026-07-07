@@ -2,6 +2,7 @@
   // Project directory (plan 12.5, 16) with inline add/edit dialog.
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -12,6 +13,7 @@
   let formOpen = $state(false);
   let editing = $state<Project | undefined>(undefined);
   let expandedId = $state<string | undefined>(undefined);
+  let pendingDelete = $state<Project | undefined>(undefined);
 
   // form fields
   let fName = $state("");
@@ -100,6 +102,34 @@
   function toggleExpanded(id: string) {
     expandedId = expandedId === id ? undefined : id;
   }
+
+  function requestDelete(p: Project) {
+    pendingDelete = p;
+  }
+
+  function deleteMessage(p: Project): string {
+    const counts = app.projectLinkedRecordCounts(p.id);
+    const linked: [number, string][] = [
+      [counts.tasks, "task(s)"],
+      [counts.meetingNotes, "meeting note(s)"],
+      [counts.performanceInputs, "performance input(s)"]
+    ];
+    const parts = linked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    let message = `Permanently delete project "${p.name}"?`;
+    if (parts.length) message += ` ${parts.join(", ")} will be kept but no longer linked to this project.`;
+    message += " This cannot be undone.";
+    return message;
+  }
+
+  async function deleteProject(p: Project) {
+    await app.deleteProject(p);
+    if (editing?.id === p.id) {
+      formOpen = false;
+      editing = undefined;
+    }
+    if (expandedId === p.id) expandedId = undefined;
+    pendingDelete = undefined;
+  }
 </script>
 
 <div class="page">
@@ -157,13 +187,23 @@
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
             <td style="white-space:nowrap">
-              <button
-                type="button"
-                onclick={(ev) => {
-                  ev.stopPropagation();
-                  ui.openNewTask({ projectId: r.p.id });
-                }}>Add task</button
-              >
+              <div class="row-actions">
+                <button
+                  type="button"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    ui.openNewTask({ projectId: r.p.id });
+                  }}>Add task</button
+                >
+                <button
+                  type="button"
+                  class="danger"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    requestDelete(r.p);
+                  }}>Delete</button
+                >
+              </div>
             </td>
           </tr>
           {#if expandedId === r.p.id}
@@ -196,6 +236,13 @@
 <style>
   .row-clickable {
     cursor: pointer;
+  }
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
   }
   .project-name {
     display: inline-flex;
@@ -260,10 +307,25 @@
       </select>
       <label for="pf-desc">Description</label>
       <textarea id="pf-desc" bind:value={fDesc} rows="3" maxlength="10000" style="width:100%"></textarea>
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div style="display:flex; gap:.5rem; align-items:center; margin-top:1rem;">
+        {#if editing}
+          <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>
+        {/if}
+        <span class="spacer"></span>
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
   </Dialog>
+{/if}
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete project"
+    message={deleteMessage(pendingDelete)}
+    confirmLabel="Delete project"
+    danger
+    onconfirm={() => void deleteProject(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
 {/if}

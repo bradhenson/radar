@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Added
+- Projects can now be deleted, from either the row Delete button or the Edit Project dialog. A
+  confirmation dialog lists how many tasks, meeting notes, and performance inputs reference the
+  project; those records are kept but unlinked from the project so nothing points at a project
+  that no longer exists.
+
 ### Changed
 - Leave list is simpler: the advisory "Warnings" column and the ERP "Verified" column (and the
   "Mark verified" action) are gone, and the Add/Edit Leave dialog no longer has a "Verified against
