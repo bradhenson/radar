@@ -356,6 +356,12 @@
   .leave-page.wide {
     max-width: none;
   }
+  /* The leave list has only a few short columns, so let the table size to its
+     content instead of stretching full width and spreading the columns apart. */
+  .leave-page :global(table.data) {
+    width: auto;
+    max-width: 100%;
+  }
   .leave-toolbar {
     align-items: center;
   }
