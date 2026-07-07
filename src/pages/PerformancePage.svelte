@@ -137,7 +137,7 @@
             >
             {#if p.projectId}<span>· {app.projectName(p.projectId)}</span>{/if}
             {#if p.recognitionPotential}<span class="badge success">Recognition potential</span>{/if}
-            <span class="spacer" style="flex:1"></span>
+            <span class="spacer"></span>
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
             <label style="margin:0; font-weight:400" class="small" onclick={(ev) => ev.stopPropagation()}>
               Status:

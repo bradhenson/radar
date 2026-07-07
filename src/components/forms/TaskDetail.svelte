@@ -427,7 +427,7 @@
           {deleting ? "Deleting..." : "Delete"}
         </button>
       {/if}
-      <span class="spacer" style="flex:1"></span>
+      <span class="spacer"></span>
       <button type="button" onclick={discardAndClose} title="Close without saving changes">Cancel</button>
     </div>
   </form>

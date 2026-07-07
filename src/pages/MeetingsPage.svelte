@@ -112,7 +112,7 @@
   <div class="page-header">
     <h1>Meeting Notes</h1>
     <span class="muted">{notes.length} shown</span>
-    <span class="spacer" style="flex:1"></span>
+    <span class="spacer"></span>
     <button type="button" onclick={exportCsv} disabled={notes.length === 0}>Export CSV</button>
     <button type="button" class="primary" onclick={() => (createOpen = true)}>New Meeting Note</button>
   </div>
@@ -163,7 +163,7 @@
             >
             <span class="badge">{note.meetingType}</span>
             {#if note.projectId}<span class="muted">{app.projectName(note.projectId)}</span>{/if}
-            <span class="spacer" style="flex:1"></span>
+            <span class="spacer"></span>
             <button type="button" onclick={(ev) => { ev.stopPropagation(); void archive(note); }}>Archive</button>
             <button type="button" class="danger" onclick={(ev) => { ev.stopPropagation(); requestDelete(note); }}>Delete</button>
           </div>
@@ -192,7 +192,7 @@
           </div>
 
           <div class="meeting-footer">
-            <span class="spacer" style="flex:1"></span>
+            <span class="spacer"></span>
             {#if note.actionItems}
               <button type="button" onclick={(ev) => { ev.stopPropagation(); createFollowUpTask(note); }}>Create follow-up task</button>
             {/if}

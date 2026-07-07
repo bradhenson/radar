@@ -237,7 +237,7 @@
       {#if employee.positionTitle}<span class="muted">{employee.positionTitle}</span>{/if}
       {#if employee.team}<span class="muted">{employee.team}</span>{/if}
       {#if employee.activeStatus !== "active"}<span class="badge warning">{employee.activeStatus.replace("_", " ")}</span>{/if}
-      <span class="spacer" style="flex:1"></span>
+      <span class="spacer"></span>
       <button type="button" onclick={() => (checkInOpen = true)}>Record check-in</button>
       <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
@@ -485,7 +485,7 @@
             </div>
             <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
               <strong>{note.title}</strong>
-              <span class="spacer" style="flex:1"></span>
+              <span class="spacer"></span>
               <button type="button" onclick={() => (editingMeetingNote = note)}>Edit</button>
             </div>
             {#if note.notes}<div><strong>Discussion:</strong> {note.notes}</div>{/if}
