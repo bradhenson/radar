@@ -7,7 +7,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { LeaveRecord, LeaveStatus } from "../domain/models";
   import { LEAVE_TYPES } from "../domain/models";
-  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
+  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -23,7 +23,6 @@
   let fEnd = $state("");
   let fStatus = $state<LeaveStatus>("planned");
   let fNote = $state("");
-  let fVerified = $state("");
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<LeaveRecord | undefined>(undefined);
@@ -36,7 +35,6 @@
     fEnd = l?.endDate ?? defaults.endDate ?? "";
     fStatus = l?.status ?? "planned";
     fNote = l?.workloadImpactNote ?? "";
-    fVerified = l?.lastVerifiedDate ?? "";
     fError = "";
     formOpen = true;
   }
@@ -80,8 +78,8 @@
       endDate: fEnd,
       status: fStatus,
       workloadImpactNote: fNote.trim() || undefined,
-      lastVerifiedDate: fVerified || undefined,
-      sourceSystem: editing?.sourceSystem ?? "ERP",
+      lastVerifiedDate: editing?.lastVerifiedDate,
+      sourceSystem: editing?.sourceSystem,
       createdAt: editing?.createdAt ?? now,
       updatedAt: now
     };
@@ -146,37 +144,6 @@
     return l.leaveType ?? "Leave";
   }
 
-  // Advisory overlap warnings (plan 19.6).
-  function overlaps(l: LeaveRecord): string[] {
-    const warnings: string[] = [];
-    for (const other of app.leaveRecords) {
-      if (other.id === l.id || ["cancelled", "complete"].includes(other.status)) continue;
-      if (other.startDate <= l.endDate && l.startDate <= other.endDate) {
-        const empProjects = new Set(
-          app.tasks.filter((t) => t.employeeId === l.employeeId && t.projectId).map((t) => t.projectId)
-        );
-        const shared = app.tasks.some((t) => t.employeeId === other.employeeId && t.projectId && empProjects.has(t.projectId));
-        if (shared) warnings.push(`Overlaps ${app.employeeName(other.employeeId)} (same project)`);
-      }
-    }
-    const dueDuring = app.tasks.filter(
-      (t) =>
-        t.employeeId === l.employeeId &&
-        !t.isArchived &&
-        t.status !== "complete" &&
-        t.status !== "cancelled" &&
-        t.dueDate &&
-        t.dueDate >= l.startDate &&
-        t.dueDate <= l.endDate
-    );
-    if (dueDuring.length) warnings.push(`${dueDuring.length} task(s) due during this leave`);
-    return warnings;
-  }
-
-  async function markVerified(l: LeaveRecord) {
-    await app.putRecord("leaveRecords", { ...l, lastVerifiedDate: todayIso(), updatedAt: nowTimestamp() });
-  }
-
   function editFromRow(l: LeaveRecord) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
@@ -224,7 +191,7 @@
       <EmptyState message="No leave records." hint="Track upcoming absences for workload awareness. Details stay broad — no reasons required." />
     {:else}
       <table class="data">
-        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th><th>Warnings</th><th>Verified</th><th></th></tr></thead>
+        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th><th></th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
             <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
@@ -245,20 +212,6 @@
               <td>{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
               <td>{l.status}</td>
-              <td>
-                {#each overlaps(l) as w, i (i)}<span class="badge warning">{w}</span>{/each}
-              </td>
-              <td>
-                {#if l.lastVerifiedDate}{formatDate(l.lastVerifiedDate)}
-                {:else}<button
-                    type="button"
-                    class="link"
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      void markVerified(l);
-                    }}>Mark verified</button
-                  >{/if}
-              </td>
               <td>
                 <div class="row-actions">
                   <button
@@ -375,8 +328,6 @@
       </div>
       <label for="lf-note">Workload impact note</label>
       <input id="lf-note" type="text" bind:value={fNote} maxlength="500" style="width:100%" />
-      <label for="lf-verified">Verified against ERP on</label>
-      <input id="lf-verified" type="date" bind:value={fVerified} style="width:100%" />
       <div class="dialog-actions">
         {#if editing}
           <button type="button" class="danger" onclick={() => requestDelete(editing!)}>Delete</button>

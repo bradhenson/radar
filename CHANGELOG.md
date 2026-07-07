@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Changed
+- Leave list is simpler: the advisory "Warnings" column and the ERP "Verified" column (and the
+  "Mark verified" action) are gone, and the Add/Edit Leave dialog no longer has a "Verified against
+  ERP on" field. Existing verification data on records is preserved but no longer shown or edited.
 - Performance inputs are now edited by clicking the card itself instead of a separate Edit
   button. The date acts as the keyboard/screen-reader handle, the inline Status dropdown still
   works without opening the editor, and selecting text to copy no longer triggers an edit.
