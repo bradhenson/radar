@@ -169,7 +169,7 @@
   }
 </script>
 
-<div class="page leave-page">
+<div class="page leave-page" class:wide={view === "calendar"}>
   <div class="page-header">
     <h1>Leave and Availability</h1>
     <span class="muted">{rows.length} shown</span>
@@ -352,7 +352,8 @@
 {/if}
 
 <style>
-  .leave-page {
+  /* List view uses the default page width; only the calendar spans full width. */
+  .leave-page.wide {
     max-width: none;
   }
   .leave-toolbar {
