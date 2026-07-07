@@ -279,6 +279,28 @@ export interface TeleworkRecord {
   updatedAt: IsoTimestamp;
 }
 
+// Travel awareness (who is on travel, and the DTS paperwork state around it).
+export type TravelIptConcurrence = "pending" | "concurred" | "not_required";
+export type TravelDtsAuthStatus = "not_started" | "created" | "approved";
+
+export interface TravelRecord {
+  id: Id;
+  employeeId: Id;
+  destination: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  iptConcurrence: TravelIptConcurrence;
+  dtsAuthorizationStatus: TravelDtsAuthStatus;
+  dtsAuthorizationId?: string;
+  // DTS voucher is due five days after the traveler returns (see
+  // domain/rules/travel.ts). Stored so it can be overridden for special cases.
+  voucherDueDate?: IsoDate;
+  notes?: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived?: boolean;
+}
+
 export interface AwardRecord {
   id: Id;
   employeeId: Id;
@@ -451,6 +473,18 @@ export const MEETING_TYPES = ["Product team", "Project", "Staff", "Customer", "O
 export const LEAVE_TYPES = ["Annual", "Sick", "Comp Time", "Credit Hours", "Administrative", "Other", "Not specified"];
 
 export const TELEWORK_RECORD_TYPES = ["Agreement", "Routine request", "Situational request", "Renewal", "Modification", "Other"];
+
+export const TRAVEL_IPT_CONCURRENCE_OPTIONS: { value: TravelIptConcurrence; label: string }[] = [
+  { value: "pending", label: "Pending" },
+  { value: "concurred", label: "Concurred" },
+  { value: "not_required", label: "Not required" }
+];
+
+export const TRAVEL_DTS_AUTH_STATUS_OPTIONS: { value: TravelDtsAuthStatus; label: string }[] = [
+  { value: "not_started", label: "Not started" },
+  { value: "created", label: "Created" },
+  { value: "approved", label: "Approved" }
+];
 
 export const COMPUTER_ASSET_OPTIONS: { value: ComputerAsset; label: string }[] = [
   { value: "rdte", label: "RDT&E" },

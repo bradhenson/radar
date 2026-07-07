@@ -497,6 +497,36 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     });
   }
 
+  const travelDestinations = [
+    "San Diego, CA",
+    "Washington, DC",
+    "Huntsville, AL",
+    "Dayton, OH",
+    "Orlando, FL",
+    "Colorado Springs, CO",
+    "Norfolk, VA"
+  ];
+  for (let i = 0; i < 7; i++) {
+    const employee = employees[(i * 5 + 4) % employees.length]!;
+    const start = addDays(today, i * 6 - 8);
+    const end = addDays(start, 2 + (i % 3));
+    const iptConcurrence = (["concurred", "pending", "not_required"] as const)[i % 3]!;
+    const dtsAuthorizationStatus = (["approved", "created", "not_started"] as const)[i % 3]!;
+    c.travelRecords.push({
+      id: newId(),
+      employeeId: employee.id,
+      destination: travelDestinations[i % travelDestinations.length]!,
+      startDate: start,
+      endDate: end,
+      iptConcurrence,
+      dtsAuthorizationStatus,
+      dtsAuthorizationId: dtsAuthorizationStatus === "not_started" ? undefined : `A${(240000 + i * 137).toString()}`,
+      voucherDueDate: addDays(end, 5),
+      notes: i % 4 === 0 ? "Conference travel; coordinate coverage during the trip." : undefined,
+      ...stamp
+    });
+  }
+
   for (let i = 0; i < 8; i++) {
     const employee = employees[(i * 4 + 3) % employees.length]!;
     c.awardRecords.push({

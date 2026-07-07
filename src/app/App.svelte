@@ -19,6 +19,7 @@
   import TrainingPage from "../pages/TrainingPage.svelte";
   import LeavePage from "../pages/LeavePage.svelte";
   import TeleworkPage from "../pages/TeleworkPage.svelte";
+  import TravelPage from "../pages/TravelPage.svelte";
   import AwardsPage from "../pages/AwardsPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
@@ -54,6 +55,7 @@
     { page: "training", label: "Training", icon: "training" },
     { page: "leave", label: "Leave", icon: "leave" },
     { page: "telework", label: "Telework", icon: "telework" },
+    { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
     { page: "meetings", label: "Meetings", icon: "meetings", section: "Work" },
     { page: "projects", label: "Projects", icon: "projects" },
@@ -202,6 +204,8 @@
           <LeavePage />
         {:else if router.current.page === "telework"}
           <TeleworkPage />
+        {:else if router.current.page === "travel"}
+          <TravelPage />
         {:else if router.current.page === "awards"}
           <AwardsPage />
         {:else if router.current.page === "archive"}

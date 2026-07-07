@@ -68,6 +68,7 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employeeTrainingRecords: ["id", "employeeId", "trainingRequirementId", "status"],
   leaveRecords: ["id", "employeeId", "startDate", "endDate", "status"],
   teleworkRecords: ["id", "employeeId", "recordType", "status"],
+  travelRecords: ["id", "employeeId", "destination", "startDate", "endDate"],
   awardRecords: ["id", "employeeId", "title", "status"],
   employeeInteractions: ["id", "employeeId", "interactionDate", "interactionType"],
   employeeNotes: ["id", "employeeId", "noteText"],
@@ -87,6 +88,7 @@ const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employeeTrainingRecords: ["assignedDate", "dueDate", "completedDate", "expirationDate", "lastVerifiedDate"],
   leaveRecords: ["startDate", "endDate", "lastVerifiedDate"],
   teleworkRecords: ["requestDate", "effectiveDate", "expirationDate", "lastVerifiedDate"],
+  travelRecords: ["startDate", "endDate", "voucherDueDate"],
   awardRecords: ["accomplishmentPeriodStart", "accomplishmentPeriodEnd", "nominationDueDate", "submittedDate", "decisionDate"],
   meetingNotes: ["meetingDate"]
 };

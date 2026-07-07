@@ -15,6 +15,11 @@
   until hovered so lists aren't a wall of red. Labelled "Add …" actions remain text buttons.
 
 ### Added
+- New **Travel** section (under People) for tracking who is on travel: destination, travel dates,
+  IPT concurrence, DTS authorization status and ID, and the DTS voucher due date (which defaults to
+  5 days after the return date but can be overridden). Includes list and calendar views, add/edit/
+  delete, per-employee filtering, a "show past travel" toggle, voucher due-soon/overdue badges, and
+  CSV export. Travel records are removed with their employee like other people records.
 - Projects can now be deleted, from either the row Delete button or the Edit Project dialog. A
   confirmation dialog lists how many tasks, meeting notes, and performance inputs reference the
   project; those records are kept but unlinked from the project so nothing points at a project

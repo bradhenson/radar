@@ -24,6 +24,7 @@ import type {
   Task,
   TaskNote,
   TeleworkRecord,
+  TravelRecord,
   TrainingRequirement
 } from "../domain/models";
 
@@ -42,6 +43,7 @@ export interface CollectionTypes {
   employeeTrainingRecords: EmployeeTrainingRecord;
   leaveRecords: LeaveRecord;
   teleworkRecords: TeleworkRecord;
+  travelRecords: TravelRecord;
   awardRecords: AwardRecord;
   employeeInteractions: EmployeeInteraction;
   employeeNotes: EmployeeNote;
@@ -67,6 +69,7 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "employeeTrainingRecords",
   "leaveRecords",
   "teleworkRecords",
+  "travelRecords",
   "awardRecords",
   "employeeInteractions",
   "employeeNotes",

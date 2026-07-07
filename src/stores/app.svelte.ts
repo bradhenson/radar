@@ -24,6 +24,7 @@ import type {
   Task,
   TaskNote,
   TeleworkRecord,
+  TravelRecord,
   TrainingRequirement
 } from "../domain/models";
 import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeTaskStatus } from "../domain/models";
@@ -74,6 +75,7 @@ class AppStore {
   employeeTrainingRecords = $state<EmployeeTrainingRecord[]>([]);
   leaveRecords = $state<LeaveRecord[]>([]);
   teleworkRecords = $state<TeleworkRecord[]>([]);
+  travelRecords = $state<TravelRecord[]>([]);
   awardRecords = $state<AwardRecord[]>([]);
   employeeInteractions = $state<EmployeeInteraction[]>([]);
   employeeNotes = $state<EmployeeNote[]>([]);
@@ -288,6 +290,7 @@ class AppStore {
     this.employeeTrainingRecords = snapshot.collections.employeeTrainingRecords;
     this.leaveRecords = snapshot.collections.leaveRecords;
     this.teleworkRecords = snapshot.collections.teleworkRecords;
+    this.travelRecords = snapshot.collections.travelRecords;
     this.awardRecords = snapshot.collections.awardRecords;
     this.employeeInteractions = snapshot.collections.employeeInteractions;
     this.employeeNotes = snapshot.collections.employeeNotes;
@@ -792,6 +795,7 @@ class AppStore {
       trainingRecords: this.employeeTrainingRecords.filter((r) => r.employeeId === employeeId).length,
       leaveRecords: this.leaveRecords.filter((r) => r.employeeId === employeeId).length,
       teleworkRecords: this.teleworkRecords.filter((r) => r.employeeId === employeeId).length,
+      travelRecords: this.travelRecords.filter((r) => r.employeeId === employeeId).length,
       awardRecords: this.awardRecords.filter((r) => r.employeeId === employeeId).length,
       interactions: this.employeeInteractions.filter((r) => r.employeeId === employeeId).length,
       notes: this.employeeNotes.filter((r) => r.employeeId === employeeId).length,
@@ -819,6 +823,7 @@ class AppStore {
       const training = this.employeeTrainingRecords.filter((r) => r.employeeId === id);
       const leave = this.leaveRecords.filter((r) => r.employeeId === id);
       const telework = this.teleworkRecords.filter((r) => r.employeeId === id);
+      const travel = this.travelRecords.filter((r) => r.employeeId === id);
       const awards = this.awardRecords.filter((r) => r.employeeId === id);
       const interactions = this.employeeInteractions.filter((r) => r.employeeId === id);
       const notes = this.employeeNotes.filter((r) => r.employeeId === id);
@@ -827,6 +832,7 @@ class AppStore {
       for (const r of training) await this.store.delete("employeeTrainingRecords", r.id);
       for (const r of leave) await this.store.delete("leaveRecords", r.id);
       for (const r of telework) await this.store.delete("teleworkRecords", r.id);
+      for (const r of travel) await this.store.delete("travelRecords", r.id);
       for (const r of awards) await this.store.delete("awardRecords", r.id);
       for (const r of interactions) await this.store.delete("employeeInteractions", r.id);
       for (const r of notes) await this.store.delete("employeeNotes", r.id);
@@ -882,6 +888,7 @@ class AppStore {
       this.employeeTrainingRecords = this.employeeTrainingRecords.filter((r) => r.employeeId !== id);
       this.leaveRecords = this.leaveRecords.filter((r) => r.employeeId !== id);
       this.teleworkRecords = this.teleworkRecords.filter((r) => r.employeeId !== id);
+      this.travelRecords = this.travelRecords.filter((r) => r.employeeId !== id);
       this.employeeInteractions = this.employeeInteractions.filter((r) => r.employeeId !== id);
       this.employeeNotes = this.employeeNotes.filter((r) => r.employeeId !== id);
       this.awardRecords = this.awardRecords

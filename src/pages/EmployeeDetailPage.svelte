@@ -191,6 +191,7 @@
       [counts.trainingRecords, "training records"],
       [counts.leaveRecords, "leave records"],
       [counts.teleworkRecords, "telework records"],
+      [counts.travelRecords, "travel records"],
       [counts.awardRecords, "awards"],
       [counts.interactions, "check-ins"],
       [counts.notes, "notes"]
