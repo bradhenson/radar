@@ -272,7 +272,7 @@
             <td>
               <button
                 type="button"
-                class="link"
+                class="link cell-link"
                 onclick={(ev) => {
                   ev.stopPropagation();
                   router.go("employees", r.e.id);

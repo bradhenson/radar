@@ -62,6 +62,12 @@
     formOpen = false;
   }
 
+  function editFromRow(a: AwardRecord) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    openForm(a);
+  }
+
   function requestDelete(a: AwardRecord) {
     pendingDelete = a;
   }
@@ -98,16 +104,34 @@
       <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th><th></th></tr></thead>
       <tbody>
         {#each rows as a (a.id)}
-          <tr>
-            <td>{a.title}</td>
+          <!-- Row click is a mouse convenience; the title button is the keyboard path. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <tr class="row-clickable" onclick={() => editFromRow(a)}>
+            <td>
+              <button
+                type="button"
+                class="link cell-link"
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  openForm(a);
+                }}>{a.title}</button
+              >
+            </td>
             <td>{app.employeeName(a.employeeId)}</td>
             <td>{a.awardType ?? ""}</td>
             <td>{a.status}</td>
             <td>{formatDate(a.nominationDueDate)}</td>
             <td>
               <div class="row-actions">
-                <button type="button" onclick={() => openForm(a)}>Edit</button>
-                <button type="button" class="danger" onclick={() => requestDelete(a)}>Delete</button>
+                <button
+                  type="button"
+                  class="danger"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    requestDelete(a);
+                  }}>Delete</button
+                >
               </div>
             </td>
           </tr>
@@ -190,5 +214,8 @@
   }
   .delete-action {
     margin-right: auto;
+  }
+  .row-clickable {
+    cursor: pointer;
   }
 </style>

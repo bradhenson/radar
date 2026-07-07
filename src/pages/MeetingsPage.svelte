@@ -92,6 +92,12 @@
     app.toast("Meeting note deleted", "success");
   }
 
+  function openEdit(note: MeetingNote) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    editing = note;
+  }
+
   function createFollowUpTask(note: MeetingNote) {
     ui.openNewTask({
       title: `Follow up: ${note.title}`,
@@ -144,15 +150,22 @@
   {:else}
     <div class="note-list">
       {#each notes as note (note.id)}
-        <article class="card meeting-card">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <article class="card meeting-card" onclick={() => openEdit(note)}>
           <div class="meeting-meta">
-            <span>{formatDate(note.meetingDate)}</span>
+            <button
+              type="button"
+              class="link cell-link"
+              aria-label={`Edit meeting note "${note.title}"`}
+              onclick={(ev) => { ev.stopPropagation(); editing = note; }}>{formatDate(note.meetingDate)}</button
+            >
             <span class="badge">{note.meetingType}</span>
             {#if note.projectId}<span class="muted">{app.projectName(note.projectId)}</span>{/if}
             <span class="spacer" style="flex:1"></span>
-            <button type="button" onclick={() => (editing = note)}>Edit</button>
-            <button type="button" onclick={() => void archive(note)}>Archive</button>
-            <button type="button" class="danger" onclick={() => requestDelete(note)}>Delete</button>
+            <button type="button" onclick={(ev) => { ev.stopPropagation(); void archive(note); }}>Archive</button>
+            <button type="button" class="danger" onclick={(ev) => { ev.stopPropagation(); requestDelete(note); }}>Delete</button>
           </div>
 
           <h2 class="meeting-title">{note.title}</h2>
@@ -181,7 +194,7 @@
           <div class="meeting-footer">
             <span class="spacer" style="flex:1"></span>
             {#if note.actionItems}
-              <button type="button" onclick={() => createFollowUpTask(note)}>Create follow-up task</button>
+              <button type="button" onclick={(ev) => { ev.stopPropagation(); createFollowUpTask(note); }}>Create follow-up task</button>
             {/if}
           </div>
         </article>
@@ -217,6 +230,15 @@
   .meeting-card {
     display: grid;
     gap: .45rem;
+    cursor: pointer;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .meeting-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    box-shadow: var(--shadow-lg);
+  }
+  .meeting-card:focus-within {
+    border-color: var(--accent);
   }
   .meeting-meta,
   .meeting-footer {

@@ -90,6 +90,16 @@
       .filter((t) => t.projectId === projectId && !t.isArchived)
       .sort((a, b) => ((a.dueDate ?? "9999") < (b.dueDate ?? "9999") ? -1 : 1));
   }
+
+  function editFromRow(p: Project) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    openForm(p);
+  }
+
+  function toggleExpanded(id: string) {
+    expandedId = expandedId === id ? undefined : id;
+  }
 </script>
 
 <div class="page">
@@ -113,11 +123,32 @@
       </thead>
       <tbody>
         {#each rows as r (r.p.id)}
-          <tr>
+          <!-- Row click and the name open edit; the list icon expands related tasks. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <tr class="row-clickable" onclick={() => editFromRow(r.p)}>
             <td>
-              <button type="button" class="link" onclick={() => (expandedId = expandedId === r.p.id ? undefined : r.p.id)}>
-                {r.p.name}{r.p.shortName ? ` (${r.p.shortName})` : ""}
-              </button>
+              <span class="project-name">
+                <button
+                  type="button"
+                  class="disclosure"
+                  class:open={expandedId === r.p.id}
+                  aria-expanded={expandedId === r.p.id}
+                  aria-label={expandedId === r.p.id ? `Hide tasks for ${r.p.name}` : `Show tasks for ${r.p.name}`}
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    toggleExpanded(r.p.id);
+                  }}>☰</button
+                >
+                <button
+                  type="button"
+                  class="link cell-link"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    openForm(r.p);
+                  }}>{r.p.name}{r.p.shortName ? ` (${r.p.shortName})` : ""}</button
+                >
+              </span>
             </td>
             <td>{r.p.status.replace("_", " ")}</td>
             <td>{formatDate(r.p.startDate)}</td>
@@ -126,8 +157,13 @@
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
             <td style="white-space:nowrap">
-              <button type="button" onclick={() => ui.openNewTask({ projectId: r.p.id })}>Add task</button>
-              <button type="button" onclick={() => openForm(r.p)}>Edit</button>
+              <button
+                type="button"
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  ui.openNewTask({ projectId: r.p.id });
+                }}>Add task</button
+              >
             </td>
           </tr>
           {#if expandedId === r.p.id}
@@ -140,7 +176,7 @@
                   <ul style="margin:.3rem 0">
                     {#each projectTasks(r.p.id) as t (t.id)}
                       <li>
-                        <button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button>
+                        <button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button>
                         <span class="muted small">
                           {t.status.replace("_", " ")}{t.dueDate ? ` · due ${formatDate(t.dueDate)}` : ""}{t.employeeId ? ` · ${app.employeeName(t.employeeId)}` : ""}
                         </span>
@@ -156,6 +192,33 @@
     </table>
   {/if}
 </div>
+
+<style>
+  .row-clickable {
+    cursor: pointer;
+  }
+  .project-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+  }
+  .disclosure {
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-muted);
+    padding: 0.1rem 0.25rem;
+    min-height: 0;
+    min-width: 1.2rem;
+    font-size: 0.85rem;
+    line-height: 1;
+  }
+  .disclosure:hover,
+  .disclosure.open {
+    background: none;
+    color: var(--accent);
+  }
+</style>
 
 {#if formOpen}
   <Dialog title={editing ? "Edit Project" : "Add Project"} onclose={() => (formOpen = false)}>

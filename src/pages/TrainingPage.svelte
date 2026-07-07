@@ -120,6 +120,12 @@
     }
   }
 
+  function editReqFromRow(req: TrainingRequirement) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    openReqForm(req);
+  }
+
   function openReqForm(req?: TrainingRequirement) {
     editingReq = req;
     rName = req?.name ?? "";
@@ -295,8 +301,20 @@
       <thead><tr><th>Name</th><th>Due</th><th>Applies to</th><th>Progress</th><th></th></tr></thead>
       <tbody>
         {#each summaries as s (s.req.id)}
-          <tr class:selected-req={s.req.id === selectedReqId}>
-            <td>{s.req.name}</td>
+          <!-- Row click edits the requirement; the name button is the keyboard path. Track stays explicit. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+          <tr class="row-clickable" class:selected-req={s.req.id === selectedReqId} onclick={() => editReqFromRow(s.req)}>
+            <td>
+              <button
+                type="button"
+                class="link cell-link"
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  openReqForm(s.req);
+                }}>{s.req.name}</button
+              >
+            </td>
             <td>{scheduleText(s.req)}</td>
             <td>{scopeText(s.req)}</td>
             <td>
@@ -304,8 +322,13 @@
               {#if s.overdue > 0}<span class="badge overdue" style="margin-left:.4rem">{s.overdue} overdue</span>{/if}
             </td>
             <td style="white-space:nowrap">
-              <button type="button" onclick={() => openRoster(s.req.id)}>{s.req.id === selectedReqId ? "Close" : "Track"}</button>
-              <button type="button" onclick={() => openReqForm(s.req)}>Edit</button>
+              <button
+                type="button"
+                onclick={(ev) => {
+                  ev.stopPropagation();
+                  openRoster(s.req.id);
+                }}>{s.req.id === selectedReqId ? "Close" : "Track"}</button
+              >
             </td>
           </tr>
         {/each}
@@ -614,6 +637,7 @@
   .roster-head { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
   .roster-head h2 { margin: 0; }
   .selected-req td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
+  .row-clickable { cursor: pointer; }
   .employee-picker { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 0.8rem; }
   .employee-picker label { display: flex; align-items: center; gap: 0.35rem; font-weight: normal; }
 </style>

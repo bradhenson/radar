@@ -83,6 +83,9 @@
     animation: dialog-in .16s cubic-bezier(.16, 1, .3, 1);
   }
   .dialog.wide { max-width: 52rem; }
+  /* The container is focused programmatically as the focus-trap entry point;
+     its outline isn't a useful signal (controls inside keep their own). */
+  .dialog:focus { outline: none; }
   header {
     display: flex;
     align-items: center;

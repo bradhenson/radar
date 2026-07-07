@@ -216,6 +216,12 @@
     downloadText(backupFilename("RADAR_SituationalTelework", "csv"), csv, "text/csv");
   }
 
+  function editFromRow(t: TeleworkRecord) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    openForm(t);
+  }
+
   function requestDelete(t: TeleworkRecord) {
     pendingDelete = t;
   }
@@ -274,8 +280,20 @@
         </thead>
         <tbody>
           {#each rows as t (t.id)}
-            <tr>
-              <td>{app.employeeName(t.employeeId)}</td>
+            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <tr class="row-clickable" onclick={() => editFromRow(t)}>
+              <td>
+                <button
+                  type="button"
+                  class="link cell-link"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    openForm(t);
+                  }}>{app.employeeName(t.employeeId)}</button
+                >
+              </td>
               <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
               <td>{formatDate(t.requestDate)}</td>
               <td>{formatDate(t.effectiveDate)}</td>
@@ -283,8 +301,14 @@
               <td class="notes-cell">{t.notes ?? ""}</td>
               <td>
                 <div class="row-actions">
-                  <button type="button" onclick={() => openForm(t)}>Edit</button>
-                  <button type="button" class="danger" onclick={() => requestDelete(t)}>Delete</button>
+                  <button
+                    type="button"
+                    class="danger"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      requestDelete(t);
+                    }}>Delete</button
+                  >
                 </div>
               </td>
             </tr>
@@ -462,6 +486,9 @@
     justify-content: flex-end;
     gap: .5rem;
     flex-wrap: wrap;
+  }
+  .row-clickable {
+    cursor: pointer;
   }
   .calendar-view {
     min-width: 0;

@@ -177,6 +177,12 @@
     await app.putRecord("leaveRecords", { ...l, lastVerifiedDate: todayIso(), updatedAt: nowTimestamp() });
   }
 
+  function editFromRow(l: LeaveRecord) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    openForm(l);
+  }
+
   function requestDelete(l: LeaveRecord) {
     pendingDelete = l;
   }
@@ -221,8 +227,20 @@
         <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th><th>Warnings</th><th>Verified</th><th></th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
-            <tr>
-              <td>{app.employeeName(l.employeeId)}</td>
+            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <tr class="row-clickable" onclick={() => editFromRow(l)}>
+              <td>
+                <button
+                  type="button"
+                  class="link cell-link"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    openForm(l);
+                  }}>{app.employeeName(l.employeeId)}</button
+                >
+              </td>
               <td>{formatDate(l.startDate)}</td>
               <td>{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
@@ -232,12 +250,25 @@
               </td>
               <td>
                 {#if l.lastVerifiedDate}{formatDate(l.lastVerifiedDate)}
-                {:else}<button type="button" class="link" onclick={() => void markVerified(l)}>Mark verified</button>{/if}
+                {:else}<button
+                    type="button"
+                    class="link"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      void markVerified(l);
+                    }}>Mark verified</button
+                  >{/if}
               </td>
               <td>
                 <div class="row-actions">
-                  <button type="button" onclick={() => openForm(l)}>Edit</button>
-                  <button type="button" class="danger" onclick={() => requestDelete(l)}>Delete</button>
+                  <button
+                    type="button"
+                    class="danger"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      requestDelete(l);
+                    }}>Delete</button
+                  >
                 </div>
               </td>
             </tr>
@@ -410,6 +441,9 @@
   .row-actions {
     justify-content: flex-end;
     flex-wrap: wrap;
+  }
+  .row-clickable {
+    cursor: pointer;
   }
   .dialog-actions {
     justify-content: flex-end;

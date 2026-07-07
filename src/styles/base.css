@@ -253,6 +253,12 @@ button.link {
 }
 button.link:hover { text-decoration: underline; background: none; }
 
+/* Subtle row-title link: reads as text, reveals it's clickable on hover.
+   Used for the first cell (name/title) in data tables where the whole row
+   is already clickable. */
+button.link.cell-link { color: var(--text); }
+button.link.cell-link:hover { color: var(--accent); }
+
 button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 
 input, select, textarea {

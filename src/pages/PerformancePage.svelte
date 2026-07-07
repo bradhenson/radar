@@ -78,6 +78,12 @@
       updatedAt: new Date().toISOString()
     });
   }
+
+  function openEdit(p: (typeof inputs)[number]) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    ui.performanceFormInput = p;
+  }
 </script>
 
 <div class="page">
@@ -116,14 +122,24 @@
     {#each byEmployee as group (group.employeeId)}
       <h3 style="margin-top:1rem">{group.name} <span class="muted small">({group.list.length})</span></h3>
       {#each group.list as p (p.id)}
-        <div class="card" style="margin-bottom:.5rem">
+        <!-- svelte-ignore a11y_no_static_element_interactions -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <div class="card perf-card" style="margin-bottom:.5rem" onclick={() => openEdit(p)}>
           <div class="small muted" style="display:flex; gap:.6rem; align-items:center; flex-wrap:wrap">
-            <span>{formatDate(p.inputDate)}</span>
+            <button
+              type="button"
+              class="link"
+              aria-label={`Edit performance input from ${formatDate(p.inputDate)}`}
+              onclick={(ev) => {
+                ev.stopPropagation();
+                ui.performanceFormInput = p;
+              }}>{formatDate(p.inputDate)}</button
+            >
             {#if p.projectId}<span>· {app.projectName(p.projectId)}</span>{/if}
             {#if p.recognitionPotential}<span class="badge success">Recognition potential</span>{/if}
             <span class="spacer" style="flex:1"></span>
-            <button type="button" onclick={() => (ui.performanceFormInput = p)}>Edit</button>
-            <label style="margin:0; font-weight:400" class="small">
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <label style="margin:0; font-weight:400" class="small" onclick={(ev) => ev.stopPropagation()}>
               Status:
               <select value={p.inputStatus} onchange={(e) => void setStatus(p.id, (e.currentTarget as HTMLSelectElement).value)}>
                 {#each ["draft", "ready", "used_midyear", "used_annual", "archived"] as s (s)}
@@ -140,6 +156,20 @@
     {/each}
   {/if}
 </div>
+
+<style>
+  .perf-card {
+    cursor: pointer;
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+  }
+  .perf-card:hover {
+    border-color: color-mix(in srgb, var(--accent) 40%, var(--border));
+    box-shadow: var(--shadow-lg);
+  }
+  .perf-card:focus-within {
+    border-color: var(--accent);
+  }
+</style>
 
 {#if coverageOpen}
   <Dialog title="Performance Coverage" wide onclose={() => (coverageOpen = false)}>

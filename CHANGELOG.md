@@ -3,6 +3,17 @@
 ## Unreleased
 
 ### Changed
+- Performance inputs are now edited by clicking the card itself instead of a separate Edit
+  button. The date acts as the keyboard/screen-reader handle, the inline Status dropdown still
+  works without opening the editor, and selecting text to copy no longer triggers an edit.
+- The Leave, Situational Telework, Awards, Training requirements, and Projects lists now open the
+  editor when you click a row, replacing the per-row Edit button. The first cell (employee name,
+  award title, requirement, or project name) stays a focusable link as the keyboard/screen-reader
+  path; Delete, Track, Add task, and Mark-verified remain explicit buttons; and selecting text to
+  copy no longer triggers an edit. On Projects, a disclosure caret next to the name expands the
+  task list (previously the name itself toggled it).
+- Row-title links in data tables are now styled as ordinary text that reveals the accent color on
+  hover, rather than always-on blue links.
 - Employee directory refresh: summary tiles at the top (overdue tasks, training due, employees
   with no performance input in 30+ days, on leave now — all reflecting the current filters),
   sortable columns (Name, Competency, Open, Overdue, Training due, Last input; numeric columns
