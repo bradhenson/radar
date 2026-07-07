@@ -6,8 +6,9 @@
 - Leave list is simpler: the advisory "Warnings" column and the ERP "Verified" column (and the
   "Mark verified" action) are gone, and the Add/Edit Leave dialog no longer has a "Verified against
   ERP on" field. Existing verification data on records is preserved but no longer shown or edited.
-  The list table now sizes to its content instead of stretching edge to edge and spreading its
-  few columns apart; the calendar view still spans full width.
+  The Leave and Situational Telework list views now use the standard page width (matching the
+  Training and Awards tables) instead of stretching edge to edge; each page's calendar view still
+  spans full width.
 - Performance inputs are now edited by clicking the card itself instead of a separate Edit
   button. The date acts as the keyboard/screen-reader handle, the inline Status dropdown still
   works without opening the editor, and selecting text to copy no longer triggers an edit.

@@ -241,7 +241,7 @@
   }
 </script>
 
-<div class="page telework-page">
+<div class="page telework-page" class:wide={view === "calendar"}>
   <div class="page-header">
     <h1>Situational Telework</h1>
     <span class="muted">{rows.length} shown</span>
@@ -435,7 +435,9 @@
 {/if}
 
 <style>
-  .telework-page {
+  /* List view uses the default page width (matching Training/Awards); only the
+     calendar spans full width. */
+  .telework-page.wide {
     max-width: none;
   }
   .telework-toolbar {
