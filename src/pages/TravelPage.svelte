@@ -269,7 +269,7 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Employee</th><th>Destination</th><th>Start</th><th>End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th><th></th>
+            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th><th></th>
           </tr>
         </thead>
         <tbody>
@@ -292,8 +292,8 @@
                 {t.destination}
                 {#if t.notes}<div class="notes-line">{t.notes}</div>{/if}
               </td>
-              <td>{formatDate(t.startDate)}</td>
-              <td>{formatDate(t.endDate)}</td>
+              <td class="date-col">{formatDate(t.startDate)}</td>
+              <td class="date-col">{formatDate(t.endDate)}</td>
               <td><span class="badge {iptBadgeClass(t.iptConcurrence)}">{iptLabel(t.iptConcurrence)}</span></td>
               <td>
                 <span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span>
@@ -500,6 +500,10 @@
   .view-toggle button.active {
     background: var(--accent-soft);
     color: var(--accent);
+  }
+  /* Keep the full date on one line so Start/End don't wrap. */
+  .date-col {
+    white-space: nowrap;
   }
   .notes-line {
     color: var(--text-muted);
