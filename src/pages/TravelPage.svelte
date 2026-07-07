@@ -606,9 +606,6 @@
   .calendar-day.outside .day-number {
     opacity: .55;
   }
-  .calendar-day.today {
-    box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--accent) 45%, transparent);
-  }
   .day-head {
     display: flex;
     align-items: center;
@@ -621,7 +618,14 @@
     font-size: .8rem;
   }
   .today-number {
-    color: var(--accent);
+    display: inline-grid;
+    place-items: center;
+    min-width: 1.55rem;
+    height: 1.55rem;
+    padding: 0 .3rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: #fff;
   }
   .day-add {
     min-width: 1.45rem;
