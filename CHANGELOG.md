@@ -9,6 +9,10 @@
   the far left consistently, matching the Awards dialog.
 
 ### Changed
+- Browser storage is now treated more explicitly as RADAR's working copy, not the durable copy:
+  backup reminders default to daily after changed records (or 10 changed records), legacy default
+  settings migrate to that posture, and the backup attention item stays quiet when nothing has
+  changed since the last export.
 - Meeting notes now auto-save when you dismiss the dialog (click outside it, press Escape, or use
   the ✕) instead of discarding your edits, as long as a title is present and something changed. If
   the title is still empty the dialog stays open with the "Title is required" message so nothing is
@@ -19,6 +23,13 @@
   until hovered so lists aren't a wall of red. Labelled "Add …" actions remain text buttons.
 
 ### Added
+- A compact top-bar **Export JSON** button now sits beside the save-status chip, so full backups
+  can be exported without opening Settings.
+- The app shell now shows a recovery banner when no RADAR records are found in the browser, with a
+  direct path to Settings -> Import backup for cases where managed browser storage was cleared.
+- Settings now reports browser persistent-storage status, storage estimate availability, and offers
+  a "Request persistent storage" action when the browser exposes that API. The page also makes clear
+  that enterprise cleanup or profile policy can still remove browser data.
 - New **Travel** section (under People) for tracking who is on travel: destination, travel dates,
   IPT concurrence, DTS authorization status and ID, and the DTS voucher due date (which defaults to
   5 days after the return date but can be overridden). Includes list and calendar views, add/edit/

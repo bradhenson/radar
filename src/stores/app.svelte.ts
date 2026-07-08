@@ -27,7 +27,7 @@ import type {
   TravelRecord,
   TrainingRequirement
 } from "../domain/models";
-import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeTaskStatus } from "../domain/models";
+import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeTaskStatus } from "../domain/models";
 import type { CollectionName, CollectionTypes, DataStore, DatabaseSnapshot, StoreMeta } from "../data/DataStore";
 import { COLLECTION_NAMES } from "../data/DataStore";
 import { IndexedDbDataStore } from "../data/IndexedDbDataStore";
@@ -56,8 +56,17 @@ export interface Toast {
   undo?: () => void;
 }
 
+export interface StoragePersistenceStatus {
+  supported: boolean;
+  persistAvailable: boolean;
+  estimateAvailable: boolean;
+  persisted?: boolean;
+  usageBytes?: number;
+  quotaBytes?: number;
+  error?: string;
+}
+
 const MUTATING_ACTIVITY = new Set(["created", "updated", "status_changed", "completed", "reopened", "archived", "restored", "deleted"]);
-const LEGACY_DEFAULT_APPLICATION_NAMES = new Set(["Supervisor Assistant"]);
 
 class AppStore {
   // --- reactive entity state ------------------------------------------------
@@ -87,6 +96,11 @@ class AppStore {
   meta = $state<StoreMeta>({ databaseId: "", changesSinceBackup: 0 });
   saveStatus = $state<SaveStatus>("saved");
   storageKind = $state<"indexeddb" | "memory" | "unknown">("unknown");
+  storagePersistence = $state<StoragePersistenceStatus>({
+    supported: false,
+    persistAvailable: false,
+    estimateAvailable: false
+  });
   initialized = $state(false);
   initError = $state<string | undefined>(undefined);
   today = $state(todayIso());
@@ -115,6 +129,26 @@ class AppStore {
   );
 
   activeEmployees = $derived(this.employees.filter((e) => e.activeStatus === "active" && !e.isArchived));
+  hasOperatorData = $derived(
+    this.competencies.length > 0 ||
+      this.employees.length > 0 ||
+      this.projects.length > 0 ||
+      this.tasks.length > 0 ||
+      this.taskNotes.length > 0 ||
+      this.checklistItems.length > 0 ||
+      this.performanceElements.length > 0 ||
+      this.evaluationCycles.length > 0 ||
+      this.performanceInputs.length > 0 ||
+      this.trainingRequirements.length > 0 ||
+      this.employeeTrainingRecords.length > 0 ||
+      this.leaveRecords.length > 0 ||
+      this.teleworkRecords.length > 0 ||
+      this.travelRecords.length > 0 ||
+      this.awardRecords.length > 0 ||
+      this.employeeInteractions.length > 0 ||
+      this.employeeNotes.length > 0 ||
+      this.meetingNotes.length > 0
+  );
   competencyList = $derived(
     [...this.competencies].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.id.localeCompare(b.id))
   );
@@ -240,6 +274,7 @@ class AppStore {
         this.storageKind = "memory";
       }
       await this.loadAll();
+      await this.refreshStoragePersistence();
       this.initialized = true;
     } catch (e) {
       this.initError = e instanceof Error ? e.message : String(e);
@@ -259,20 +294,72 @@ class AppStore {
     this.applySnapshotToState(snapshot);
     this.settings = this.migrateSettings(settings ?? { ...DEFAULT_SETTINGS });
     this.meta = meta;
-    if (settings && settings.applicationName !== this.settings.applicationName) {
+    if (!settings || JSON.stringify(settings) !== JSON.stringify(this.settings)) {
       await this.store.saveSettings(this.plainRecord(this.settings));
     }
     await this.ensureBoardColumns();
     await this.migrateTaskStatuses();
   }
 
-  private migrateSettings(settings: AppSettings): AppSettings {
-    // Fill in keys added after the data was first saved (e.g. colorTheme).
-    const merged = { ...DEFAULT_SETTINGS, ...settings };
-    if (LEGACY_DEFAULT_APPLICATION_NAMES.has(merged.applicationName)) {
-      merged.applicationName = DEFAULT_SETTINGS.applicationName;
+  private migrateSettings(settings: unknown): AppSettings {
+    return normalizeAppSettings(settings);
+  }
+
+  private async refreshStoragePersistence(): Promise<void> {
+    const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
+    if (!storage) {
+      this.storagePersistence = {
+        supported: false,
+        persistAvailable: false,
+        estimateAvailable: false
+      };
+      return;
     }
-    return merged;
+
+    try {
+      const persistAvailable = typeof storage.persist === "function";
+      const estimateAvailable = typeof storage.estimate === "function";
+      const persisted =
+        typeof storage.persisted === "function" ? await storage.persisted() : undefined;
+      const estimate = estimateAvailable ? await storage.estimate() : {};
+      this.storagePersistence = {
+        supported: true,
+        persistAvailable,
+        estimateAvailable,
+        persisted,
+        usageBytes: estimate.usage,
+        quotaBytes: estimate.quota
+      };
+    } catch (e) {
+      this.storagePersistence = {
+        supported: true,
+        persistAvailable: typeof storage.persist === "function",
+        estimateAvailable: typeof storage.estimate === "function",
+        error: e instanceof Error ? e.message : String(e)
+      };
+    }
+  }
+
+  async requestPersistentStorage(): Promise<void> {
+    const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
+    if (!storage || typeof storage.persist !== "function") {
+      await this.refreshStoragePersistence();
+      this.toast("This browser does not expose persistent storage requests", "info");
+      return;
+    }
+
+    try {
+      const granted = await storage.persist();
+      await this.refreshStoragePersistence();
+      if (granted) {
+        this.toast("Persistent browser storage granted", "success");
+      } else {
+        this.toast("Persistent browser storage was not granted by this browser", "info");
+      }
+    } catch (e) {
+      await this.refreshStoragePersistence();
+      this.toast(`Persistent storage request failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
   }
 
   private applySnapshotToState(snapshot: DatabaseSnapshot): void {

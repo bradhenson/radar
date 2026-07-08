@@ -129,4 +129,33 @@ describe("backup validation rejects bad input", () => {
     expect(settings.userDisplayName).toBe("Sample Supervisor");
     expect("evil" in settings).toBe(false);
   });
+
+  it("migrates legacy default backup reminder settings", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.data.settings = {
+      ...pkg.data.settings,
+      schemaVersion: 1,
+      backupReminderDays: 7,
+      backupChangeThreshold: 50
+    };
+    const r = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(r.valid).toBe(true);
+    expect(r.package!.data.settings.schemaVersion).toBe(2);
+    expect(r.package!.data.settings.backupReminderDays).toBe(1);
+    expect(r.package!.data.settings.backupChangeThreshold).toBe(10);
+  });
+
+  it("keeps customized legacy backup reminder settings", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.data.settings = {
+      ...pkg.data.settings,
+      schemaVersion: 1,
+      backupReminderDays: 3,
+      backupChangeThreshold: 25
+    };
+    const r = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(r.valid).toBe(true);
+    expect(r.package!.data.settings.backupReminderDays).toBe(3);
+    expect(r.package!.data.settings.backupChangeThreshold).toBe(25);
+  });
 });

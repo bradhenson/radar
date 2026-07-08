@@ -24,6 +24,7 @@
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
   import { formatTimestamp } from "../utils/dates";
+  import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
 
   $effect(() => {
@@ -72,6 +73,16 @@
 
   function toggleTheme() {
     void app.saveSettings({ ...app.settings, theme: isDark ? "light" : "dark" });
+  }
+
+  async function exportBackup() {
+    try {
+      const pkg = await app.buildBackup();
+      downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
+      app.toast("Backup exported", "success");
+    } catch (e) {
+      app.toast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
   }
 
   let detailTask = $derived(ui.detailTaskId ? app.tasks.find((t) => t.id === ui.detailTaskId) : undefined);
@@ -124,7 +135,7 @@
   }
 
   let backupAgeText = $derived(
-    app.meta.lastBackupAt ? `Last backup ${formatTimestamp(app.meta.lastBackupAt)}` : "No backup yet"
+    app.meta.lastBackupAt ? `Last backup ${formatTimestamp(app.meta.lastBackupAt)}` : app.hasOperatorData ? "No backup yet" : "No local records"
   );
 </script>
 
@@ -159,6 +170,16 @@
         <span class="dot" aria-hidden="true"></span>
         {#if app.saveStatus === "saving"}Saving…{:else if app.saveStatus === "error"}Save failed{:else}Saved{/if}
       </span>
+      <button
+        type="button"
+        class="topbar-backup"
+        onclick={() => void exportBackup()}
+        disabled={app.saveStatus === "saving"}
+        title="Export full JSON backup"
+      >
+        <Icon name="download" size={15} />
+        <span>Export JSON</span>
+      </button>
       {#if app.storageKind === "memory"}
         <span class="badge overdue" title="IndexedDB is unavailable. Data will be lost when this tab closes unless you export a backup.">
           Memory-only storage
@@ -182,6 +203,15 @@
       </nav>
 
       <main>
+        {#if !app.hasOperatorData}
+          <section class="recovery-banner" role="status">
+            <div>
+              <strong>No RADAR records found in this browser.</strong>
+              <span>If you expected existing data, browser storage may have been cleared. Import your latest JSON backup before creating new records.</span>
+            </div>
+            <button type="button" class="primary" onclick={() => router.go("settings")}>Restore backup</button>
+          </section>
+        {/if}
         {#if router.current.page === "today"}
           <TodayPage />
         {:else if router.current.page === "board"}
@@ -356,6 +386,16 @@
   .save-status[data-status="error"] { color: var(--danger); border-color: var(--danger); }
   .save-status[data-status="error"] .dot { background: var(--danger); }
 
+  .topbar-backup {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    min-height: 1.85rem;
+    padding: .22rem .65rem;
+    font-size: .78rem;
+    white-space: nowrap;
+  }
+
   .icon-btn {
     display: inline-grid;
     place-items: center;
@@ -427,12 +467,39 @@
 
   main { flex: 1; min-width: 0; overflow-x: auto; }
 
+  .recovery-banner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin: 1rem 1.6rem 0;
+    padding: .8rem 1rem;
+    border: 1px solid color-mix(in srgb, var(--warning) 35%, var(--border));
+    border-radius: var(--radius);
+    background: var(--duesoon-bg);
+    color: var(--duesoon-fg);
+    box-shadow: var(--shadow-xs);
+  }
+  .recovery-banner div {
+    display: grid;
+    gap: .15rem;
+  }
+  .recovery-banner span {
+    font-size: .84rem;
+  }
+
   @media (max-width: 900px) {
     .sidenav { width: 10.5rem; }
   }
   @media (max-width: 700px) {
     .topbar { flex-wrap: wrap; }
     .brand { flex: 1 1 100%; }
+    .topbar-backup span { display: none; }
+    .topbar-backup {
+      width: 2.1rem;
+      padding: 0;
+      justify-content: center;
+    }
     .body { flex-direction: column; }
     .sidenav {
       display: flex;
@@ -448,5 +515,10 @@
     }
     .sidenav .section, .sidenav-footer { display: none; }
     .sidenav a { flex: 0 0 auto; margin: 0; white-space: nowrap; }
+    .recovery-banner {
+      align-items: flex-start;
+      flex-direction: column;
+      margin: .75rem .9rem 0;
+    }
   }
 </style>

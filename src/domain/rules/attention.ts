@@ -469,11 +469,11 @@ export function backupAttention(
   }
 
   const age = daysSinceTimestamp(ctx.lastBackupAt, ctx.today);
-  if (age >= settings.backupReminderDays) {
+  if (ctx.changesSinceBackup > 0 && age >= settings.backupReminderDays) {
     items.push({
       ...base,
       reasonCode: "backup_overdue",
-      reasonText: `Last backup was ${age} days ago`,
+      reasonText: `Last backup was ${age} days ago with ${ctx.changesSinceBackup} unsaved change${ctx.changesSinceBackup === 1 ? "" : "s"}`,
       severity: "medium",
       sortScore: SEVERITY_SCORE.medium + Math.min(age, 60) * 3
     });

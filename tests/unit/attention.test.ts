@@ -317,11 +317,14 @@ describe("backup attention rules", () => {
     expect(items[0]?.reasonCode).toBe("backup_never");
   });
   it("flags old backups", () => {
-    const items = backupAttention(baseCtx({ lastBackupAt: "2026-06-01T00:00:00.000Z", changesSinceBackup: 0 }));
+    const items = backupAttention(baseCtx({ lastBackupAt: "2026-06-01T00:00:00.000Z", changesSinceBackup: 1 }));
     expect(items[0]?.reasonCode).toBe("backup_overdue");
   });
+  it("stays quiet when the backup is old but nothing changed", () => {
+    expect(backupAttention(baseCtx({ lastBackupAt: "2026-06-01T00:00:00.000Z", changesSinceBackup: 0 }))).toHaveLength(0);
+  });
   it("flags change-count threshold", () => {
-    const items = backupAttention(baseCtx({ lastBackupAt: "2026-07-03T00:00:00.000Z", changesSinceBackup: 51 }));
+    const items = backupAttention(baseCtx({ lastBackupAt: "2026-07-04T12:00:00.000Z", changesSinceBackup: 10 }));
     expect(items[0]?.reasonCode).toBe("backup_change_threshold");
   });
 });

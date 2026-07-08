@@ -2,7 +2,7 @@
 // All imported data is untrusted: validated structurally before use,
 // and always rendered as text by the UI.
 
-import { DEFAULT_SETTINGS, type AppSettings } from "../domain/models";
+import { DEFAULT_SETTINGS, normalizeAppSettings, type AppSettings } from "../domain/models";
 import { isValidIsoDate } from "../utils/dates";
 import { COLLECTION_NAMES, emptyCollections, type CollectionName, type DatabaseSnapshot } from "./DataStore";
 
@@ -205,7 +205,7 @@ export function parseAndValidateBackup(jsonText: string): BackupValidationResult
 
   if (result.errors.length > 0) return result;
 
-  const settings = normalizeSettings(data.settings);
+  const settings = normalizeAppSettings(data.settings);
   data.settings = settings;
 
   result.valid = true;
@@ -214,21 +214,6 @@ export function parseAndValidateBackup(jsonText: string): BackupValidationResult
   result.applicationVersion = typeof pkg.applicationVersion === "string" ? pkg.applicationVersion : undefined;
   result.databaseId = typeof pkg.databaseId === "string" ? pkg.databaseId : undefined;
   return result;
-}
-
-/** Merge imported settings over defaults, keeping only known keys with correct types. */
-function normalizeSettings(raw: unknown): AppSettings {
-  const out: AppSettings = { ...DEFAULT_SETTINGS };
-  if (typeof raw !== "object" || raw === null) return out;
-  const src = raw as Record<string, unknown>;
-  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof AppSettings)[]) {
-    const v = src[key];
-    if (v !== undefined && typeof v === typeof DEFAULT_SETTINGS[key]) {
-      (out as unknown as Record<string, unknown>)[key] = v;
-    }
-  }
-  if (typeof src.userDisplayName === "string") out.userDisplayName = src.userDisplayName;
-  return out;
 }
 
 /** Convert a validated backup package into a database snapshot for replaceAll. */

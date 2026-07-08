@@ -398,6 +398,8 @@ export interface AppSettings {
 
 export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
 
+const LEGACY_DEFAULT_APPLICATION_NAMES = new Set(["Supervisor Assistant"]);
+
 /** Selectable accent palettes. Swatches are the light/dark accent colors (for pickers). */
 export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; swatchDark: string }[] = [
   { value: "default", label: "Default", swatch: "#3661e4", swatchDark: "#4daafc" },
@@ -409,7 +411,7 @@ export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; s
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
@@ -417,13 +419,45 @@ export const DEFAULT_SETTINGS: AppSettings = {
   performanceInputReminderDays: 90,
   checkInReminderDays: 30,
   completedVisibleDays: 7,
-  backupReminderDays: 7,
-  backupChangeThreshold: 50,
+  backupReminderDays: 1,
+  backupChangeThreshold: 10,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
   theme: "system",
   colorTheme: "default"
 };
+
+/** Normalize persisted/imported settings and apply schema migrations. */
+export function normalizeAppSettings(raw: unknown): AppSettings {
+  const out: AppSettings = { ...DEFAULT_SETTINGS };
+  if (typeof raw !== "object" || raw === null) return out;
+
+  const src = raw as Record<string, unknown>;
+  const priorSchema = typeof src.schemaVersion === "number" ? src.schemaVersion : 1;
+  for (const key of Object.keys(DEFAULT_SETTINGS) as (keyof AppSettings)[]) {
+    const v = src[key];
+    if (v !== undefined && typeof v === typeof DEFAULT_SETTINGS[key]) {
+      (out as unknown as Record<string, unknown>)[key] = v;
+    }
+  }
+  if (typeof src.userDisplayName === "string") out.userDisplayName = src.userDisplayName;
+
+  if (LEGACY_DEFAULT_APPLICATION_NAMES.has(out.applicationName)) {
+    out.applicationName = DEFAULT_SETTINGS.applicationName;
+  }
+
+  if (priorSchema < 2) {
+    if (src.backupReminderDays === undefined || src.backupReminderDays === 7) {
+      out.backupReminderDays = DEFAULT_SETTINGS.backupReminderDays;
+    }
+    if (src.backupChangeThreshold === undefined || src.backupChangeThreshold === 50) {
+      out.backupChangeThreshold = DEFAULT_SETTINGS.backupChangeThreshold;
+    }
+  }
+
+  out.schemaVersion = DEFAULT_SETTINGS.schemaVersion;
+  return out;
+}
 
 export const TASK_STATUSES: { value: TaskStatus; label: string }[] = [
   { value: "open", label: "Open" },

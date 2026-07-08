@@ -171,6 +171,28 @@
     };
   });
   let healthIssues = $derived(Object.values(health).reduce((a, b) => a + b, 0));
+
+  function formatBytes(value: number | undefined): string {
+    if (value === undefined) return "unknown";
+    if (value < 1024) return `${value} B`;
+    if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+    return `${Math.round(value / (1024 * 1024))} MB`;
+  }
+
+  let persistenceLabel = $derived.by(() => {
+    const status = app.storagePersistence;
+    if (!status.supported) return "Storage Manager API unavailable";
+    if (status.error) return `Unknown (${status.error})`;
+    if (status.persisted === true) return "persistent storage granted";
+    if (status.persisted === false) return "best-effort storage";
+    return "unknown";
+  });
+
+  let storageEstimate = $derived.by(() => {
+    const status = app.storagePersistence;
+    if (!status.estimateAvailable) return "storage estimate unavailable";
+    return `${formatBytes(status.usageBytes)} used of ${formatBytes(status.quotaBytes)} available`;
+  });
 </script>
 
 <div class="page">
@@ -180,17 +202,28 @@
     <h2>Backup and restore</h2>
     <p class="small muted">
       Browser storage can be cleared by policy or profile changes. Exported JSON backups are the canonical copy of
-      your data — export regularly and store the file in an approved location.
+      your data. Export at the end of any day when records changed and store the file in an approved location.
     </p>
     <p>
       <strong>Storage:</strong>
-      {app.storageKind === "indexeddb" ? "IndexedDB (persistent browser storage)" : "In-memory only — data will NOT survive closing this tab"}
+      {app.storageKind === "indexeddb" ? "IndexedDB (browser working storage)" : "In-memory only - data will NOT survive closing this tab"}
       · <strong>Last backup:</strong> {app.meta.lastBackupAt ? formatTimestamp(app.meta.lastBackupAt) : "never"}
       · <strong>Changes since backup:</strong> {app.meta.changesSinceBackup}
     </p>
+    <p class="small muted">
+      <strong>Browser persistence:</strong> {persistenceLabel}. {storageEstimate}. Persistent storage can reduce normal
+      browser eviction, but enterprise cleanup or profile policy can still remove site data.
+    </p>
     <div style="display:flex; gap:.5rem; flex-wrap:wrap">
       <button type="button" class="primary" onclick={() => void exportBackup()}>Export backup (JSON)</button>
-      <button type="button" onclick={() => fileInput?.click()}>Import backup…</button>
+      <button type="button" onclick={() => fileInput?.click()}>Import backup...</button>
+      <button
+        type="button"
+        onclick={() => void app.requestPersistentStorage()}
+        disabled={!app.storagePersistence.persistAvailable || app.storagePersistence.persisted === true}
+      >
+        {app.storagePersistence.persisted === true ? "Persistent storage granted" : "Request persistent storage"}
+      </button>
       <input type="file" accept=".json,application/json" style="display:none" bind:this={fileInput} onchange={onImportFile} />
     </div>
   </section>
@@ -214,7 +247,7 @@
         <input type="number" min="1" value={app.settings.leaveLookaheadDays} onchange={numberInput("leaveLookaheadDays")} /></label>
       <label>Completed cards visible (days)
         <input type="number" min="0" value={app.settings.completedVisibleDays} onchange={numberInput("completedVisibleDays")} /></label>
-      <label>Backup reminder (days)
+      <label>Backup reminder after changes (days)
         <input type="number" min="1" value={app.settings.backupReminderDays} onchange={numberInput("backupReminderDays")} /></label>
       <label>Backup change threshold
         <input type="number" min="1" value={app.settings.backupChangeThreshold} onchange={numberInput("backupChangeThreshold")} /></label>
