@@ -2,6 +2,7 @@
   // Travel awareness: who is on travel, where, when, and the DTS paperwork
   // state around each trip (IPT concurrence, authorization, voucher due).
   import { app } from "../stores/app.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -14,13 +15,12 @@
     type TravelRecord
   } from "../domain/models";
   import { travelVoucherDueDate } from "../domain/rules/travel";
-  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
+  import { mergeTravelEdit } from "../domain/rules/editMerge";
+  import { monthGrid, monthOf } from "../domain/rules/calendar";
+  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
-
-  const CALENDAR_WEEK_COUNT = 5;
-  const CALENDAR_DAY_COUNT = CALENDAR_WEEK_COUNT * 7;
 
   let view = $state<"list" | "calendar">("list");
   let showPast = $state(false);
@@ -43,6 +43,17 @@
   let voucherManual = $state(false);
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<TravelRecord | undefined>(undefined);
+
+  // Deep link: #/travel/{recordId} opens the trip's edit dialog (Today page
+  // attention items and calendar chips land on the actual record).
+  $effect(() => {
+    const id = router.current.param;
+    if (router.current.page !== "travel" || !id) return;
+    const record = app.travelRecords.find((t) => t.id === id);
+    if (!record) return;
+    openForm(record);
+    router.go("travel");
+  });
 
   // Auto-fill the voucher due date (return + 5 days) until the user overrides it.
   $effect(() => {
@@ -79,6 +90,13 @@
     return "";
   }
 
+  // Snapshot of the values the form opened with, for the unsaved-changes
+  // guard. The auto-filled voucher date only counts once the user touches it.
+  let openedSnapshot = $state("");
+  function formSnapshot(): string {
+    return JSON.stringify([fEmployee, fDestination, fStart, fEnd, fIpt, fDtsStatus, fDtsId, voucherManual ? fVoucher : "", fNotes]);
+  }
+
   function openForm(t?: TravelRecord, defaults: Partial<Pick<TravelRecord, "employeeId" | "startDate" | "endDate">> = {}) {
     editing = t;
     fEmployee = t?.employeeId ?? defaults.employeeId ?? "";
@@ -92,6 +110,7 @@
     fNotes = t?.notes ?? "";
     voucherManual = Boolean(t?.voucherDueDate);
     fError = "";
+    openedSnapshot = formSnapshot();
     formOpen = true;
   }
 
@@ -131,21 +150,22 @@
       fError = "Voucher due date must be valid.";
       return;
     }
-    const now = nowTimestamp();
-    const record: TravelRecord = {
-      id: editing?.id ?? newId(),
-      employeeId: fEmployee,
-      destination: fDestination.trim(),
-      startDate: fStart,
-      endDate: fEnd,
-      iptConcurrence: fIpt,
-      dtsAuthorizationStatus: fDtsStatus,
-      dtsAuthorizationId: fDtsId.trim() || undefined,
-      voucherDueDate: fVoucher || travelVoucherDueDate(fEnd),
-      notes: fNotes.trim() || undefined,
-      createdAt: editing?.createdAt ?? now,
-      updatedAt: now
-    };
+    // Merge over the existing record so unexposed fields (archive flag) survive.
+    const record: TravelRecord = mergeTravelEdit(
+      editing,
+      {
+        employeeId: fEmployee,
+        destination: fDestination,
+        startDate: fStart,
+        endDate: fEnd,
+        iptConcurrence: fIpt,
+        dtsAuthorizationStatus: fDtsStatus,
+        dtsAuthorizationId: fDtsId,
+        voucherDueDate: fVoucher || travelVoucherDueDate(fEnd),
+        notes: fNotes
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
     await app.putRecord("travelRecords", record, {
       actionType: editing ? "updated" : "created",
       summary: `${editing ? "Updated" : "Added"} travel for ${app.employeeName(fEmployee)} to ${record.destination} (${fStart} to ${fEnd})`
@@ -165,28 +185,21 @@
   );
 
   let calendarTitle = $derived(monthLabel(calendarMonth));
-  let calendarDays = $derived.by(() => {
-    const nextMonth = addMonths(calendarMonth, 1);
-    const gridStart = addDays(calendarMonth, -weekday(calendarMonth));
-    return Array.from({ length: CALENDAR_DAY_COUNT }, (_, i) => {
-      const date = addDays(gridStart, i);
-      return {
-        date,
-        day: Number(date.slice(8, 10)),
-        inMonth: date >= calendarMonth && date < nextMonth,
-        isToday: date === app.today,
-        events: rows.filter((t) => t.startDate <= date && date <= t.endDate)
-      };
-    });
+  // Shared month grid (domain/rules/calendar.ts) sizes itself to the month, so
+  // six-row months like August 2026 keep all of their days.
+  let calendarWeeks = $derived.by(() => {
+    const { year, month } = monthOf(calendarMonth);
+    return monthGrid(year, month).map((week) =>
+      week.map((cell) => ({
+        date: cell.date,
+        day: Number(cell.date.slice(8, 10)),
+        inMonth: cell.inMonth,
+        isToday: cell.date === app.today,
+        events: rows.filter((t) => t.startDate <= cell.date && cell.date <= t.endDate)
+      }))
+    );
   });
-  let calendarWeeks = $derived.by(() =>
-    Array.from({ length: CALENDAR_WEEK_COUNT }, (_, i) => calendarDays.slice(i * 7, i * 7 + 7))
-  );
 
-  function weekday(date: string): number {
-    const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-    return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
-  }
   function monthLabel(date: string): string {
     const [y, m] = date.split("-").map(Number) as [number, number];
     const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -387,7 +400,11 @@
 </div>
 
 {#if formOpen}
-  <Dialog title={editing ? "Edit Travel" : "Add Travel"} onclose={() => (formOpen = false)}>
+  <Dialog
+    title={editing ? "Edit Travel" : "Add Travel"}
+    onclose={() => (formOpen = false)}
+    unsavedGuard={() => formSnapshot() !== openedSnapshot}
+  >
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -401,7 +418,7 @@
       </select>
       <label for="tv-dest">Destination <span class="req">*</span></label>
       <input id="tv-dest" type="text" bind:value={fDestination} maxlength="200" placeholder="City, ST" style="width:100%" />
-      {#if fError}<div class="field-error">{fError}</div>{/if}
+      {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div class="form-grid">
         <div>
           <label for="tv-start">Start <span class="req">*</span></label>

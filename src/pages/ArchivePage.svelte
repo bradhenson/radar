@@ -70,6 +70,7 @@
       [counts.trainingRecords, "training records"],
       [counts.leaveRecords, "leave records"],
       [counts.teleworkRecords, "telework records"],
+      [counts.travelRecords, "travel records"],
       [counts.awardRecords, "awards"],
       [counts.interactions, "check-ins"],
       [counts.notes, "notes"]
@@ -80,6 +81,13 @@
     if (counts.linkedTasks > 0) {
       message += ` ${counts.linkedTasks} task(s) will be kept but no longer linked to an employee.`;
     }
+    const unlinked: [number, string][] = [
+      [counts.meetingAttendances, "meeting attendee link(s)"],
+      [counts.projectLeads, "project lead assignment(s)"],
+      [counts.trainingAssignments, "training assignment(s)"]
+    ];
+    const unlinkedParts = unlinked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    if (unlinkedParts.length) message += ` The following will be kept but unlinked: ${unlinkedParts.join(", ")}.`;
     message += " This cannot be undone.";
     return message;
   }

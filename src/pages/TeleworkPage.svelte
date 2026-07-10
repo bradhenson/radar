@@ -1,23 +1,35 @@
 <script lang="ts">
   // Situational telework request tracking (plan 12.9, 20).
   import { app } from "../stores/app.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
-  import type { TeleworkRecord, TeleworkStatus } from "../domain/models";
-  import { addDays, addMonths, daysBetween, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
+  import { TELEWORK_RECORD_TYPES, type TeleworkRecord, type TeleworkStatus } from "../domain/models";
+  import { mergeTeleworkEdit } from "../domain/rules/editMerge";
+  import { monthGrid, monthOf } from "../domain/rules/calendar";
+  import { addMonths, daysBetween, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
 
   const SITUATIONAL_TYPE = "Situational request";
-  const CALENDAR_WEEK_COUNT = 5;
-  const CALENDAR_DAY_COUNT = CALENDAR_WEEK_COUNT * 7;
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
   const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
     { value: "pending", label: "Pending" },
     { value: "approved", label: "Approved" },
+    { value: "denied", label: "Denied" },
+    { value: "cancelled", label: "Cancelled" }
+  ];
+
+  const AGREEMENT_TYPES = TELEWORK_RECORD_TYPES.filter((t) => t !== SITUATIONAL_TYPE);
+  const AGREEMENT_STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
+    { value: "draft", label: "Draft" },
+    { value: "pending", label: "Pending" },
+    { value: "approved", label: "Approved" },
+    { value: "active", label: "Active" },
+    { value: "expired", label: "Expired" },
     { value: "denied", label: "Denied" },
     { value: "cancelled", label: "Cancelled" }
   ];
@@ -36,8 +48,32 @@
   let fEndDate = $state("");
   let fNotes = $state("");
   let fError = $state("");
+  // Agreement form (telework agreements, renewals, modifications).
+  let agreementFormOpen = $state(false);
+  let editingAgreement = $state<TeleworkRecord | undefined>(undefined);
+  let aEmployee = $state("");
+  let aType = $state("Agreement");
+  let aStatus = $state<TeleworkStatus>("active");
+  let aRequestDate = $state("");
+  let aEffective = $state("");
+  let aExpiration = $state("");
+  let aSchedule = $state("");
+  let aNotes = $state("");
+  let aError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<TeleworkRecord | undefined>(undefined);
+
+  // Deep link: #/telework/{recordId} opens the record's edit dialog, so
+  // attention items land on the actual agreement instead of a generic list.
+  $effect(() => {
+    const id = router.current.param;
+    if (router.current.page !== "telework" || !id) return;
+    const record = app.teleworkRecords.find((t) => t.id === id);
+    if (!record) return;
+    if (isSituationalRequest(record)) openForm(record);
+    else openAgreementForm(record);
+    router.go("telework");
+  });
 
   function statusLabel(status: TeleworkStatus): string {
     return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
@@ -57,6 +93,16 @@
     return Boolean(end && end < app.today && (t.status === "approved" || t.status === "active"));
   }
 
+  // Snapshots of the values each form opened with, for the unsaved-changes guards.
+  let openedSnapshot = $state("");
+  function formSnapshot(): string {
+    return JSON.stringify([fEmployee, fStatus, fRequestDate, fStartDate, fEndDate, fNotes]);
+  }
+  let openedAgreementSnapshot = $state("");
+  function agreementSnapshot(): string {
+    return JSON.stringify([aEmployee, aType, aStatus, aRequestDate, aEffective, aExpiration, aSchedule, aNotes]);
+  }
+
   function openForm(
     t?: TeleworkRecord,
     defaults: Partial<Pick<TeleworkRecord, "employeeId" | "effectiveDate" | "expirationDate">> = {}
@@ -69,6 +115,7 @@
     fEndDate = t?.expirationDate ?? defaults.expirationDate ?? "";
     fNotes = t?.notes ?? "";
     fError = "";
+    openedSnapshot = formSnapshot();
     formOpen = true;
   }
 
@@ -113,29 +160,85 @@
       fError = "Telework end date must be on or after the start date.";
       return;
     }
-    const now = nowTimestamp();
-    const record: TeleworkRecord = {
-      id: editing?.id ?? newId(),
-      employeeId: fEmployee,
-      recordType: SITUATIONAL_TYPE,
-      status: fStatus,
-      requestDate: fRequestDate || undefined,
-      effectiveDate: fStartDate,
-      expirationDate: endDate,
-      scheduleSummary: editing?.scheduleSummary,
-      sourceSystem: editing?.sourceSystem,
-      sourceReference: editing?.sourceReference,
-      lastVerifiedDate: editing?.lastVerifiedDate,
-      notes: fNotes.trim() || undefined,
-      relatedTaskId: editing?.relatedTaskId,
-      createdAt: editing?.createdAt ?? now,
-      updatedAt: now
-    };
+    // Merge over the existing record so unexposed fields (schedule summary,
+    // source system/reference, verification date, related task) survive.
+    const record: TeleworkRecord = mergeTeleworkEdit(
+      editing,
+      {
+        employeeId: fEmployee,
+        recordType: editing?.recordType ?? SITUATIONAL_TYPE,
+        status: fStatus,
+        requestDate: fRequestDate,
+        effectiveDate: fStartDate,
+        expirationDate: endDate,
+        notes: fNotes
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
     await app.putRecord("teleworkRecords", record, {
       actionType: editing ? "updated" : "created",
       summary: `${editing ? "Updated" : "Added"} situational telework request for ${app.employeeName(fEmployee)}`
     });
     formOpen = false;
+  }
+
+  function openAgreementForm(t?: TeleworkRecord) {
+    editingAgreement = t;
+    aEmployee = t?.employeeId ?? "";
+    aType = t?.recordType ?? "Agreement";
+    aStatus = t?.status ?? "active";
+    aRequestDate = t?.requestDate ?? "";
+    aEffective = t?.effectiveDate ?? "";
+    aExpiration = t?.expirationDate ?? "";
+    aSchedule = t?.scheduleSummary ?? "";
+    aNotes = t?.notes ?? "";
+    aError = "";
+    openedAgreementSnapshot = agreementSnapshot();
+    agreementFormOpen = true;
+  }
+
+  async function saveAgreement() {
+    if (!aEmployee) {
+      aError = "Employee is required.";
+      return;
+    }
+    for (const v of [aRequestDate, aEffective, aExpiration]) {
+      if (v && !isValidIsoDate(v)) {
+        aError = "Dates must be valid.";
+        return;
+      }
+    }
+    if (aEffective && aExpiration && aExpiration < aEffective) {
+      aError = "Expiration must be on or after the effective date.";
+      return;
+    }
+    const record: TeleworkRecord = mergeTeleworkEdit(
+      editingAgreement,
+      {
+        employeeId: aEmployee,
+        recordType: aType,
+        status: aStatus,
+        requestDate: aRequestDate,
+        effectiveDate: aEffective,
+        expirationDate: aExpiration,
+        scheduleSummary: aSchedule,
+        notes: aNotes
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
+    await app.putRecord("teleworkRecords", record, {
+      actionType: editingAgreement ? "updated" : "created",
+      summary: `${editingAgreement ? "Updated" : "Added"} telework ${aType.toLowerCase()} for ${app.employeeName(aEmployee)}`
+    });
+    agreementFormOpen = false;
+  }
+
+  function expirationState(t: TeleworkRecord): "overdue" | "soon" | "" {
+    if (!t.expirationDate || HISTORICAL_STATUSES.has(t.status)) return "";
+    const diff = daysBetween(app.today, t.expirationDate);
+    if (diff < 0) return "overdue";
+    if (diff <= 30) return "soon";
+    return "";
   }
 
   let rows = $derived(
@@ -151,34 +254,38 @@
       })
   );
 
-  let calendarTitle = $derived(monthLabel(calendarMonth));
-  let calendarDays = $derived.by(() => {
-    const nextMonth = addMonths(calendarMonth, 1);
-    const gridStart = addDays(calendarMonth, -weekday(calendarMonth));
-    return Array.from({ length: CALENDAR_DAY_COUNT }, (_, i) => {
-      const date = addDays(gridStart, i);
-      return {
-        date,
-        day: Number(date.slice(8, 10)),
-        inMonth: date >= calendarMonth && date < nextMonth,
-        isToday: date === app.today,
-        events: rows.filter((t) => requestCoversDate(t, date))
-      };
-    });
-  });
-  let calendarWeeks = $derived.by(() =>
-    Array.from({ length: CALENDAR_WEEK_COUNT }, (_, i) => calendarDays.slice(i * 7, i * 7 + 7))
+  let agreementRows = $derived(
+    app.teleworkRecords
+      .filter((t) => !isSituationalRequest(t))
+      .filter((t) => showHistorical || !isHistorical(t))
+      .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
+      .sort(
+        (a, b) =>
+          (a.expirationDate ?? "9999-12-31").localeCompare(b.expirationDate ?? "9999-12-31") ||
+          app.employeeName(a.employeeId).localeCompare(app.employeeName(b.employeeId))
+      )
   );
+
+  let calendarTitle = $derived(monthLabel(calendarMonth));
+  // Shared month grid (domain/rules/calendar.ts) sizes itself to the month, so
+  // six-row months like August 2026 keep all of their days.
+  let calendarWeeks = $derived.by(() => {
+    const { year, month } = monthOf(calendarMonth);
+    return monthGrid(year, month).map((week) =>
+      week.map((cell) => ({
+        date: cell.date,
+        day: Number(cell.date.slice(8, 10)),
+        inMonth: cell.inMonth,
+        isToday: cell.date === app.today,
+        events: rows.filter((t) => requestCoversDate(t, cell.date))
+      }))
+    );
+  });
 
   function requestCoversDate(t: TeleworkRecord, date: string): boolean {
     if (!t.effectiveDate) return false;
     const end = requestEndDate(t) ?? t.effectiveDate;
     return t.effectiveDate <= date && date <= end;
-  }
-
-  function weekday(date: string): number {
-    const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-    return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   }
 
   function monthLabel(date: string): string {
@@ -231,21 +338,25 @@
     await app.deleteRecord(
       "teleworkRecords",
       t.id,
-      `Deleted situational telework request for ${app.employeeName(t.employeeId)} (${t.effectiveDate ?? "no start"} to ${requestEndDate(t) ?? "no end"})`
+      `Deleted telework ${t.recordType.toLowerCase()} for ${app.employeeName(t.employeeId)} (${t.effectiveDate ?? "no start"} to ${requestEndDate(t) ?? "no end"})`
     );
     if (editing?.id === t.id) {
       formOpen = false;
       editing = undefined;
     }
+    if (editingAgreement?.id === t.id) {
+      agreementFormOpen = false;
+      editingAgreement = undefined;
+    }
     pendingDelete = undefined;
-    app.toast("Telework request deleted", "success");
+    app.toast("Telework record deleted", "success");
   }
 </script>
 
 <div class="page telework-page" class:wide={view === "calendar"}>
   <div class="page-header">
-    <h1>Situational Telework</h1>
-    <span class="muted">{rows.length} shown</span>
+    <h1>Telework</h1>
+    <span class="muted">{rows.length + agreementRows.length} shown</span>
   </div>
 
   <div class="toolbar telework-toolbar">
@@ -266,10 +377,12 @@
     </div>
     <span class="spacer"></span>
     <button type="button" onclick={exportCsv} disabled={rows.length === 0}>Export CSV</button>
+    <button type="button" onclick={() => openAgreementForm()}>Add Agreement</button>
     <button type="button" class="primary" onclick={() => openForm()}>Add Request</button>
   </div>
 
   {#if view === "list"}
+    <h2 class="section-heading">Situational requests</h2>
     {#if rows.length === 0}
       <EmptyState message="No situational telework requests." hint="Add requests as they arrive by email." />
     {:else}
@@ -306,6 +419,68 @@
                     type="button"
                     class="icon-btn danger"
                     aria-label="Delete telework request"
+                    title="Delete"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      requestDelete(t);
+                    }}><Icon name="trash" size={16} /></button
+                  >
+                </div>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+
+    <h2 class="section-heading">Agreements</h2>
+    <p class="small muted section-hint">
+      Telework agreements, renewals, and modifications. Expiration alerts on the Today page link here.
+    </p>
+    {#if agreementRows.length === 0}
+      <EmptyState message="No telework agreements." hint="Track agreement effective and expiration dates to get renewal reminders." />
+    {:else}
+      <table class="data">
+        <thead>
+          <tr>
+            <th>Employee</th><th>Type</th><th>Status</th><th>Effective</th><th>Expires</th><th>Schedule</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each agreementRows as t (t.id)}
+            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events -->
+            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+            <tr class="row-clickable" onclick={() => { if (!window.getSelection()?.toString()) openAgreementForm(t); }}>
+              <td>
+                <button
+                  type="button"
+                  class="link cell-link"
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    openAgreementForm(t);
+                  }}>{app.employeeName(t.employeeId)}</button
+                >
+              </td>
+              <td>{t.recordType}</td>
+              <td><span class="badge status-{t.status}">{t.status.replace(/_/g, " ")}</span></td>
+              <td>{formatDate(t.effectiveDate)}</td>
+              <td>
+                {#if expirationState(t) === "overdue"}
+                  <span class="badge overdue" title="Agreement expired">{formatDate(t.expirationDate)}</span>
+                {:else if expirationState(t) === "soon"}
+                  <span class="badge warning" title="Agreement expires within 30 days">{formatDate(t.expirationDate)}</span>
+                {:else}
+                  {formatDate(t.expirationDate)}
+                {/if}
+              </td>
+              <td class="notes-cell">{t.scheduleSummary ?? ""}</td>
+              <td>
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    class="icon-btn danger"
+                    aria-label="Delete telework agreement"
                     title="Delete"
                     onclick={(ev) => {
                       ev.stopPropagation();
@@ -379,7 +554,11 @@
 </div>
 
 {#if formOpen}
-  <Dialog title={editing ? "Edit Situational Telework" : "Add Situational Telework"} onclose={() => (formOpen = false)}>
+  <Dialog
+    title={editing ? "Edit Situational Telework" : "Add Situational Telework"}
+    onclose={() => (formOpen = false)}
+    unsavedGuard={() => formSnapshot() !== openedSnapshot}
+  >
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -391,7 +570,7 @@
         <option value="">(select)</option>
         {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
       </select>
-      {#if fError}<div class="field-error">{fError}</div>{/if}
+      {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div class="form-grid">
         <div>
           <label for="tw-status">Status</label>
@@ -426,11 +605,73 @@
   </Dialog>
 {/if}
 
+{#if agreementFormOpen}
+  <Dialog
+    title={editingAgreement ? "Edit Telework Agreement" : "Add Telework Agreement"}
+    onclose={() => (agreementFormOpen = false)}
+    unsavedGuard={() => agreementSnapshot() !== openedAgreementSnapshot}
+  >
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        void saveAgreement();
+      }}
+    >
+      <label for="ta-emp">Employee <span class="req">*</span></label>
+      <select id="ta-emp" bind:value={aEmployee} style="width:100%">
+        <option value="">(select)</option>
+        {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+      </select>
+      {#if aError}<div class="field-error" role="alert">{aError}</div>{/if}
+      <div class="form-grid">
+        <div>
+          <label for="ta-type">Type</label>
+          <select id="ta-type" bind:value={aType} style="width:100%">
+            {#each AGREEMENT_TYPES as t (t)}<option value={t}>{t}</option>{/each}
+          </select>
+        </div>
+        <div>
+          <label for="ta-status">Status</label>
+          <select id="ta-status" bind:value={aStatus} style="width:100%">
+            {#each AGREEMENT_STATUS_OPTIONS as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
+          </select>
+        </div>
+        <div>
+          <label for="ta-request">Request date</label>
+          <input id="ta-request" type="date" bind:value={aRequestDate} style="width:100%" />
+        </div>
+        <div>
+          <label for="ta-effective">Effective</label>
+          <input id="ta-effective" type="date" bind:value={aEffective} style="width:100%" />
+        </div>
+        <div>
+          <label for="ta-expiration">Expires</label>
+          <input id="ta-expiration" type="date" bind:value={aExpiration} style="width:100%" />
+        </div>
+        <div>
+          <label for="ta-schedule">Schedule summary</label>
+          <input id="ta-schedule" type="text" bind:value={aSchedule} maxlength="200" placeholder="e.g. Mon/Wed remote" style="width:100%" />
+        </div>
+      </div>
+      <label for="ta-notes">Notes</label>
+      <textarea id="ta-notes" bind:value={aNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
+      <div class="dialog-actions">
+        {#if editingAgreement}
+          <button type="button" class="icon-btn danger" aria-label="Delete telework agreement" title="Delete" onclick={() => requestDelete(editingAgreement!)}><Icon name="trash" size={17} /></button>
+        {/if}
+        <span class="spacer"></span>
+        <button type="button" onclick={() => (agreementFormOpen = false)}>Cancel</button>
+        <button type="submit" class="primary">Save</button>
+      </div>
+    </form>
+  </Dialog>
+{/if}
+
 {#if pendingDelete}
   <ConfirmDialog
-    title="Delete telework request"
-    message={`Permanently delete ${app.employeeName(pendingDelete.employeeId)} telework from ${formatDate(pendingDelete.effectiveDate)} to ${formatDate(requestEndDate(pendingDelete))}?`}
-    confirmLabel="Delete request"
+    title={`Delete telework ${isSituationalRequest(pendingDelete) ? "request" : "record"}`}
+    message={`Permanently delete the ${pendingDelete.recordType.toLowerCase()} for ${app.employeeName(pendingDelete.employeeId)}${pendingDelete.effectiveDate ? ` (${formatDate(pendingDelete.effectiveDate)} to ${formatDate(requestEndDate(pendingDelete)) || "no end"})` : ""}?`}
+    confirmLabel="Delete"
     danger
     onconfirm={() => void deleteTelework(pendingDelete!)}
     oncancel={() => (pendingDelete = undefined)}
@@ -656,9 +897,21 @@
     color: var(--duesoon-fg);
   }
   .status-denied,
-  .status-cancelled {
+  .status-cancelled,
+  .status-expired {
     background: var(--surface-2);
     color: var(--text-muted);
+  }
+  .status-approved,
+  .status-active {
+    background: var(--success-bg, var(--surface-2));
+  }
+  .section-heading {
+    margin: 1.1rem 0 .4rem;
+    font-size: 1rem;
+  }
+  .section-hint {
+    margin: 0 0 .5rem;
   }
   @media (max-width: 900px) {
     .form-grid {

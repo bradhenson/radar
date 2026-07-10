@@ -91,6 +91,26 @@ export interface DatabaseSnapshot {
   meta: StoreMeta;
 }
 
+/**
+ * One step of an atomic unit of work. A batch of ops passed to
+ * DataStore.mutate() commits together or not at all, so a record write, its
+ * activity entry, and the backup-change counter can never diverge, and a
+ * cascading deletion cannot stop halfway.
+ */
+export type MutationOp =
+  | { kind: "put"; collection: CollectionName; record: CollectionTypes[CollectionName] }
+  | { kind: "delete"; collection: CollectionName; id: string }
+  | { kind: "saveSettings"; settings: AppSettings }
+  | { kind: "saveMeta"; meta: StoreMeta };
+
+export function putOp<K extends CollectionName>(collection: K, record: CollectionTypes[K]): MutationOp {
+  return { kind: "put", collection, record };
+}
+
+export function deleteOp(collection: CollectionName, id: string): MutationOp {
+  return { kind: "delete", collection, id };
+}
+
 export interface DataStore {
   readonly kind: "indexeddb" | "memory";
   initialize(): Promise<void>;
@@ -98,6 +118,8 @@ export interface DataStore {
   put<K extends CollectionName>(name: K, record: CollectionTypes[K]): Promise<void>;
   bulkPut<K extends CollectionName>(name: K, records: CollectionTypes[K][]): Promise<void>;
   delete(name: CollectionName, id: string): Promise<void>;
+  /** Apply every op atomically (single transaction); see MutationOp. */
+  mutate(ops: MutationOp[]): Promise<void>;
   getSettings(): Promise<AppSettings | undefined>;
   saveSettings(settings: AppSettings): Promise<void>;
   getMeta(): Promise<StoreMeta>;

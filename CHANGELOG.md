@@ -3,6 +3,45 @@
 ## Unreleased
 
 ### Fixed
+
+- Editing an imported or previously detailed project, award, leave, telework, or travel record no
+  longer clears fields that its quick form does not expose.
+- Employee-deletion confirmation now lists travel records and every linked record that will be
+  retained but unlinked (tasks, meeting attendance, project leadership, and training assignment).
+- Record writes, activity history, backup-change metadata, and cascading deletions now commit as a
+  single transaction. A failed cascade leaves both memory and storage unchanged.
+- Backup export no longer clears the backup reminder until the user confirms the downloaded file
+  exists. Replacing data after an export is impossible until that confirmation succeeds.
+- Backup import now has versioned format migration, checksum/count verification, strict record and
+  settings validation, duplicate-ID and duplicate-training-record detection, and import limits.
+- Travel and telework month views now render all weeks in six-row months. Telework agreement alerts
+  and travel/award alerts open the relevant record instead of a generic, filtered list.
+- Default Waiting and Complete board lanes now synchronize task status, including completion moving
+  a card to the Complete lane.
+- CSV exports neutralize spreadsheet formula prefixes, and employee CSV exports default to a
+  minimal operational column set; sensitive columns require an explicit choice.
+
+### Added
+
+- Title-first **Quick Add** task dialog (`Q`) for rapid capture without opening the full task editor.
+- Attention severity/summary filters, collapsible top-N groups, Travel and Award lookahead items,
+  privacy-aware employee export selection, responsive compact navigation, and accessible employee
+  tabs/navigation state.
+- Single-writer IndexedDB protection, safe takeover/retry screens, and a coherent point-in-time
+  snapshot for backup export.
+- `npm run verify` and stricter single-file build checks that fail if JavaScript or CSS is not
+  successfully inlined for `file://` operation, plus `npm run smoke:file` for an Edge-based
+  first-run/reload persistence probe of the actual artifact.
+
+### Changed
+
+- Board remains RADAR's default cockpit. Today is enhanced as an action queue but is not the startup
+  page.
+- Dialogs now restore focus, begin at the first useful field, avoid disabled controls in the focus
+  trap, and warn before accidental backdrop/Escape dismissal of changed forms.
+- Unmodified single-key shortcuts can be disabled in Settings.
+
+### Fixed
 - Dialog footers with a Delete button (Leave, Situational Telework, Projects) no longer show an
   uneven gap next to Delete. The layout spacer only pushed content apart inside toolbars, so in
   those footers it collapsed and merely doubled the gap beside Delete; it now separates Delete to

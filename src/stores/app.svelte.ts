@@ -27,16 +27,17 @@ import type {
   TravelRecord,
   TrainingRequirement
 } from "../domain/models";
-import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeTaskStatus } from "../domain/models";
-import type { CollectionName, CollectionTypes, DataStore, DatabaseSnapshot, StoreMeta } from "../data/DataStore";
-import { COLLECTION_NAMES } from "../data/DataStore";
-import { IndexedDbDataStore } from "../data/IndexedDbDataStore";
+import { DEFAULT_BOARD_COLUMN_SEEDS, DEFAULT_SETTINGS, normalizeAppSettings, normalizeTaskStatus, statusLabel } from "../domain/models";
+import type { CollectionName, CollectionTypes, DataStore, DatabaseSnapshot, MutationOp, StoreMeta } from "../data/DataStore";
+import { COLLECTION_NAMES, deleteOp, putOp } from "../data/DataStore";
+import { IndexedDbDataStore, StorageBlockedError, StorageLockedError, type ConnectionLossReason } from "../data/IndexedDbDataStore";
 import { InMemoryDataStore } from "../data/InMemoryDataStore";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
+import { laneForStatus, statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 import { requirementAppliesTo, rollingExpiration, trainingStatus, type TrainingStatus } from "../domain/rules/training";
 
@@ -68,7 +69,7 @@ export interface StoragePersistenceStatus {
 
 const MUTATING_ACTIVITY = new Set(["created", "updated", "status_changed", "completed", "reopened", "archived", "restored", "deleted"]);
 
-class AppStore {
+export class AppStore {
   // --- reactive entity state ------------------------------------------------
   competencies = $state<Competency[]>([]);
   employees = $state<Employee[]>([]);
@@ -101,6 +102,12 @@ class AppStore {
     persistAvailable: false,
     estimateAvailable: false
   });
+  /**
+    * Blocking storage fault. "blocked": another window holds an older database
+   * version open. "locked": another window holds the writer lease. The
+   * connection-loss reasons arrive mid-session via onConnectionLost.
+   */
+  storageFault = $state<"blocked" | "locked" | ConnectionLossReason | undefined>(undefined);
   initialized = $state(false);
   initError = $state<string | undefined>(undefined);
   today = $state(todayIso());
@@ -122,6 +129,8 @@ class AppStore {
       trainingRequirements: this.trainingRequirements,
       leaveRecords: this.leaveRecords,
       teleworkRecords: this.teleworkRecords,
+      travelRecords: this.travelRecords,
+      awardRecords: this.awardRecords,
       lastBackupAt: this.meta.lastBackupAt,
       changesSinceBackup: this.meta.changesSinceBackup,
       snoozes: this.attentionSnoozes
@@ -255,15 +264,36 @@ class AppStore {
   }
 
   // --- lifecycle --------------------------------------------------------------
-  async initialize(): Promise<void> {
+  /**
+   * Open storage and load state. A blocked upgrade or a writer lease held by
+   * another window is a BLOCKING fault (recovery screen), never a silent
+   * fallback to memory — memory-only mode is reserved for environments where
+   * IndexedDB is genuinely unavailable (plan 9.5 outcome C).
+   */
+  async initialize(options: { takeOverWriterLease?: boolean } = {}): Promise<void> {
+    this.storageFault = undefined;
+    this.initError = undefined;
     try {
       if (IndexedDbDataStore.isSupported()) {
         try {
-          const idb = new IndexedDbDataStore();
+          const idb = new IndexedDbDataStore({
+            forceWriterLease: options.takeOverWriterLease,
+            onConnectionLost: (reason) => {
+              this.storageFault = reason;
+            }
+          });
           await idb.initialize();
           this.store = idb;
           this.storageKind = "indexeddb";
         } catch (e) {
+          if (e instanceof StorageBlockedError) {
+            this.storageFault = "blocked";
+            return;
+          }
+          if (e instanceof StorageLockedError) {
+            this.storageFault = "locked";
+            return;
+          }
           console.warn("IndexedDB unavailable, falling back to in-memory store", e);
           this.store = new InMemoryDataStore();
           await this.store.initialize();
@@ -279,22 +309,33 @@ class AppStore {
     } catch (e) {
       this.initError = e instanceof Error ? e.message : String(e);
     }
-    // Keep "today" current across midnight while the app stays open.
+    this.startClock();
+  }
+
+  private clockStarted = false;
+  /** Keep "today" current across midnight while the app stays open. */
+  private startClock(): void {
+    if (this.clockStarted) return;
+    this.clockStarted = true;
     setInterval(() => {
       this.today = todayIso();
     }, 60_000);
   }
 
+  /** Boot from an already-initialized store (unit tests, alternate hosts). */
+  async initializeFrom(store: DataStore): Promise<void> {
+    this.store = store;
+    this.storageKind = store.kind;
+    await this.loadAll();
+    this.initialized = true;
+  }
+
   private async loadAll(): Promise<void> {
-    const [snapshot, settings, meta] = await Promise.all([
-      this.store.exportSnapshot(),
-      this.store.getSettings(),
-      this.store.getMeta()
-    ]);
+    const snapshot = await this.store.exportSnapshot();
     this.applySnapshotToState(snapshot);
-    this.settings = this.migrateSettings(settings ?? { ...DEFAULT_SETTINGS });
-    this.meta = meta;
-    if (!settings || JSON.stringify(settings) !== JSON.stringify(this.settings)) {
+    this.settings = this.migrateSettings(snapshot.settings ?? { ...DEFAULT_SETTINGS });
+    this.meta = snapshot.meta;
+    if (!snapshot.settings || JSON.stringify(snapshot.settings) !== JSON.stringify(this.settings)) {
       await this.store.saveSettings(this.plainRecord(this.settings));
     }
     await this.ensureBoardColumns();
@@ -437,6 +478,7 @@ class AppStore {
           id: seed.id,
           label: seed.label,
           sortOrder: seed.sortOrder,
+          mapsToStatus: seed.mapsToStatus,
           createdAt: now,
           updatedAt: now
         };
@@ -448,6 +490,20 @@ class AppStore {
     for (const column of additions) {
       await this.store.put("boardColumns", column);
       this.boardColumns.push(column);
+    }
+
+    // Migration: default columns created before lane→status mappings existed
+    // pick up their seed mapping. Custom columns stay unmapped.
+    const seedStatusById = new Map(DEFAULT_BOARD_COLUMN_SEEDS.map((s) => [s.id, s.mapsToStatus]));
+    const mappingFixes = this.boardColumns
+      .filter((c) => c.mapsToStatus === undefined && seedStatusById.get(c.id))
+      .map((c) => ({ ...c, mapsToStatus: seedStatusById.get(c.id), updatedAt: now }));
+    if (mappingFixes.length) {
+      await this.store.bulkPut("boardColumns", this.plainRecords(mappingFixes));
+      for (const column of mappingFixes) {
+        const idx = this.boardColumns.findIndex((c) => c.id === column.id);
+        if (idx >= 0) this.boardColumns[idx] = column;
+      }
     }
 
     const migratedTasks = this.tasks
@@ -481,6 +537,8 @@ class AppStore {
   }
 
   // --- generic persistence helpers -------------------------------------------
+  // Record, activity entry, and backup-change counter are written in ONE
+  // atomic mutate() batch, so the audit trail can never diverge from the data.
   async putRecord<K extends CollectionName>(
     name: K,
     record: CollectionTypes[K],
@@ -489,15 +547,21 @@ class AppStore {
     this.saveStatus = "saving";
     try {
       const persisted = this.plainRecord(record);
-      await this.store.put(name, persisted);
+      const entry = activity
+        ? this.buildActivityEntry(activity.entityType ?? name, persisted.id, activity.actionType, activity.summary)
+        : undefined;
+      const nextMeta = this.bumpedMeta(activity?.actionType);
+      const ops: MutationOp[] = [putOp(name, persisted)];
+      if (entry) ops.push(putOp("activityEntries", entry));
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+
       const list = this.stateList(name);
       const idx = list.findIndex((r) => r.id === persisted.id);
       if (idx >= 0) list[idx] = persisted;
       else list.push(persisted);
-      if (activity) {
-        await this.recordActivity(activity.entityType ?? name, persisted.id, activity.actionType, activity.summary);
-      }
-      await this.bumpChangeCount(activity?.actionType);
+      if (entry) this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
     } catch (e) {
       this.saveStatus = "error";
@@ -509,12 +573,17 @@ class AppStore {
   async deleteRecord(name: CollectionName, id: string, summary: string): Promise<void> {
     this.saveStatus = "saving";
     try {
-      await this.store.delete(name, id);
+      const entry = this.buildActivityEntry(name, id, "deleted", summary);
+      const nextMeta = this.bumpedMeta("deleted");
+      const ops: MutationOp[] = [deleteOp(name, id), putOp("activityEntries", entry)];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+
       const list = this.stateList(name) as { id: string }[];
       const idx = list.findIndex((r) => r.id === id);
       if (idx >= 0) list.splice(idx, 1);
-      await this.recordActivity(name, id, "deleted", summary);
-      await this.bumpChangeCount("deleted");
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
     } catch (e) {
       this.saveStatus = "error";
@@ -523,8 +592,8 @@ class AppStore {
     }
   }
 
-  private async recordActivity(entityType: string, entityId: string, actionType: string, summary: string): Promise<void> {
-    const entry: ActivityEntry = {
+  private buildActivityEntry(entityType: string, entityId: string, actionType: string, summary: string): ActivityEntry {
+    return {
       id: newId(),
       entityType,
       entityId,
@@ -533,19 +602,43 @@ class AppStore {
       summary,
       sessionId: this.sessionId
     };
+  }
+
+  /** Standalone activity write for non-cascading events (imports, backups). */
+  private async recordActivity(entityType: string, entityId: string, actionType: string, summary: string): Promise<void> {
+    const entry = this.buildActivityEntry(entityType, entityId, actionType, summary);
     await this.store.put("activityEntries", entry);
     this.activityEntries.push(entry);
   }
 
-  private async bumpChangeCount(actionType?: string): Promise<void> {
-    if (actionType && !MUTATING_ACTIVITY.has(actionType)) return;
-    this.meta = { ...this.meta, changesSinceBackup: this.meta.changesSinceBackup + 1 };
-    await this.store.saveMeta($state.snapshot(this.meta));
+  /**
+   * Next meta with the backup-change counter bumped, or undefined when the
+   * action type is not a data mutation. Callers include it in their mutate()
+   * batch and assign it to this.meta only after the batch commits.
+   */
+  private bumpedMeta(actionType?: string): StoreMeta | undefined {
+    if (actionType && !MUTATING_ACTIVITY.has(actionType)) return undefined;
+    return { ...($state.snapshot(this.meta) as StoreMeta), changesSinceBackup: this.meta.changesSinceBackup + 1 };
   }
 
   async saveSettings(settings: AppSettings): Promise<void> {
-    this.settings = settings;
-    await this.store.saveSettings($state.snapshot(settings) as AppSettings);
+    this.saveStatus = "saving";
+    try {
+      const persisted = this.plainRecord(settings);
+      const entry = this.buildActivityEntry("settings", "settings", "updated", "Updated application settings");
+      const nextMeta = this.bumpedMeta("updated");
+      const ops: MutationOp[] = [{ kind: "saveSettings", settings: persisted }, putOp("activityEntries", entry)];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+      this.settings = persisted;
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
+      this.saveStatus = "saved";
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Settings save failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
   }
 
   // --- competency service -----------------------------------------------------
@@ -640,6 +733,20 @@ class AppStore {
     );
   }
 
+  async setBoardColumnStatusMapping(id: string, mapsToStatus: Task["status"] | undefined): Promise<void> {
+    const column = this.boardColumns.find((c) => c.id === id);
+    if (!column) throw new Error("Board column not found.");
+    if (column.mapsToStatus === mapsToStatus) return;
+    await this.putRecord(
+      "boardColumns",
+      { ...column, mapsToStatus, updatedAt: nowTimestamp() },
+      {
+        actionType: "updated",
+        summary: `Board column "${column.label}" now ${mapsToStatus ? `marks tasks ${statusLabel(mapsToStatus)}` : "leaves task status unchanged"}`
+      }
+    );
+  }
+
   async deleteBoardColumn(id: string): Promise<void> {
     const column = this.boardColumns.find((c) => c.id === id);
     if (!column) throw new Error("Board column not found.");
@@ -656,10 +763,9 @@ class AppStore {
     const current = ordered[idx];
     if (!current || !other) return;
     await this.reorderBoardColumns(
-      ordered.map((column) => (column.id === current.id ? other : column.id === other.id ? current : column))
+      ordered.map((column) => (column.id === current.id ? other : column.id === other.id ? current : column)),
+      { entityId: current.id, summary: `Reordered board column "${current.label}"` }
     );
-    await this.recordActivity("boardColumns", current.id, "updated", `Reordered board column "${current.label}"`);
-    await this.bumpChangeCount("updated");
   }
 
   async reorderBoardColumn(draggedId: string, targetId: string, position: "before" | "after"): Promise<void> {
@@ -671,12 +777,16 @@ class AppStore {
     if (targetIndex < 0) return;
     const insertAt = targetIndex + (position === "after" ? 1 : 0);
     const ordered = [...withoutDragged.slice(0, insertAt), dragged, ...withoutDragged.slice(insertAt)];
-    await this.reorderBoardColumns(ordered);
-    await this.recordActivity("boardColumns", dragged.id, "updated", `Reordered board column "${dragged.label}"`);
-    await this.bumpChangeCount("updated");
+    await this.reorderBoardColumns(ordered, {
+      entityId: dragged.id,
+      summary: `Reordered board column "${dragged.label}"`
+    });
   }
 
-  private async reorderBoardColumns(ordered: BoardColumnDefinition[]): Promise<void> {
+  private async reorderBoardColumns(
+    ordered: BoardColumnDefinition[],
+    activity: { entityId: string; summary: string }
+  ): Promise<void> {
     const now = nowTimestamp();
     const updated = ordered.map((column, index) => ({
       ...column,
@@ -685,11 +795,19 @@ class AppStore {
     }));
     this.saveStatus = "saving";
     try {
-      await this.store.bulkPut("boardColumns", this.plainRecords(updated));
+      const entry = this.buildActivityEntry("boardColumns", activity.entityId, "updated", activity.summary);
+      const nextMeta = this.bumpedMeta("updated");
+      const ops: MutationOp[] = this.plainRecords(updated).map((column) => putOp("boardColumns", column));
+      ops.push(putOp("activityEntries", entry));
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+
       for (const column of updated) {
         const idx = this.boardColumns.findIndex((c) => c.id === column.id);
         if (idx >= 0) this.boardColumns[idx] = column;
       }
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
     } catch (e) {
       this.saveStatus = "error";
@@ -730,13 +848,32 @@ class AppStore {
     await this.putRecord("tasks", updated, { actionType, summary });
   }
 
-  async moveTaskToBoardColumn(task: Task, boardColumnId: string, boardOrder: number): Promise<void> {
+  /**
+   * Move a card to a lane. If the lane maps to a status (Waiting, Complete,
+   * open lanes), the task status follows the card so the board never shows a
+   * state the domain rules disagree with.
+   */
+  async moveTaskToBoardColumn(task: Task, boardColumnId: string, boardOrder: number): Promise<Task> {
     const prev = this.taskBoardColumnId(task);
-    const updated: Task = { ...task, boardColumnId, boardOrder, updatedAt: nowTimestamp() };
+    const before = this.plainRecord(task);
+    const column = this.boardColumns.find((c) => c.id === boardColumnId);
+    const statusChange = statusChangeForLaneMove(task, column, this.today, nowTimestamp());
+    const updated: Task = { ...task, ...statusChange, boardColumnId, boardOrder, updatedAt: nowTimestamp() };
+    const moveText = `Moved "${task.title}" from ${this.boardColumnLabel(prev)} to ${this.boardColumnLabel(boardColumnId)}`;
     await this.putRecord("tasks", updated, {
-      actionType: "updated",
-      summary: `Moved "${task.title}" from ${this.boardColumnLabel(prev)} to ${this.boardColumnLabel(boardColumnId)}`
+      actionType: statusChange?.status === "complete" ? "completed" : statusChange ? "status_changed" : "updated",
+      summary: statusChange ? `${moveText} (status: ${statusLabel(updated.status)})` : moveText
     });
+    if (statusChange?.status === "complete") {
+      this.toast(`Completed "${task.title}"`, "success", async () => {
+        await this.putRecord(
+          "tasks",
+          { ...before, updatedAt: nowTimestamp() },
+          { actionType: "reopened", summary: `Reopened "${before.title}"` }
+        );
+      });
+    }
+    return updated;
   }
 
   /** Set or clear a task's due date (calendar drag-to-reschedule and its keyboard alternative). */
@@ -753,7 +890,22 @@ class AppStore {
 
   async completeTask(task: Task): Promise<Task> {
     const before = $state.snapshot(task) as Task;
-    const updated: Task = { ...task, status: "complete", completedDate: this.today, updatedAt: nowTimestamp() };
+    // Completing a task also moves its card to the complete-mapped lane, so
+    // the board reflects the status change (lane/status stay in step).
+    const currentLane = this.taskBoardColumnId(task);
+    const completeLane = laneForStatus(this.boardColumnList, "complete");
+    const laneMove =
+      completeLane && completeLane.id !== currentLane
+        ? {
+            boardColumnId: completeLane.id,
+            boardOrder: orderForAppend(
+              this.tasks
+                .filter((t) => t.id !== task.id && this.taskBoardColumnId(t) === completeLane.id && !t.isArchived)
+                .map((t) => t.boardOrder)
+            )
+          }
+        : {};
+    const updated: Task = { ...task, ...laneMove, status: "complete", completedDate: this.today, updatedAt: nowTimestamp() };
     await this.putRecord("tasks", updated, { actionType: "completed", summary: `Completed "${task.title}"` });
     this.toast(`Completed "${task.title}"`, "success", async () => {
       await this.putRecord("tasks", { ...before, updatedAt: nowTimestamp() }, { actionType: "reopened", summary: `Reopened "${before.title}"` });
@@ -771,23 +923,30 @@ class AppStore {
       const relatedChecklistItems = this.checklistItems.filter((item) => item.taskId === id);
       const updatedAt = nowTimestamp();
 
-      for (const note of relatedNotes) await this.store.delete("taskNotes", note.id);
-      for (const item of relatedChecklistItems) await this.store.delete("checklistItems", item.id);
+      const unlink = <T extends { relatedTaskId?: string }>(records: T[]): T[] =>
+        records
+          .filter((record) => record.relatedTaskId === id)
+          .map((record) => this.plainRecord({ ...record, relatedTaskId: undefined, updatedAt }));
+      const unlinkedInputs = unlink(this.performanceInputs);
+      const unlinkedLeave = unlink(this.leaveRecords);
+      const unlinkedTelework = unlink(this.teleworkRecords);
+      const unlinkedInteractions = unlink(this.employeeInteractions);
 
-      for (const input of this.performanceInputs.filter((record) => record.relatedTaskId === id)) {
-        await this.store.put("performanceInputs", this.plainRecord({ ...input, relatedTaskId: undefined, updatedAt }));
-      }
-      for (const leave of this.leaveRecords.filter((record) => record.relatedTaskId === id)) {
-        await this.store.put("leaveRecords", this.plainRecord({ ...leave, relatedTaskId: undefined, updatedAt }));
-      }
-      for (const telework of this.teleworkRecords.filter((record) => record.relatedTaskId === id)) {
-        await this.store.put("teleworkRecords", this.plainRecord({ ...telework, relatedTaskId: undefined, updatedAt }));
-      }
-      for (const interaction of this.employeeInteractions.filter((record) => record.relatedTaskId === id)) {
-        await this.store.put("employeeInteractions", this.plainRecord({ ...interaction, relatedTaskId: undefined, updatedAt }));
-      }
+      const entry = this.buildActivityEntry("tasks", id, "deleted", `Deleted task "${task.title}"`);
+      const nextMeta = this.bumpedMeta("deleted");
+      const ops: MutationOp[] = [
+        ...relatedNotes.map((note) => deleteOp("taskNotes", note.id)),
+        ...relatedChecklistItems.map((item) => deleteOp("checklistItems", item.id)),
+        ...unlinkedInputs.map((record) => putOp("performanceInputs", record)),
+        ...unlinkedLeave.map((record) => putOp("leaveRecords", record)),
+        ...unlinkedTelework.map((record) => putOp("teleworkRecords", record)),
+        ...unlinkedInteractions.map((record) => putOp("employeeInteractions", record)),
+        deleteOp("tasks", id),
+        putOp("activityEntries", entry)
+      ];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
 
-      await this.store.delete("tasks", id);
       this.taskNotes = this.taskNotes.filter((note) => note.taskId !== id);
       this.checklistItems = this.checklistItems.filter((item) => item.taskId !== id);
       this.performanceInputs = this.performanceInputs.map((record) =>
@@ -804,8 +963,8 @@ class AppStore {
       );
       this.tasks = this.tasks.filter((t) => t.id !== id);
 
-      await this.recordActivity("tasks", id, "deleted", `Deleted task "${task.title}"`);
-      await this.bumpChangeCount("deleted");
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
       this.toast(`Deleted "${task.title}"`, "success");
     } catch (e) {
@@ -822,19 +981,16 @@ class AppStore {
     try {
       const id = input.id;
       const updatedAt = nowTimestamp();
-      const linkedAwards = this.awardRecords.filter((award) => award.relatedPerformanceInputIds.includes(id));
-      let updatedTask: Task | undefined;
-
-      for (const award of linkedAwards) {
-        await this.store.put(
-          "awardRecords",
+      const unlinkedAwards = this.awardRecords
+        .filter((award) => award.relatedPerformanceInputIds.includes(id))
+        .map((award) =>
           this.plainRecord({
             ...award,
             relatedPerformanceInputIds: award.relatedPerformanceInputIds.filter((inputId) => inputId !== id),
             updatedAt
           })
         );
-      }
+      let updatedTask: Task | undefined;
 
       if (input.relatedTaskId) {
         const task = this.tasks.find((t) => t.id === input.relatedTaskId);
@@ -842,12 +998,26 @@ class AppStore {
           (record) => record.id !== id && record.relatedTaskId === input.relatedTaskId
         );
         if (task && task.performanceInputCreated && !hasOtherInputForTask) {
-          updatedTask = { ...task, performanceInputCreated: false, updatedAt };
-          await this.store.put("tasks", this.plainRecord(updatedTask));
+          updatedTask = this.plainRecord({ ...task, performanceInputCreated: false, updatedAt });
         }
       }
 
-      await this.store.delete("performanceInputs", id);
+      const entry = this.buildActivityEntry(
+        "performanceInputs",
+        id,
+        "deleted",
+        `Deleted performance input for ${this.employeeName(input.employeeId)} (${formatDate(input.inputDate)})`
+      );
+      const nextMeta = this.bumpedMeta("deleted");
+      const ops: MutationOp[] = [
+        ...unlinkedAwards.map((award) => putOp("awardRecords", award)),
+        ...(updatedTask ? [putOp("tasks", updatedTask)] : []),
+        deleteOp("performanceInputs", id),
+        putOp("activityEntries", entry)
+      ];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+
       this.awardRecords = this.awardRecords.map((award) =>
         award.relatedPerformanceInputIds.includes(id)
           ? { ...award, relatedPerformanceInputIds: award.relatedPerformanceInputIds.filter((inputId) => inputId !== id), updatedAt }
@@ -858,13 +1028,8 @@ class AppStore {
       }
       this.performanceInputs = this.performanceInputs.filter((p) => p.id !== id);
 
-      await this.recordActivity(
-        "performanceInputs",
-        id,
-        "deleted",
-        `Deleted performance input for ${this.employeeName(input.employeeId)} (${formatDate(input.inputDate)})`
-      );
-      await this.bumpChangeCount("deleted");
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
       this.toast("Performance input deleted", "success");
     } catch (e) {
@@ -886,7 +1051,10 @@ class AppStore {
       awardRecords: this.awardRecords.filter((r) => r.employeeId === employeeId).length,
       interactions: this.employeeInteractions.filter((r) => r.employeeId === employeeId).length,
       notes: this.employeeNotes.filter((r) => r.employeeId === employeeId).length,
-      linkedTasks: this.tasks.filter((t) => t.employeeId === employeeId).length
+      linkedTasks: this.tasks.filter((t) => t.employeeId === employeeId).length,
+      meetingAttendances: this.meetingNotes.filter((n) => n.attendeeEmployeeIds.includes(employeeId)).length,
+      projectLeads: this.projects.filter((p) => p.leadEmployeeId === employeeId).length,
+      trainingAssignments: this.trainingRequirements.filter((r) => r.assignedEmployeeIds?.includes(employeeId)).length
     };
   }
 
@@ -915,15 +1083,6 @@ class AppStore {
       const interactions = this.employeeInteractions.filter((r) => r.employeeId === id);
       const notes = this.employeeNotes.filter((r) => r.employeeId === id);
 
-      for (const r of inputs) await this.store.delete("performanceInputs", r.id);
-      for (const r of training) await this.store.delete("employeeTrainingRecords", r.id);
-      for (const r of leave) await this.store.delete("leaveRecords", r.id);
-      for (const r of telework) await this.store.delete("teleworkRecords", r.id);
-      for (const r of travel) await this.store.delete("travelRecords", r.id);
-      for (const r of awards) await this.store.delete("awardRecords", r.id);
-      for (const r of interactions) await this.store.delete("employeeInteractions", r.id);
-      for (const r of notes) await this.store.delete("employeeNotes", r.id);
-
       // Tasks survive but lose the employee link; a task whose only performance
       // input was just deleted also gets its "input created" flag back (same
       // rule as deletePerformanceInput).
@@ -943,7 +1102,6 @@ class AppStore {
           performanceInputCreated: keepInputFlag(t),
           updatedAt
         }));
-      for (const t of updatedTasks) await this.store.put("tasks", this.plainRecord(t));
 
       const updatedAwards = this.awardRecords
         .filter((a) => a.employeeId !== id && a.relatedPerformanceInputIds.some((i) => deletedInputIds.has(i)))
@@ -952,24 +1110,40 @@ class AppStore {
           relatedPerformanceInputIds: a.relatedPerformanceInputIds.filter((i) => !deletedInputIds.has(i)),
           updatedAt
         }));
-      for (const a of updatedAwards) await this.store.put("awardRecords", this.plainRecord(a));
 
       const updatedMeetings = this.meetingNotes
         .filter((n) => n.attendeeEmployeeIds.includes(id))
         .map((n) => ({ ...n, attendeeEmployeeIds: n.attendeeEmployeeIds.filter((e) => e !== id), updatedAt }));
-      for (const n of updatedMeetings) await this.store.put("meetingNotes", this.plainRecord(n));
 
       const updatedProjects = this.projects
         .filter((p) => p.leadEmployeeId === id)
         .map((p) => ({ ...p, leadEmployeeId: undefined, updatedAt }));
-      for (const p of updatedProjects) await this.store.put("projects", this.plainRecord(p));
 
       const updatedRequirements = this.trainingRequirements
         .filter((r) => r.assignedEmployeeIds?.includes(id))
         .map((r) => ({ ...r, assignedEmployeeIds: r.assignedEmployeeIds!.filter((e) => e !== id), updatedAt }));
-      for (const r of updatedRequirements) await this.store.put("trainingRequirements", this.plainRecord(r));
 
-      await this.store.delete("employees", id);
+      const entry = this.buildActivityEntry("employees", id, "deleted", `Deleted employee ${name} and their linked records`);
+      const nextMeta = this.bumpedMeta("deleted");
+      const ops: MutationOp[] = [
+        ...inputs.map((r) => deleteOp("performanceInputs", r.id)),
+        ...training.map((r) => deleteOp("employeeTrainingRecords", r.id)),
+        ...leave.map((r) => deleteOp("leaveRecords", r.id)),
+        ...telework.map((r) => deleteOp("teleworkRecords", r.id)),
+        ...travel.map((r) => deleteOp("travelRecords", r.id)),
+        ...awards.map((r) => deleteOp("awardRecords", r.id)),
+        ...interactions.map((r) => deleteOp("employeeInteractions", r.id)),
+        ...notes.map((r) => deleteOp("employeeNotes", r.id)),
+        ...updatedTasks.map((t) => putOp("tasks", this.plainRecord(t))),
+        ...updatedAwards.map((a) => putOp("awardRecords", this.plainRecord(a))),
+        ...updatedMeetings.map((n) => putOp("meetingNotes", this.plainRecord(n))),
+        ...updatedProjects.map((p) => putOp("projects", this.plainRecord(p))),
+        ...updatedRequirements.map((r) => putOp("trainingRequirements", this.plainRecord(r))),
+        deleteOp("employees", id),
+        putOp("activityEntries", entry)
+      ];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
 
       this.performanceInputs = survivingInputs;
       this.employeeTrainingRecords = this.employeeTrainingRecords.filter((r) => r.employeeId !== id);
@@ -989,8 +1163,8 @@ class AppStore {
       );
       this.employees = this.employees.filter((e) => e.id !== id);
 
-      await this.recordActivity("employees", id, "deleted", `Deleted employee ${name} and their linked records`);
-      await this.bumpChangeCount("deleted");
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
       this.toast(`Deleted employee ${name}`, "success");
     } catch (e) {
@@ -1025,27 +1199,34 @@ class AppStore {
       const updatedAt = nowTimestamp();
 
       const updatedTasks = this.tasks.filter((t) => t.projectId === id).map((t) => ({ ...t, projectId: undefined, updatedAt }));
-      for (const t of updatedTasks) await this.store.put("tasks", this.plainRecord(t));
 
       const updatedMeetings = this.meetingNotes
         .filter((n) => n.projectId === id)
         .map((n) => ({ ...n, projectId: undefined, updatedAt }));
-      for (const n of updatedMeetings) await this.store.put("meetingNotes", this.plainRecord(n));
 
       const updatedInputs = this.performanceInputs
         .filter((p) => p.projectId === id)
         .map((p) => ({ ...p, projectId: undefined, updatedAt }));
-      for (const p of updatedInputs) await this.store.put("performanceInputs", this.plainRecord(p));
 
-      await this.store.delete("projects", id);
+      const entry = this.buildActivityEntry("projects", id, "deleted", `Deleted project ${name}`);
+      const nextMeta = this.bumpedMeta("deleted");
+      const ops: MutationOp[] = [
+        ...updatedTasks.map((t) => putOp("tasks", this.plainRecord(t))),
+        ...updatedMeetings.map((n) => putOp("meetingNotes", this.plainRecord(n))),
+        ...updatedInputs.map((p) => putOp("performanceInputs", this.plainRecord(p))),
+        deleteOp("projects", id),
+        putOp("activityEntries", entry)
+      ];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
 
       this.tasks = this.tasks.map((t) => updatedTasks.find((u) => u.id === t.id) ?? t);
       this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
       this.performanceInputs = this.performanceInputs.map((p) => updatedInputs.find((u) => u.id === p.id) ?? p);
       this.projects = this.projects.filter((p) => p.id !== id);
 
-      await this.recordActivity("projects", id, "deleted", `Deleted project ${name}`);
-      await this.bumpChangeCount("deleted");
+      this.activityEntries.push(entry);
+      if (nextMeta) this.meta = nextMeta;
       this.saveStatus = "saved";
       this.toast(`Deleted project ${name}`, "success");
     } catch (e) {
@@ -1098,28 +1279,46 @@ class AppStore {
   }
 
   // --- backup -----------------------------------------------------------------
+  /**
+   * Build the backup package without touching any state. The caller records it
+   * as completed only after the browser accepts the download request.
+   */
   async buildBackup(): Promise<BackupPackage> {
     const snapshot = await this.store.exportSnapshot();
-    const pkg = createBackupPackage(snapshot);
-    this.meta = { ...this.meta, lastBackupAt: pkg.exportedAt, changesSinceBackup: 0 };
-    await this.store.saveMeta($state.snapshot(this.meta));
-    await this.recordActivity("system", "backup", "exported", `Exported backup with ${Object.values(pkg.integrity.recordCounts).reduce((a, b) => a + b, 0)} records`);
-    return pkg;
+    return createBackupPackage(snapshot);
+  }
+
+  /** Record an initiated backup download: reset the change counter and reminder. */
+  async markBackupCompleted(pkg: BackupPackage): Promise<void> {
+    const totalRecords = Object.values(pkg.integrity.recordCounts).reduce((a, b) => a + b, 0);
+    const entry = this.buildActivityEntry("system", "backup", "exported", `Exported backup with ${totalRecords} records`);
+    const nextMeta: StoreMeta = {
+      ...($state.snapshot(this.meta) as StoreMeta),
+      lastBackupAt: pkg.exportedAt,
+      changesSinceBackup: 0
+    };
+    await this.store.mutate([putOp("activityEntries", entry), { kind: "saveMeta", meta: nextMeta }]);
+    this.activityEntries.push(entry);
+    this.meta = nextMeta;
   }
 
   async replaceDatabase(pkg: BackupPackage): Promise<void> {
     // Unwrap any $state proxy: IndexedDB structured clone rejects Proxy objects.
     const snapshot = snapshotFromBackup(this.plainRecord(pkg));
+    snapshot.collections.activityEntries.push(
+      this.buildActivityEntry("system", "backup", "imported", `Imported backup exported at ${pkg.exportedAt}`)
+    );
     await this.store.replaceAll(snapshot);
     await this.loadAll();
-    await this.recordActivity("system", "backup", "imported", `Imported backup exported at ${pkg.exportedAt}`);
   }
 
   async loadSampleData(): Promise<void> {
     const snapshot = createSampleSnapshot();
+    snapshot.collections.activityEntries.push(
+      this.buildActivityEntry("system", "sample", "imported", "Loaded sample data")
+    );
     await this.store.replaceAll(snapshot);
     await this.loadAll();
-    await this.recordActivity("system", "sample", "imported", "Loaded sample data");
   }
 
   async resetAllData(): Promise<void> {

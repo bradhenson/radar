@@ -12,12 +12,18 @@
   let competencyId = $state("");
   let activeStatus = $state<Employee["activeStatus"]>("active");
   let error = $state("");
+  let openedSnapshot = $state("");
+
+  function formSnapshot(): string {
+    return JSON.stringify([displayName, competencyId, activeStatus]);
+  }
 
   $effect(() => {
     if (initialized) return;
     displayName = employee?.displayName ?? "";
     competencyId = employee?.competencyId ?? "";
     activeStatus = employee?.activeStatus ?? "active";
+    openedSnapshot = formSnapshot();
     initialized = true;
   });
 
@@ -54,7 +60,11 @@
   }
 </script>
 
-<Dialog title={employee ? "Edit Employee" : "Add Employee"} {onclose}>
+<Dialog
+  title={employee ? "Edit Employee" : "Add Employee"}
+  {onclose}
+  unsavedGuard={() => initialized && formSnapshot() !== openedSnapshot}
+>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -63,7 +73,7 @@
   >
     <label for="ef-name">Display name <span class="req">*</span></label>
     <input id="ef-name" type="text" bind:value={displayName} maxlength="200" style="width:100%" />
-    {#if error}<div class="field-error">{error}</div>{/if}
+    {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
       <div>

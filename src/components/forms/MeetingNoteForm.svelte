@@ -158,7 +158,7 @@
   >
     <label for="mn-title">Title <span class="req">*</span></label>
     <input id="mn-title" type="text" bind:value={title} maxlength="200" style="width:100%" />
-    {#if error}<div class="field-error">{error}</div>{/if}
+    {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <div class="grid">
       <div>

@@ -8,8 +8,15 @@ import {
   type CollectionTypes,
   type DataStore,
   type DatabaseSnapshot,
+  type MutationOp,
   type StoreMeta
 } from "./DataStore";
+
+export interface MutationDraft {
+  collections: DatabaseSnapshot["collections"];
+  settings: AppSettings | undefined;
+  meta: StoreMeta;
+}
 
 /**
  * Non-persistent store. Used for tests and as a runtime fallback when
@@ -47,6 +54,47 @@ export class InMemoryDataStore implements DataStore {
     const list = this.collections[name] as { id: string }[];
     const idx = list.findIndex((r) => r.id === id);
     if (idx >= 0) list.splice(idx, 1);
+  }
+
+  async mutate(ops: MutationOp[]): Promise<void> {
+    if (ops.length === 0) return;
+    // Stage every change on a deep copy, then swap the copy in: either every
+    // op applies or none do (mirrors the IndexedDB single-transaction path).
+    const draft: MutationDraft = {
+      collections: structuredClone(this.collections),
+      settings: this.settings ? structuredClone(this.settings) : undefined,
+      meta: structuredClone(this.meta)
+    };
+    for (const op of ops) this.applyToDraft(draft, op);
+    this.collections = draft.collections;
+    this.settings = draft.settings;
+    this.meta = draft.meta;
+  }
+
+  /** Overridable seam for failure-injection tests. */
+  protected applyToDraft(draft: MutationDraft, op: MutationOp): void {
+    switch (op.kind) {
+      case "put": {
+        const list = draft.collections[op.collection] as { id: string }[];
+        const idx = list.findIndex((r) => r.id === op.record.id);
+        const copy = structuredClone(op.record);
+        if (idx >= 0) list[idx] = copy;
+        else list.push(copy);
+        break;
+      }
+      case "delete": {
+        const list = draft.collections[op.collection] as { id: string }[];
+        const idx = list.findIndex((r) => r.id === op.id);
+        if (idx >= 0) list.splice(idx, 1);
+        break;
+      }
+      case "saveSettings":
+        draft.settings = structuredClone(op.settings);
+        break;
+      case "saveMeta":
+        draft.meta = structuredClone(op.meta);
+        break;
+    }
   }
 
   async getSettings(): Promise<AppSettings | undefined> {

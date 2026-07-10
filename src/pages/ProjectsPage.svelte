@@ -8,6 +8,7 @@
   import Icon from "../components/common/Icon.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
+  import { mergeProjectEdit } from "../domain/rules/editMerge";
   import type { Project, ProjectStatus } from "../domain/models";
 
   let showClosed = $state(false);
@@ -26,6 +27,12 @@
   let fLead = $state("");
   let fError = $state("");
 
+  // Snapshot of the values the form opened with, for the unsaved-changes guard.
+  let openedSnapshot = $state("");
+  function formSnapshot(): string {
+    return JSON.stringify([fName, fShort, fDesc, fStatus, fStart, fEnd, fLead]);
+  }
+
   function openForm(p?: Project) {
     editing = p;
     fName = p?.name ?? "";
@@ -36,6 +43,7 @@
     fEnd = p?.targetEndDate ?? "";
     fLead = p?.leadEmployeeId ?? "";
     fError = "";
+    openedSnapshot = formSnapshot();
     formOpen = true;
   }
 
@@ -53,21 +61,21 @@
       fError = "Target end date must be on or after the start date.";
       return;
     }
-    const now = nowTimestamp();
-    const record: Project = {
-      id: editing?.id ?? newId(),
-      name,
-      shortName: fShort.trim() || undefined,
-      description: fDesc.trim() || undefined,
-      status: fStatus,
-      startDate: fStart || undefined,
-      targetEndDate: fEnd || undefined,
-      leadEmployeeId: fLead || undefined,
-      tags: editing?.tags ?? [],
-      createdAt: editing?.createdAt ?? now,
-      updatedAt: now,
-      isArchived: editing?.isArchived ?? false
-    };
+    // Merge over the existing record so fields this form doesn't expose
+    // (competency, source system/reference, verification date) survive.
+    const record: Project = mergeProjectEdit(
+      editing,
+      {
+        name,
+        shortName: fShort,
+        description: fDesc,
+        status: fStatus,
+        startDate: fStart,
+        targetEndDate: fEnd,
+        leadEmployeeId: fLead
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
     await app.putRecord("projects", record, {
       actionType: editing ? "updated" : "created",
       summary: `${editing ? "Updated" : "Created"} project ${name}`
@@ -271,7 +279,11 @@
 </style>
 
 {#if formOpen}
-  <Dialog title={editing ? "Edit Project" : "Add Project"} onclose={() => (formOpen = false)}>
+  <Dialog
+    title={editing ? "Edit Project" : "Add Project"}
+    onclose={() => (formOpen = false)}
+    unsavedGuard={() => formSnapshot() !== openedSnapshot}
+  >
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -280,7 +292,7 @@
     >
       <label for="pf-name">Name <span class="req">*</span></label>
       <input id="pf-name" type="text" bind:value={fName} maxlength="200" style="width:100%" />
-      {#if fError}<div class="field-error">{fError}</div>{/if}
+      {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
         <div>
           <label for="pf-short">Short name</label>

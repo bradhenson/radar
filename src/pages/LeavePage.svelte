@@ -2,13 +2,16 @@
   // Leave awareness (plan 12.8, 19): availability tracking, not official
   // leave accounting. No medical or reason details are collected.
   import { app } from "../stores/app.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import type { LeaveRecord, LeaveStatus } from "../domain/models";
   import { LEAVE_TYPES } from "../domain/models";
-  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
+  import { mergeLeaveEdit } from "../domain/rules/editMerge";
+  import { monthGrid, monthOf } from "../domain/rules/calendar";
+  import { addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -28,6 +31,22 @@
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<LeaveRecord | undefined>(undefined);
 
+  // Deep link: #/leave/{recordId} opens the record's edit dialog.
+  $effect(() => {
+    const id = router.current.param;
+    if (router.current.page !== "leave" || !id) return;
+    const record = app.leaveRecords.find((l) => l.id === id);
+    if (!record) return;
+    openForm(record);
+    router.go("leave");
+  });
+
+  // Snapshot of the values the form opened with, for the unsaved-changes guard.
+  let openedSnapshot = $state("");
+  function formSnapshot(): string {
+    return JSON.stringify([fEmployee, fType, fStart, fEnd, fStatus, fNote]);
+  }
+
   function openForm(l?: LeaveRecord, defaults: Partial<Pick<LeaveRecord, "employeeId" | "startDate" | "endDate">> = {}) {
     editing = l;
     fEmployee = l?.employeeId ?? defaults.employeeId ?? "";
@@ -37,6 +56,7 @@
     fStatus = l?.status ?? "planned";
     fNote = l?.workloadImpactNote ?? "";
     fError = "";
+    openedSnapshot = formSnapshot();
     formOpen = true;
   }
 
@@ -70,20 +90,20 @@
       fError = "End date must be on or after the start date.";
       return;
     }
-    const now = nowTimestamp();
-    const record: LeaveRecord = {
-      id: editing?.id ?? newId(),
-      employeeId: fEmployee,
-      leaveType: fType === "Not specified" ? undefined : fType,
-      startDate: fStart,
-      endDate: fEnd,
-      status: fStatus,
-      workloadImpactNote: fNote.trim() || undefined,
-      lastVerifiedDate: editing?.lastVerifiedDate,
-      sourceSystem: editing?.sourceSystem,
-      createdAt: editing?.createdAt ?? now,
-      updatedAt: now
-    };
+    // Merge over the existing record so fields this form doesn't expose
+    // (partial day, related task, source system/reference) survive.
+    const record: LeaveRecord = mergeLeaveEdit(
+      editing,
+      {
+        employeeId: fEmployee,
+        leaveType: fType === "Not specified" ? "" : fType,
+        startDate: fStart,
+        endDate: fEnd,
+        status: fStatus,
+        workloadImpactNote: fNote
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
     await app.putRecord("leaveRecords", record, {
       actionType: editing ? "updated" : "created",
       summary: `${editing ? "Updated" : "Added"} leave for ${app.employeeName(fEmployee)} (${fStart} to ${fEnd})`
@@ -98,37 +118,23 @@
   );
 
   let calendarTitle = $derived(monthLabel(calendarMonth));
+  // Shared month grid (domain/rules/calendar.ts), same as Travel/Telework.
   let calendarWeeks = $derived.by(() => {
-    const nextMonth = addMonths(calendarMonth, 1);
-    const gridStart = addDays(calendarMonth, -weekday(calendarMonth));
-    const weeks = [];
-    let cursor = gridStart;
-    do {
-      const week = [];
-      for (let i = 0; i < 7; i++) {
-        const date = cursor;
-        week.push({
-          date,
-          day: Number(date.slice(8, 10)),
-          inMonth: date >= calendarMonth && date < nextMonth,
-          isToday: date === app.today,
-          events: rows.filter((l) => leaveCoversDate(l, date))
-        });
-        cursor = addDays(cursor, 1);
-      }
-      weeks.push(week);
-    } while (cursor < nextMonth);
-    return weeks;
+    const { year, month } = monthOf(calendarMonth);
+    return monthGrid(year, month).map((week) =>
+      week.map((cell) => ({
+        date: cell.date,
+        day: Number(cell.date.slice(8, 10)),
+        inMonth: cell.inMonth,
+        isToday: cell.date === app.today,
+        events: rows.filter((l) => leaveCoversDate(l, cell.date))
+      }))
+    );
   });
 
   function leaveCoversDate(l: LeaveRecord, date: string): boolean {
     const end = l.endDate < l.startDate ? l.startDate : l.endDate;
     return l.startDate <= date && date <= end;
-  }
-
-  function weekday(date: string): number {
-    const [y, m, d] = date.split("-").map(Number) as [number, number, number];
-    return new Date(Date.UTC(y, m - 1, d)).getUTCDay();
   }
 
   function monthLabel(date: string): string {
@@ -292,7 +298,11 @@
 </div>
 
 {#if formOpen}
-  <Dialog title={editing ? "Edit Leave" : "Add Leave"} onclose={() => (formOpen = false)}>
+  <Dialog
+    title={editing ? "Edit Leave" : "Add Leave"}
+    onclose={() => (formOpen = false)}
+    unsavedGuard={() => formSnapshot() !== openedSnapshot}
+  >
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -304,7 +314,7 @@
         <option value="">(select)</option>
         {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
       </select>
-      {#if fError}<div class="field-error">{fError}</div>{/if}
+      {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
         <div>
           <label for="lf-start">Start <span class="req">*</span></label>

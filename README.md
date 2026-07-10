@@ -12,12 +12,16 @@ by the application. Repository fixtures, tests, screenshots, and sample data rem
 ## Quick start (development machine)
 
 ```
-npm install
+npm ci
 npm run dev        # dev server
-npm test           # unit tests (domain rules, dates, backup round-trip)
-npm run check      # svelte-check / TypeScript strict
-npm run build      # production build + single-file inline + no-network scan
+npm run verify     # strict check + unit tests + production build
 ```
+
+RADAR requires Node `^20.19.0 || >=22.12.0`. `npm run check`, `npm test`, and
+`npm run build` remain available separately when iterating on a focused change.
+After a build, `npm run smoke:file` opens the generated artifact in system Edge,
+checks the Board default route, performs Quick Add, reloads, and rejects any
+network request or console error.
 
 ## Production artifact
 
@@ -47,10 +51,15 @@ tracking data, and choose the storage posture accordingly (plan section 9.5):
 ## Data safety
 
 - **Backups are first-class.** Settings → Export backup produces a JSON package with record
-  counts; import validates everything, shows a preview, and never silently overwrites (it offers
-  to export current data first and requires explicit confirmation to replace).
+  counts and a checksum. The backup reminder is cleared only after the user confirms that the
+  download exists. Import validates the package structure, field types, enums, dates, timestamps,
+  duplicate IDs, training-record uniqueness, counts, and checksum before it can replace data.
+- **Edits are transactional.** A record change, its activity entry, and the backup-change count
+  commit together. Cascading deletes either complete as one operation or leave the database intact.
 - All persistence goes through the `DataStore` interface (`src/data/DataStore.ts`);
   `IndexedDbDataStore` is the working store, `InMemoryDataStore` the fallback and test double.
+- Only one RADAR window may edit a database at a time. A second window offers a safe retry or an
+  explicit takeover rather than silently allowing stale writes.
 - "Reset all data" requires typing a confirmation phrase.
 - Backup reminders surface on the Today dashboard after 7 days or 50 changes (configurable).
 
@@ -58,45 +67,42 @@ tracking data, and choose the storage posture accordingly (plan section 9.5):
 
 Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple awards list:
 
-- **Today**: explainable attention items (overdue / due today / due soon / reminder / waiting too
-  long / stale / training / telework / leave / backup), snooze, 14-day lookahead, recently
-  completed with one-click performance-input conversion. Summary cards and attention tables use
-  fixed alignment so the dashboard scans cleanly.
-- **Kanban Board**: editable visual columns, drag-and-drop card movement, draggable column
-  reordering, keyboard card movement (`[`, `]`, `C`, `Enter`), filters, gap-based ordering, and
-  hover/focus card highlighting. Board columns organize cards visually; task progress is tracked
-  separately by each task's status.
-- **Calendar**: month view for task due dates, leave, and situational telework. Layers can be
-  toggled independently and filtered by employee. Tasks can be rescheduled by drag-and-drop, moved
-  by keyboard, cleared into a "No due date" tray, or created directly on a day.
-- **Tasks**: detailed creation/edit dialog from the start, auto-save on close, status and board
-  column fields, editable categories, notes, checklists, tags, waiting metadata, activity history
-  with concise changed-field summaries, archive/restore.
-- **Employees**: directory with workload columns, configurable competencies, CSV export, 360°
-  profile (tasks, performance, meeting notes, training, leave, telework, awards, activity),
-  check-in recording.
+- **Board**: RADAR opens to the Board by default. Editable columns support drag-and-drop,
+  keyboard card movement (`[`, `]`, `C`, `Enter`, `Alt`+arrow), and gap-based ordering. Default
+  Waiting and Complete lanes update task status; custom lanes can remain visual-only.
+- **Today**: explainable attention items, severity and summary filters, top-N/collapsible groups,
+  snooze, direct record links, and a 14-day lookahead that includes travel and award deadlines.
+- **Calendar**: dynamically sized month view for task due dates, leave, situational telework,
+  travel, and award deadlines. Layers can be toggled independently and filtered by employee.
+- **Tasks**: title-first Quick Add plus a detailed editor with notes, checklists, tags, waiting
+  metadata, activity history, and archive/restore.
+- **Employees**: directory with workload columns, sortable/sticky wide-table behavior, configurable
+  competencies, privacy-aware CSV export, and a 360° profile (tasks, performance, meetings,
+  training, leave, telework, travel, awards, activity).
 - **Performance**: Context/Action/Result & Impact capture, edit existing inputs, import from tasks,
   completion-to-input conversion prompt, coverage table, text export for evaluation preparation.
 - **Meetings**: product-team meeting note capture with linked employees/projects, discussion
   notes, action items, CSV export, archive/restore, and follow-up task creation.
-- **Training**: requirements, bulk assignment (all/by competency), employee × requirement matrix,
-  completion with expiration calculation, due warnings.
-- **Leave / Telework**: leave availability records plus situational telework request tracking,
-  request calendar, email-reference fields, CSV export, and pending-action attention.
-- **Archive**, **Settings** (thresholds, light/dark/system theme, accent color palettes,
-  editable competencies, editable board columns, editable task categories, health check, sample
-  data).
+- **Training**: requirements, employee × requirement matrix, completion with expiration
+  calculation, and due warnings.
+- **Leave / Telework / Travel / Awards**: calendar/list tracking, CSV export, direct links from
+  attention items, agreement expiry, voucher, paperwork, and nomination-deadline attention.
+- **Archive**, **Settings** (thresholds, light/dark/system theme, accent palettes, editable
+  competencies and board columns, data-health checks, sample data, backup import/export).
 
 Not yet implemented (later phases): recurring-task templates (Phase 7), saved views, global
 search, bulk actions, merge-on-import, useful reporting/print views. See `CHANGELOG.md`.
 
 ## Keyboard shortcuts
 
-`N` new task · `P` new performance input · `T` Today · `B` Board · `E` Employees · `M` Meetings ·
-on a focused board card: `[`/`]` move, `C` complete, `Enter` open · on a focused calendar task:
+`N` new task · `Q` quick add · `P` new performance input · `T` Today · `B` Board · `E` Employees ·
+`M` Meetings · on a focused board card: `[`/`]` move, `C` complete, `Enter` open, `Alt`+arrow
+reorders · on a focused calendar task:
 `[`/`]` moves by day and `{`/`}` moves by week · `Esc` closes dialogs.
+
+Single-key shortcuts can be disabled in Settings for assistive-technology compatibility.
 
 ## Repository rules
 
-See `CLAUDE.md` for the working rules every change must follow (no network dependencies, DataStore
+See `AGENTS.md` for the working rules every change must follow (no network dependencies, DataStore
 abstraction, strict TypeScript, no real personnel data anywhere, etc.).

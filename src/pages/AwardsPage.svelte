@@ -2,12 +2,14 @@
   // Awards (plan 12.10, 21). Optional module for the first MVP — a simple
   // status list; a status board can follow in Phase 9.
   import { app } from "../stores/app.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
+  import { mergeAwardEdit } from "../domain/rules/editMerge";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
 
@@ -22,6 +24,22 @@
   let fError = $state("");
   let pendingDelete = $state<AwardRecord | undefined>(undefined);
 
+  // Deep link: #/awards/{recordId} opens the award's edit dialog.
+  $effect(() => {
+    const id = router.current.param;
+    if (router.current.page !== "awards" || !id) return;
+    const record = app.awardRecords.find((a) => a.id === id);
+    if (!record) return;
+    openForm(record);
+    router.go("awards");
+  });
+
+  // Snapshot of the values the form opened with, for the unsaved-changes guard.
+  let openedSnapshot = $state("");
+  function formSnapshot(): string {
+    return JSON.stringify([fEmployee, fTitle, fType, fStatus, fDue, fNotes]);
+  }
+
   function openForm(a?: AwardRecord) {
     editing = a;
     fEmployee = a?.employeeId ?? "";
@@ -31,6 +49,7 @@
     fDue = a?.nominationDueDate ?? "";
     fNotes = a?.supportingNotes ?? "";
     fError = "";
+    openedSnapshot = formSnapshot();
     formOpen = true;
   }
 
@@ -43,19 +62,21 @@
       fError = "Nomination due date is not valid.";
       return;
     }
-    const now = nowTimestamp();
-    const record: AwardRecord = {
-      id: editing?.id ?? newId(),
-      employeeId: fEmployee,
-      title: fTitle.trim(),
-      awardType: fType.trim() || undefined,
-      status: fStatus,
-      nominationDueDate: fDue || undefined,
-      supportingNotes: fNotes.trim() || undefined,
-      relatedPerformanceInputIds: editing?.relatedPerformanceInputIds ?? [],
-      createdAt: editing?.createdAt ?? now,
-      updatedAt: now
-    };
+    // Merge over the existing record so fields this form doesn't expose
+    // (accomplishment period, citation draft, project, submission/decision
+    // dates, source reference) survive.
+    const record: AwardRecord = mergeAwardEdit(
+      editing,
+      {
+        employeeId: fEmployee,
+        title: fTitle,
+        awardType: fType,
+        status: fStatus,
+        nominationDueDate: fDue,
+        supportingNotes: fNotes
+      },
+      { id: newId(), now: nowTimestamp() }
+    );
     await app.putRecord("awardRecords", record, {
       actionType: editing ? "updated" : "created",
       summary: `${editing ? "Updated" : "Added"} award "${record.title}" for ${app.employeeName(fEmployee)}`
@@ -145,7 +166,11 @@
 </div>
 
 {#if formOpen}
-  <Dialog title={editing ? "Edit Award" : "Add Award"} onclose={() => (formOpen = false)}>
+  <Dialog
+    title={editing ? "Edit Award" : "Add Award"}
+    onclose={() => (formOpen = false)}
+    unsavedGuard={() => formSnapshot() !== openedSnapshot}
+  >
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -159,7 +184,7 @@
       </select>
       <label for="aw-title">Title <span class="req">*</span></label>
       <input id="aw-title" type="text" bind:value={fTitle} maxlength="200" style="width:100%" />
-      {#if fError}<div class="field-error">{fError}</div>{/if}
+      {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
         <div>
           <label for="aw-type">Award type</label>

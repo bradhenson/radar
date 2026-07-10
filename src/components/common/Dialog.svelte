@@ -5,20 +5,56 @@
     title,
     onclose,
     wide = false,
+    unsavedGuard,
     children
-  }: { title: string; onclose: () => void; wide?: boolean; children: Snippet } = $props();
+  }: {
+    title: string;
+    onclose: () => void;
+    wide?: boolean;
+    /**
+     * Return true while the dialog holds unsaved changes. Dismissal (backdrop
+     * click, Escape, the ✕ button) then asks before discarding, so a stray
+     * click can never silently throw away form input. Explicit Cancel/Save
+     * buttons inside the dialog bypass this by calling onclose directly.
+     */
+    unsavedGuard?: () => boolean;
+    children: Snippet;
+  } = $props();
 
   let dialogEl: HTMLDivElement | undefined = $state();
+  let confirmingDiscard = $state(false);
+
+  // Restore focus to the control that opened the dialog when it closes.
+  const opener =
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
   $effect(() => {
-    // Focus trap entry point.
-    dialogEl?.focus();
+    if (!dialogEl) return;
+    // Focus the first meaningful field; fall back to the container (which is
+    // also the focus-trap entry point).
+    const first = dialogEl.querySelector<HTMLElement>(
+      '.body input:not([type="hidden"]):not(:disabled), .body select:not(:disabled), .body textarea:not(:disabled)'
+    );
+    (first ?? dialogEl).focus();
   });
+
+  $effect(() => {
+    return () => opener?.focus();
+  });
+
+  function requestClose() {
+    if (unsavedGuard?.()) {
+      confirmingDiscard = true;
+      return;
+    }
+    onclose();
+  }
 
   function onKeydown(e: KeyboardEvent) {
     if (e.key === "Escape") {
       e.stopPropagation();
-      onclose();
+      if (confirmingDiscard) confirmingDiscard = false;
+      else requestClose();
     } else if (e.key === "Tab" && dialogEl) {
       const focusables = dialogEl.querySelectorAll<HTMLElement>(
         'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -37,7 +73,7 @@
   }
 </script>
 
-<div class="overlay" role="presentation" onclick={(e) => { if (e.target === e.currentTarget) onclose(); }}>
+<div class="overlay" role="presentation" onclick={(e) => { if (e.target === e.currentTarget) requestClose(); }}>
   <div
     class="dialog"
     class:wide
@@ -50,8 +86,22 @@
   >
     <header>
       <h2>{title}</h2>
-      <button type="button" aria-label="Close" onclick={onclose}>✕</button>
+      <button type="button" aria-label="Close" onclick={requestClose}>✕</button>
     </header>
+    {#if confirmingDiscard}
+      <div class="discard-bar" role="alert">
+        <span>You have unsaved changes.</span>
+        <button type="button" onclick={() => (confirmingDiscard = false)}>Keep editing</button>
+        <button
+          type="button"
+          class="danger"
+          onclick={() => {
+            confirmingDiscard = false;
+            onclose();
+          }}>Discard changes</button
+        >
+      </div>
+    {/if}
     <div class="body">
       {@render children()}
     </div>
@@ -108,6 +158,25 @@
     place-items: center;
   }
   header button:hover { background: var(--surface-2); color: var(--text); }
+  .discard-bar {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    flex-wrap: wrap;
+    margin: 0 1.15rem .5rem;
+    padding: .5rem .7rem;
+    border: 1px solid color-mix(in srgb, var(--warning) 55%, var(--border));
+    border-radius: var(--radius);
+    background: var(--duesoon-bg);
+    font-size: .85rem;
+    font-weight: 600;
+  }
+  .discard-bar span { margin-right: auto; }
+  .discard-bar button {
+    min-height: 1.8rem;
+    padding: .15rem .6rem;
+    font-size: .8rem;
+  }
   .body { padding: .3rem 1.15rem 1.15rem; overflow-y: auto; }
 
   @keyframes overlay-in {

@@ -4,9 +4,9 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
-  import type { IsoDate, LeaveRecord, Task, TeleworkRecord } from "../domain/models";
+  import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
-  import { leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap } from "../domain/rules/calendar";
+  import { awardDueMap, leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap, travelDayMap } from "../domain/rules/calendar";
   import { addDays, addMonths, formatDate } from "../utils/dates";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -17,6 +17,8 @@
   let showTasks = $state(true);
   let showLeave = $state(false);
   let showTelework = $state(false);
+  let showTravel = $state(false);
+  let showAwards = $state(false);
   let hideComplete = $state(false);
 
   let ym = $derived(monthOf(anchor));
@@ -52,6 +54,24 @@
           gridEnd
         )
       : new Map<IsoDate, TeleworkRecord[]>()
+  );
+  let travelMap = $derived(
+    showTravel
+      ? travelDayMap(
+          app.travelRecords.filter((r) => !filterEmployee || r.employeeId === filterEmployee),
+          gridStart,
+          gridEnd
+        )
+      : new Map<IsoDate, TravelRecord[]>()
+  );
+  let awardMap = $derived(
+    showAwards
+      ? awardDueMap(
+          app.awardRecords.filter((r) => !filterEmployee || r.employeeId === filterEmployee),
+          gridStart,
+          gridEnd
+        )
+      : new Map<IsoDate, AwardRecord[]>()
   );
 
   const PRIORITY_RANK: Record<Task["priority"], number> = { critical: 0, high: 1, normal: 2, low: 3 };
@@ -201,6 +221,16 @@
       <span class="kind-dot" aria-hidden="true"></span>
       Telework
     </label>
+    <label class="pill-toggle kind-travel" class:active={showTravel}>
+      <input type="checkbox" bind:checked={showTravel} />
+      <span class="kind-dot" aria-hidden="true"></span>
+      Travel
+    </label>
+    <label class="pill-toggle kind-award" class:active={showAwards}>
+      <input type="checkbox" bind:checked={showAwards} />
+      <span class="kind-dot" aria-hidden="true"></span>
+      Awards
+    </label>
     <label class="pill-toggle" class:active={hideComplete}>
       <input type="checkbox" bind:checked={hideComplete} />
       Active only
@@ -275,10 +305,30 @@
                 <button
                   type="button"
                   class="chip kind-chip kind-telework"
-                  title={`${app.employeeName(rec.employeeId)} — situational telework (${rec.status.replace(/_/g, " ")}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the Telework page.`}
-                  onclick={() => router.go("telework")}
+                  title={`${app.employeeName(rec.employeeId)} — situational telework (${rec.status.replace(/_/g, " ")}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the record.`}
+                  onclick={() => router.go("telework", rec.id)}
                 >
                   <span class="chip-text">Telework · {app.employeeName(rec.employeeId)}</span>
+                </button>
+              {/each}
+              {#each travelMap.get(cell.date) ?? [] as trip (trip.id)}
+                <button
+                  type="button"
+                  class="chip kind-chip kind-travel"
+                  title={`${app.employeeName(trip.employeeId)} — travel to ${trip.destination}, ${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}. Opens the record.`}
+                  onclick={() => router.go("travel", trip.id)}
+                >
+                  <span class="chip-text">Travel · {app.employeeName(trip.employeeId)}</span>
+                </button>
+              {/each}
+              {#each awardMap.get(cell.date) ?? [] as award (award.id)}
+                <button
+                  type="button"
+                  class="chip kind-chip kind-award"
+                  title={`Award nomination due: ${award.title} — ${app.employeeName(award.employeeId)} (${award.status}). Opens the record.`}
+                  onclick={() => router.go("awards", award.id)}
+                >
+                  <span class="chip-text">Award due · {award.title}</span>
                 </button>
               {/each}
             </div>
@@ -416,6 +466,8 @@
   .kind-tasks { --kind-color: var(--accent); }
   .kind-leave { --kind-color: #ca5010; }
   .kind-telework { --kind-color: #2564cf; }
+  .kind-travel { --kind-color: #038387; }
+  .kind-award { --kind-color: #8764b8; }
   .hint {
     margin-left: auto;
   }

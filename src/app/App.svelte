@@ -4,6 +4,7 @@
   import { router } from "./router.svelte";
   import Toasts from "../components/common/Toasts.svelte";
   import TaskDetail from "../components/forms/TaskDetail.svelte";
+  import QuickAddTask from "../components/forms/QuickAddTask.svelte";
   import PerformanceInputForm from "../components/forms/PerformanceInputForm.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
@@ -23,7 +24,7 @@
   import AwardsPage from "../pages/AwardsPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
-  import { formatTimestamp } from "../utils/dates";
+  import { daysSinceTimestamp, formatTimestamp } from "../utils/dates";
   import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
 
@@ -71,6 +72,48 @@
         window.matchMedia("(prefers-color-scheme: dark)").matches)
   );
 
+  // Narrow windows get a compact primary nav plus a "More" menu instead of a
+  // 14-destination horizontal scroll strip.
+  const PRIMARY_NAV = new Set(["board", "calendar", "today", "employees"]);
+  let primaryNavItems = $derived(NAV.filter((i) => PRIMARY_NAV.has(i.page)));
+  let moreNavItems = $derived(NAV.filter((i) => !PRIMARY_NAV.has(i.page)));
+  let isNarrow = $state(false);
+  let moreOpen = $state(false);
+  let moreWrap: HTMLDivElement | undefined = $state();
+  let moreIsActive = $derived(moreNavItems.some((i) => i.page === router.current.page));
+
+  $effect(() => {
+    const mq = window.matchMedia("(max-width: 700px)");
+    const apply = () => {
+      isNarrow = mq.matches;
+      if (!mq.matches) moreOpen = false;
+    };
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  });
+
+  function closeMoreOnOutsideClick(e: MouseEvent) {
+    if (moreOpen && moreWrap && !moreWrap.contains(e.target as Node)) moreOpen = false;
+  }
+
+  // Move focus to the new page's heading on route changes so screen-reader and
+  // keyboard users land at the top of the content, not wherever focus was.
+  let lastFocusedPage: string | undefined;
+  $effect(() => {
+    const page = router.current.page;
+    if (lastFocusedPage !== undefined && lastFocusedPage !== page) {
+      requestAnimationFrame(() => {
+        const heading = document.querySelector<HTMLElement>("main h1");
+        if (heading) {
+          heading.setAttribute("tabindex", "-1");
+          heading.focus();
+        }
+      });
+    }
+    lastFocusedPage = page;
+  });
+
   function toggleTheme() {
     void app.saveSettings({ ...app.settings, theme: isDark ? "light" : "dark" });
   }
@@ -79,6 +122,7 @@
     try {
       const pkg = await app.buildBackup();
       downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
+      await app.markBackupCompleted(pkg);
       app.toast("Backup exported", "success");
     } catch (e) {
       app.toast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`, "error");
@@ -105,15 +149,20 @@
   }
 
   function globalKeydown(e: KeyboardEvent) {
+    if (!app.settings.enableSingleKeyShortcuts) return;
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.newTaskOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask || ui.archivePromptTaskId)
+    if (ui.newTaskOpen || ui.quickAddOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask || ui.archivePromptTaskId)
       return;
     switch (e.key.toLowerCase()) {
       case "n":
         e.preventDefault();
         ui.openNewTask();
+        break;
+      case "q":
+        e.preventDefault();
+        ui.quickAddOpen = true;
         break;
       case "p":
         e.preventDefault();
@@ -137,11 +186,70 @@
   let backupAgeText = $derived(
     app.meta.lastBackupAt ? `Last backup ${formatTimestamp(app.meta.lastBackupAt)}` : app.hasOperatorData ? "No backup yet" : "No local records"
   );
+
+  // "Stored locally" (IndexedDB write state) and "backed up" (exported file the
+  // user confirmed) are different guarantees, shown as separate chips.
+  let backupAgeDays = $derived(
+    app.meta.lastBackupAt ? daysSinceTimestamp(app.meta.lastBackupAt, app.today) : undefined
+  );
+  let backupStale = $derived(
+    (!app.meta.lastBackupAt && app.meta.changesSinceBackup > 0) ||
+      (backupAgeDays !== undefined && backupAgeDays >= app.settings.backupReminderDays) ||
+      app.meta.changesSinceBackup >= app.settings.backupChangeThreshold
+  );
+  let backupChipText = $derived(
+    !app.meta.lastBackupAt
+      ? "No backup yet"
+      : backupAgeDays === 0
+        ? "Backed up today"
+        : `Backup ${backupAgeDays}d ago`
+  );
 </script>
 
-<svelte:window onkeydown={globalKeydown} />
+<svelte:window onkeydown={globalKeydown} onclick={closeMoreOnOutsideClick} />
 
-{#if app.initError}
+{#if app.storageFault === "blocked"}
+  <div class="page fault-screen">
+    <h1>RADAR can't open its database</h1>
+    <p>
+      Another RADAR window or tab is holding an older version of the database open, so this window cannot
+      upgrade it.
+    </p>
+    <p><strong>Close every other RADAR window and tab</strong>, then retry.</p>
+    <button type="button" class="primary" onclick={() => location.reload()}>Retry</button>
+  </div>
+{:else if app.storageFault === "locked"}
+  <div class="page fault-screen">
+    <h1>RADAR is already open in another window</h1>
+    <p>
+      To prevent two windows from overwriting each other's changes, only one RADAR window can save at a time.
+      The other window is currently the editing window.
+    </p>
+    <p>Close the other RADAR windows and retry, or make this the editing window (the other window will stop saving within a few seconds).</p>
+    <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+      <button type="button" class="primary" onclick={() => location.reload()}>Retry</button>
+      <button type="button" onclick={() => void app.initialize({ takeOverWriterLease: true })}>Use this window for editing</button>
+    </div>
+  </div>
+{:else if app.storageFault === "versionchange"}
+  <div class="page fault-screen">
+    <h1>The database changed in another window</h1>
+    <p>
+      Another RADAR window upgraded or replaced the database. This window has stopped saving to protect your
+      data. Reload to continue working here.
+    </p>
+    <button type="button" class="primary" onclick={() => location.reload()}>Reload</button>
+  </div>
+{:else if app.storageFault === "lease_lost"}
+  <div class="page fault-screen">
+    <h1>Another window took over editing</h1>
+    <p>
+      You chose to edit in a different RADAR window, so this one has stopped saving. Close this window, or
+      reload it to take editing back.
+    </p>
+    <button type="button" class="primary" onclick={() => location.reload()}>Reload and edit here</button>
+  </div>
+{:else if app.initError}
   <div class="page">
     <h1>RADAR could not start</h1>
     <p class="field-error">{app.initError}</p>
@@ -166,19 +274,24 @@
         <span>{app.settings.applicationName}</span>
       </span>
       <span class="spacer"></span>
-      <span class="chip save-status" data-status={app.saveStatus} title={backupAgeText}>
+      <span
+        class="chip save-status"
+        data-status={app.saveStatus}
+        title="Changes are saved to this browser's local storage. That is not an external backup."
+      >
         <span class="dot" aria-hidden="true"></span>
-        {#if app.saveStatus === "saving"}Saving…{:else if app.saveStatus === "error"}Save failed{:else}Saved{/if}
+        {#if app.saveStatus === "saving"}Saving…{:else if app.saveStatus === "error"}Save failed{:else}Stored locally{/if}
       </span>
       <button
         type="button"
-        class="topbar-backup"
+        class="chip backup-chip"
+        class:stale={backupStale}
+        title={`${backupAgeText} · ${app.meta.changesSinceBackup} change(s) since. Click to export a JSON backup.`}
         onclick={() => void exportBackup()}
         disabled={app.saveStatus === "saving"}
-        title="Export full JSON backup"
       >
-        <Icon name="download" size={15} />
-        <span>Export JSON</span>
+        <span class="dot" aria-hidden="true"></span>
+        {backupChipText}
       </button>
       {#if app.storageKind === "memory"}
         <span class="badge overdue" title="IndexedDB is unavailable. Data will be lost when this tab closes unless you export a backup.">
@@ -189,18 +302,64 @@
         <Icon name={isDark ? "sun" : "moon"} size={17} />
       </button>
     </header>
-
     <div class="body">
-      <nav class="sidenav" aria-label="Main navigation">
-        {#each NAV as item (item.page)}
-          {#if item.section}<div class="section">{item.section}</div>{/if}
-          <a href={"#/" + item.page} class:active={router.current.page === item.page}>
-            <span class="nav-icon"><Icon name={item.icon} size={17} /></span>
-            <span>{item.label}</span>
-          </a>
-        {/each}
-        <div class="sidenav-footer small muted">{backupAgeText}</div>
-      </nav>
+      {#if isNarrow}
+        <nav class="compactnav" aria-label="Main navigation">
+          {#each primaryNavItems as item (item.page)}
+            <a
+              href={"#/" + item.page}
+              class:active={router.current.page === item.page}
+              aria-current={router.current.page === item.page ? "page" : undefined}
+            >
+              <span class="nav-icon"><Icon name={item.icon} size={16} /></span>
+              <span>{item.label}</span>
+            </a>
+          {/each}
+          <div class="more-wrap" bind:this={moreWrap}>
+            <button
+              type="button"
+              class="more-button"
+              class:active={moreIsActive}
+              aria-expanded={moreOpen}
+              aria-haspopup="menu"
+              onclick={() => (moreOpen = !moreOpen)}
+            >
+              More ▾
+            </button>
+            {#if moreOpen}
+              <div class="more-menu" role="menu" aria-label="More destinations">
+                {#each moreNavItems as item (item.page)}
+                  <a
+                    role="menuitem"
+                    href={"#/" + item.page}
+                    class:active={router.current.page === item.page}
+                    aria-current={router.current.page === item.page ? "page" : undefined}
+                    onclick={() => (moreOpen = false)}
+                  >
+                    <span class="nav-icon"><Icon name={item.icon} size={16} /></span>
+                    <span>{item.label}</span>
+                  </a>
+                {/each}
+              </div>
+            {/if}
+          </div>
+        </nav>
+      {:else}
+        <nav class="sidenav" aria-label="Main navigation">
+          {#each NAV as item (item.page)}
+            {#if item.section}<div class="section">{item.section}</div>{/if}
+            <a
+              href={"#/" + item.page}
+              class:active={router.current.page === item.page}
+              aria-current={router.current.page === item.page ? "page" : undefined}
+            >
+              <span class="nav-icon"><Icon name={item.icon} size={17} /></span>
+              <span>{item.label}</span>
+            </a>
+          {/each}
+          <div class="sidenav-footer small muted">{backupAgeText}</div>
+        </nav>
+      {/if}
 
       <main>
         {#if !app.hasOperatorData}
@@ -250,6 +409,9 @@
 
   </div>
 
+  {#if ui.quickAddOpen}
+    <QuickAddTask onclose={() => (ui.quickAddOpen = false)} />
+  {/if}
   {#if ui.newTaskOpen}
     <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
   {/if}
@@ -386,15 +548,17 @@
   .save-status[data-status="error"] { color: var(--danger); border-color: var(--danger); }
   .save-status[data-status="error"] .dot { background: var(--danger); }
 
-  .topbar-backup {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
+  .backup-chip {
+    cursor: pointer;
+    font-weight: 600;
     min-height: 1.85rem;
-    padding: .22rem .65rem;
-    font-size: .78rem;
-    white-space: nowrap;
   }
+  .backup-chip:hover { color: var(--text); }
+  .backup-chip.stale {
+    color: var(--warning);
+    border-color: color-mix(in srgb, var(--warning) 60%, var(--border));
+  }
+  .backup-chip.stale .dot { background: var(--warning); }
 
   .icon-btn {
     display: inline-grid;
@@ -406,6 +570,11 @@
     color: var(--text-muted);
   }
   .icon-btn:hover { color: var(--text); }
+
+  .fault-screen {
+    max-width: 38rem;
+    margin: 3rem auto;
+  }
 
   .body { display: flex; flex: 1; min-height: 0; }
 
@@ -466,6 +635,71 @@
   }
 
   main { flex: 1; min-width: 0; overflow-x: auto; }
+  /* Headings receive programmatic focus on route changes; a focus ring there
+     is noise (the location change itself is the signal). */
+  main :global(h1[tabindex="-1"]:focus) { outline: none; }
+
+  /* Compact navigation for narrow windows: four primary destinations plus a
+     More menu, instead of one horizontally scrolling 14-item strip. */
+  .compactnav {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    width: 100%;
+    padding: .4rem .55rem;
+    border-bottom: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface) 55%, var(--bg));
+  }
+  .compactnav a,
+  .compactnav .more-button {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    min-height: 2.1rem;
+    padding: .3rem .55rem;
+    border: none;
+    border-radius: 9px;
+    background: none;
+    box-shadow: none;
+    color: var(--text-muted);
+    text-decoration: none;
+    font-weight: 600;
+    font-size: .85rem;
+    white-space: nowrap;
+  }
+  .compactnav a:hover,
+  .compactnav .more-button:hover {
+    background: color-mix(in srgb, var(--surface-2) 80%, transparent);
+    color: var(--text);
+    text-decoration: none;
+  }
+  .compactnav a.active,
+  .compactnav .more-button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
+  .more-wrap {
+    position: relative;
+    margin-left: auto;
+  }
+  .more-menu {
+    position: absolute;
+    right: 0;
+    top: calc(100% + .3rem);
+    min-width: 11rem;
+    padding: .3rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--surface-elevated);
+    box-shadow: var(--shadow-lg);
+    z-index: 60;
+    display: flex;
+    flex-direction: column;
+  }
+  .more-menu a {
+    display: flex;
+    width: 100%;
+  }
 
   .recovery-banner {
     display: flex;
@@ -494,27 +728,7 @@
   @media (max-width: 700px) {
     .topbar { flex-wrap: wrap; }
     .brand { flex: 1 1 100%; }
-    .topbar-backup span { display: none; }
-    .topbar-backup {
-      width: 2.1rem;
-      padding: 0;
-      justify-content: center;
-    }
     .body { flex-direction: column; }
-    .sidenav {
-      display: flex;
-      flex-direction: row;
-      gap: .25rem;
-      width: 100%;
-      height: auto;
-      position: static;
-      overflow-x: auto;
-      padding: .45rem .55rem;
-      border-right: none;
-      border-bottom: 1px solid var(--border);
-    }
-    .sidenav .section, .sidenav-footer { display: none; }
-    .sidenav a { flex: 0 0 auto; margin: 0; white-space: nowrap; }
     .recovery-banner {
       align-items: flex-start;
       flex-direction: column;

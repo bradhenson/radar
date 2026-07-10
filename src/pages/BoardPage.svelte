@@ -5,7 +5,7 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { TASK_PRIORITIES, type Task } from "../domain/models";
+  import { TASK_PRIORITIES, statusLabel, type Task } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
@@ -107,7 +107,17 @@
     const before = others[target.index - 1]?.boardOrder;
     const after = others[target.index]?.boardOrder;
     const order = orderBetween(before, after);
-    await app.moveTaskToBoardColumn(task, target.columnId, order);
+    await moveWithStatusFollowUp(task, target.columnId, order);
+  }
+
+  // Lane moves can change status (lane→status mapping). When a drop completes
+  // a task, offer the same performance-input prompt as the Done button.
+  async function moveWithStatusFollowUp(task: Task, columnId: string, order: number) {
+    const prevStatus = task.status;
+    const updated = await app.moveTaskToBoardColumn(task, columnId, order);
+    if (updated.status === "complete" && prevStatus !== "complete" && updated.employeeId && !updated.performanceInputCreated) {
+      ui.performancePromptTask = updated;
+    }
   }
 
   function onColumnDragStart(e: DragEvent, columnId: string) {
@@ -178,7 +188,7 @@
     if (!next) return;
     const col = visibleTasks.filter((t) => app.taskBoardColumnId(t) === next).sort((a, b) => a.boardOrder - b.boardOrder);
     const order = orderBetween(col[col.length - 1]?.boardOrder, undefined);
-    await app.moveTaskToBoardColumn(task, next, order);
+    await moveWithStatusFollowUp(task, next, order);
   }
 
   async function completeCard(task: Task) {
@@ -186,6 +196,21 @@
     if (updated.employeeId && !updated.performanceInputCreated) {
       ui.performancePromptTask = updated;
     }
+  }
+
+  /** Keyboard alternative to drag-reordering inside a column (Alt+↑/↓). */
+  async function reorderWithinColumn(task: Task, dir: -1 | 1) {
+    const columnId = app.taskBoardColumnId(task);
+    const col = visibleTasks
+      .filter((t) => app.taskBoardColumnId(t) === columnId)
+      .sort((a, b) => a.boardOrder - b.boardOrder);
+    const idx = col.findIndex((t) => t.id === task.id);
+    const target = idx + dir;
+    if (idx < 0 || target < 0 || target >= col.length) return;
+    const without = col.filter((t) => t.id !== task.id);
+    const before = without[target - 1]?.boardOrder;
+    const after = without[target]?.boardOrder;
+    await app.moveTaskToBoardColumn(task, columnId, orderBetween(before, after));
   }
 
   function onCardKeydown(e: KeyboardEvent, task: Task) {
@@ -198,6 +223,9 @@
     } else if (e.key === "]") {
       e.preventDefault();
       void moveByOffset(task, 1);
+    } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
+      e.preventDefault();
+      void reorderWithinColumn(task, e.key === "ArrowUp" ? -1 : 1);
     } else if (e.key.toLowerCase() === "c" && task.status !== "complete") {
       e.preventDefault();
       void completeCard(task);
@@ -339,31 +367,66 @@
                 <div class="placeholder" aria-hidden="true"></div>
               {/if}
               {@const ds = dueState(task, app.today, app.settings.dueSoonDays)}
-              <div
+              {@const statusDiverges = col.column.mapsToStatus && col.column.mapsToStatus !== task.status}
+              <article
                 class="task-card"
                 class:dragging={draggingId === task.id}
                 data-card-id={task.id}
                 draggable="true"
-                role="button"
-                tabindex="0"
                 ondragstart={(e) => onDragStart(e, task)}
                 ondragend={cancelDrag}
-                onclick={() => ui.openTaskDetail(task.id)}
-                onkeydown={(e) => onCardKeydown(e, task)}
               >
-                <div class="card-title">{task.title}</div>
-                {#if task.projectId}
-                  <div class="card-context">{app.projectName(task.projectId)}</div>
-                {/if}
-                {#if task.showOnCard === "description" && task.description}
-                  <p class="card-preview">{task.description}</p>
-                {:else if task.showOnCard === "checklist"}
+                <!-- A dedicated button carries card navigation and keyboard
+                     movement. The checklist and action buttons remain real,
+                     separate controls rather than nested inside role=button. -->
+                <button
+                  type="button"
+                  class="card-open"
+                  title="Enter opens · [ ] move between columns · Alt+↑/↓ reorder · C complete"
+                  onclick={() => ui.openTaskDetail(task.id)}
+                  onkeydown={(e) => onCardKeydown(e, task)}
+                >
+                  <span class="card-title">{task.title}</span>
+                  {#if task.projectId}
+                    <span class="card-context">{app.projectName(task.projectId)}</span>
+                  {/if}
+                  {#if task.showOnCard === "description" && task.description}
+                    <span class="card-preview">{task.description}</span>
+                  {/if}
+                  {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || task.status === "complete" || statusDiverges || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
+                    <span class="card-meta">
+                      {#if task.priority === "high" || task.priority === "critical"}
+                        <span class="badge priority-{task.priority}">{task.priority === "critical" ? "Critical" : "High"}</span>
+                      {/if}
+                      {#if ds === "overdue" || ds === "due_today" || ds === "due_soon"}
+                        <span class="badge {ds}">{DUE_STATE_LABELS[ds]} {task.dueDate ? formatDate(task.dueDate) : ""}</span>
+                      {:else if task.dueDate && task.status !== "complete"}
+                        <span class="badge">{formatDate(task.dueDate)}</span>
+                      {/if}
+                      {#if task.status === "waiting"}
+                        <span class="badge warning" title={task.waitingOn ? `Waiting on ${task.waitingOn}` : "Waiting"}>
+                          Waiting {daysSinceTimestamp(task.waitingSince ?? task.updatedAt, app.today)}d
+                        </span>
+                      {/if}
+                      {#if task.status === "complete"}
+                        <span class="badge success">Complete{task.completedDate ? ` ${formatDate(task.completedDate)}` : ""}</span>
+                      {/if}
+                      {#if statusDiverges && task.status !== "waiting" && task.status !== "complete"}
+                        <span class="badge" title="Task status differs from what this column implies">{statusLabel(task.status)}</span>
+                      {/if}
+                      {#if checklistProgress(task.id) && task.showOnCard !== "checklist"}
+                        <span class="badge checklist-badge">{checklistProgress(task.id)}</span>
+                      {/if}
+                    </span>
+                  {/if}
+                </button>
+                {#if task.showOnCard === "checklist"}
                   {@const items = cardChecklist(task.id)}
                   {#if items.length}
                     <ul class="card-checklist">
                       {#each items.slice(0, CARD_CHECKLIST_LIMIT) as item (item.id)}
                         <li>
-                          <label class="card-check" onclick={(e) => e.stopPropagation()}>
+                          <label class="card-check">
                             <input
                               type="checkbox"
                               checked={item.isComplete}
@@ -379,26 +442,6 @@
                       <div class="card-checklist-more">+{items.length - CARD_CHECKLIST_LIMIT} more</div>
                     {/if}
                   {/if}
-                {/if}
-                {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
-                  <div class="card-meta">
-                    {#if task.priority === "high" || task.priority === "critical"}
-                      <span class="badge priority-{task.priority}">{task.priority === "critical" ? "Critical" : "High"}</span>
-                    {/if}
-                    {#if ds === "overdue" || ds === "due_today" || ds === "due_soon"}
-                      <span class="badge {ds}">{DUE_STATE_LABELS[ds]} {task.dueDate ? formatDate(task.dueDate) : ""}</span>
-                    {:else if task.dueDate && task.status !== "complete"}
-                      <span class="badge">{formatDate(task.dueDate)}</span>
-                    {/if}
-                    {#if task.status === "waiting"}
-                      <span class="badge warning" title={task.waitingOn ? `Waiting on ${task.waitingOn}` : "Waiting"}>
-                        Waiting {daysSinceTimestamp(task.waitingSince ?? task.updatedAt, app.today)}d
-                      </span>
-                    {/if}
-                    {#if checklistProgress(task.id) && task.showOnCard !== "checklist"}
-                      <span class="badge checklist-badge">{checklistProgress(task.id)}</span>
-                    {/if}
-                  </div>
                 {/if}
                 <div class="card-footer">
                   {#if task.employeeId}
@@ -444,7 +487,7 @@
                     >
                   </div>
                 {/if}
-              </div>
+              </article>
             {/each}
             {#if dropTarget?.columnId === col.column.id && dropTarget.index >= col.tasks.filter((t) => t.id !== draggingId).length}
               <div class="placeholder" aria-hidden="true"></div>
@@ -675,7 +718,7 @@
       transform .15s ease;
   }
   .task-card:hover,
-  .task-card:focus {
+  .task-card:focus-within {
     background: color-mix(in srgb, var(--surface) 88%, var(--accent-soft));
     border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
     box-shadow:
@@ -685,7 +728,27 @@
     z-index: 2;
   }
   .task-card.dragging { opacity: .4; }
+  .card-open {
+    display: block;
+    width: 100%;
+    min-height: 0;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    cursor: pointer;
+    text-align: left;
+    font: inherit;
+  }
+  .card-open:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
   .card-title {
+    display: block;
     font-weight: 650;
     line-height: 1.25;
     margin-bottom: .35rem;
@@ -693,6 +756,7 @@
     overflow-wrap: anywhere;
   }
   .card-context {
+    display: block;
     color: var(--text-muted);
     font-size: .78rem;
     margin-bottom: .45rem;
@@ -706,6 +770,7 @@
     font-size: .8rem;
     line-height: 1.4;
     display: -webkit-box;
+    line-clamp: 3;
     -webkit-line-clamp: 3;
     -webkit-box-orient: vertical;
     overflow: hidden;

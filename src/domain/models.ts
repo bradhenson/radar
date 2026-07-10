@@ -87,6 +87,13 @@ export interface BoardColumnDefinition {
   id: Id;
   label: string;
   sortOrder: number;
+  /**
+   * Task status this lane implies. Dropping a card here also sets the task's
+   * status, and completing a task moves its card to the complete-mapped lane,
+   * so the board can never silently disagree with the domain rules. Columns
+   * without a mapping (custom lanes) never change status.
+   */
+  mapsToStatus?: TaskStatus;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
 }
@@ -394,6 +401,8 @@ export interface AppSettings {
   leaveLookaheadDays: number;
   theme: "light" | "dark" | "system";
   colorTheme: ColorTheme;
+  /** Unmodified N/P/Q/T/B/E/M shortcuts; can be disabled for accessibility. */
+  enableSingleKeyShortcuts: boolean;
 }
 
 export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
@@ -424,7 +433,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
   theme: "system",
-  colorTheme: "default"
+  colorTheme: "default",
+  enableSingleKeyShortcuts: true
 };
 
 /** Normalize persisted/imported settings and apply schema migrations. */
@@ -475,11 +485,11 @@ export function normalizeTaskStatus(value: string): TaskStatus {
   return value === "waiting" || value === "complete" || value === "cancelled" ? value : "open";
 }
 
-export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: number }[] = [
-  { id: "inbox", label: "Inbox", sortOrder: 10 },
-  { id: "in_progress", label: "In Progress", sortOrder: 20 },
-  { id: "waiting", label: "Waiting", sortOrder: 30 },
-  { id: "complete", label: "Complete", sortOrder: 40 }
+export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: number; mapsToStatus?: TaskStatus }[] = [
+  { id: "inbox", label: "Inbox", sortOrder: 10, mapsToStatus: "open" },
+  { id: "in_progress", label: "In Progress", sortOrder: 20, mapsToStatus: "open" },
+  { id: "waiting", label: "Waiting", sortOrder: 30, mapsToStatus: "waiting" },
+  { id: "complete", label: "Complete", sortOrder: 40, mapsToStatus: "complete" }
 ];
 
 export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [

@@ -5,6 +5,7 @@
 import type {
   AppSettings,
   AttentionSnooze,
+  AwardRecord,
   Employee,
   EmployeeInteraction,
   EmployeeTrainingRecord,
@@ -13,14 +14,16 @@ import type {
   PerformanceInput,
   Task,
   TeleworkRecord,
-  TrainingRequirement
+  TrainingRequirement,
+  TravelRecord
 } from "../models";
 import { compareDates, daysBetween, daysSinceTimestamp, describeDueDistance, formatDate } from "../../utils/dates";
+import { AWARD_FINAL_STATUSES } from "./calendar";
 import { requirementAppliesTo, trainingStatus } from "./training";
 
 export type AttentionSeverity = "info" | "low" | "medium" | "high" | "critical";
 
-export type AttentionEntityType = "task" | "employee" | "training" | "leave" | "telework" | "system";
+export type AttentionEntityType = "task" | "employee" | "training" | "leave" | "telework" | "travel" | "award" | "system";
 
 export interface AttentionItem {
   entityType: AttentionEntityType;
@@ -60,6 +63,8 @@ export interface AttentionContext {
   trainingRequirements: TrainingRequirement[];
   leaveRecords: LeaveRecord[];
   teleworkRecords: TeleworkRecord[];
+  travelRecords: TravelRecord[];
+  awardRecords: AwardRecord[];
   lastBackupAt?: string;
   changesSinceBackup: number;
   snoozes: AttentionSnooze[];
@@ -72,6 +77,8 @@ export function computeAttention(ctx: AttentionContext): AttentionItem[] {
     ...trainingAttention(ctx),
     ...leaveAttention(ctx),
     ...teleworkAttention(ctx),
+    ...travelAttention(ctx),
+    ...awardAttention(ctx),
     ...backupAttention(ctx)
   ];
   const activeSnoozes = new Map(
@@ -438,6 +445,131 @@ export function teleworkAttention(
 function isTeleworkAgreementRecord(recordType: string): boolean {
   const normalized = recordType.toLowerCase();
   return normalized.includes("agreement") || normalized.includes("renewal") || normalized.includes("modification");
+}
+
+// ---------------------------------------------------------------------------
+// Travel rules: DTS paperwork before departure, voucher after return.
+
+export function travelAttention(
+  ctx: Pick<AttentionContext, "today" | "settings" | "travelRecords" | "employees">
+): AttentionItem[] {
+  const { today, settings } = ctx;
+  const items: AttentionItem[] = [];
+  const empById = new Map(ctx.employees.map((e) => [e.id, e]));
+
+  for (const trip of ctx.travelRecords) {
+    if (trip.isArchived) continue;
+    const emp = empById.get(trip.employeeId);
+    if (!emp) continue;
+    const base = {
+      entityType: "travel" as const,
+      entityId: trip.id,
+      title: `${emp.displayName} — ${trip.destination}`,
+      employeeId: emp.id
+    };
+
+    // Voucher due 5 days after return; overdue vouchers are a hard deadline.
+    if (trip.voucherDueDate) {
+      const diff = daysBetween(today, trip.voucherDueDate);
+      if (diff < 0) {
+        items.push({
+          ...base,
+          reasonCode: "travel_voucher_overdue",
+          reasonText: `Travel voucher overdue by ${-diff} day${diff === -1 ? "" : "s"}`,
+          severity: "high",
+          sortScore: SEVERITY_SCORE.high + Math.min(-diff, 60) * 5,
+          suggestedAction: "Have the traveler submit the DTS voucher now",
+          dueDate: trip.voucherDueDate
+        });
+      } else if (diff <= 5 && compareDates(trip.endDate, today) <= 0) {
+        items.push({
+          ...base,
+          reasonCode: "travel_voucher_due",
+          reasonText: diff === 0 ? "Travel voucher due today" : `Travel voucher due in ${diff} day${diff === 1 ? "" : "s"}`,
+          severity: "medium",
+          sortScore: SEVERITY_SCORE.medium + (5 - diff) * 10,
+          suggestedAction: "Remind the traveler to submit the DTS voucher",
+          dueDate: trip.voucherDueDate
+        });
+      }
+    }
+
+    // Departure approaching with paperwork incomplete.
+    const untilStart = daysBetween(today, trip.startDate);
+    const paperworkGaps: string[] = [];
+    if (trip.iptConcurrence === "pending") paperworkGaps.push("IPT concurrence pending");
+    if (trip.dtsAuthorizationStatus !== "approved") paperworkGaps.push("DTS authorization not approved");
+    if (paperworkGaps.length && untilStart >= 0 && untilStart <= 7 && compareDates(trip.endDate, today) >= 0) {
+      items.push({
+        ...base,
+        reasonCode: "travel_paperwork_incomplete",
+        reasonText: `${untilStart === 0 ? "Travel starts today" : `Travel starts in ${untilStart} day${untilStart === 1 ? "" : "s"}`}: ${paperworkGaps.join(", ")}`,
+        severity: untilStart <= 2 ? "high" : "medium",
+        sortScore: SEVERITY_SCORE[untilStart <= 2 ? "high" : "medium"] + (7 - untilStart) * 10,
+        suggestedAction: "Complete the trip's IPT concurrence and DTS authorization",
+        dueDate: trip.startDate
+      });
+    } else if (untilStart >= 0 && untilStart <= settings.leaveLookaheadDays) {
+      // Awareness item, mirroring the leave lookahead.
+      items.push({
+        ...base,
+        reasonCode: "travel_begins_soon",
+        reasonText:
+          untilStart === 0
+            ? "Travel begins today"
+            : `Travel begins in ${untilStart} day${untilStart === 1 ? "" : "s"} (${formatDate(trip.startDate)} – ${formatDate(trip.endDate)})`,
+        severity: "info",
+        sortScore: SEVERITY_SCORE.info + (settings.leaveLookaheadDays - untilStart),
+        suggestedAction: "Check coverage while this employee is on travel",
+        dueDate: trip.startDate
+      });
+    }
+  }
+  return items;
+}
+
+// ---------------------------------------------------------------------------
+// Award rules: nomination deadlines for awards still being worked.
+
+export function awardAttention(
+  ctx: Pick<AttentionContext, "today" | "awardRecords" | "employees">
+): AttentionItem[] {
+  const { today } = ctx;
+  const items: AttentionItem[] = [];
+  const empById = new Map(ctx.employees.map((e) => [e.id, e]));
+
+  for (const award of ctx.awardRecords) {
+    if (!award.nominationDueDate || AWARD_FINAL_STATUSES.has(award.status)) continue;
+    const emp = empById.get(award.employeeId);
+    const base = {
+      entityType: "award" as const,
+      entityId: award.id,
+      title: `${award.title}${emp ? ` — ${emp.displayName}` : ""}`,
+      employeeId: award.employeeId,
+      dueDate: award.nominationDueDate
+    };
+    const diff = daysBetween(today, award.nominationDueDate);
+    if (diff < 0) {
+      items.push({
+        ...base,
+        reasonCode: "award_nomination_overdue",
+        reasonText: `Award nomination overdue by ${-diff} day${diff === -1 ? "" : "s"} (status: ${award.status})`,
+        severity: "high",
+        sortScore: SEVERITY_SCORE.high + Math.min(-diff, 60) * 5,
+        suggestedAction: "Submit the nomination or update the award status"
+      });
+    } else if (diff <= 14) {
+      items.push({
+        ...base,
+        reasonCode: "award_nomination_due_soon",
+        reasonText: diff === 0 ? "Award nomination due today" : `Award nomination due in ${diff} day${diff === 1 ? "" : "s"}`,
+        severity: diff <= 3 ? "high" : "medium",
+        sortScore: SEVERITY_SCORE[diff <= 3 ? "high" : "medium"] + (14 - diff) * 5,
+        suggestedAction: "Finish drafting and submit the nomination"
+      });
+    }
+  }
+  return items;
 }
 
 // ---------------------------------------------------------------------------

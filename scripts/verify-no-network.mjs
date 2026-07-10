@@ -43,6 +43,14 @@ for (const file of walk(DIST)) {
     if (/href=["']\.?\//.test(t) || /src=["']\.?\//.test(t)) continue;
     failures.push(`${file}: suspicious tag ${t.slice(0, 120)}`);
   }
+  // The release artifact is intentionally self-contained. Relative external
+  // JavaScript/CSS references would pass the network scan yet fail under
+  // file://, so reject them explicitly.
+  if (/\.html?$/i.test(file)) {
+    for (const tag of text.matchAll(/<(script\b[^>]*\bsrc|link\b(?=[^>]*\brel=["'][^"']*(?:stylesheet|modulepreload)[^"']*["'])[^>]*\bhref)=["'][^"']+["'][^>]*>/gi)) {
+      failures.push(`${file}: non-inline executable or stylesheet reference ${tag[0].slice(0, 120)}`);
+    }
+  }
 }
 
 if (checkedFiles === 0) {

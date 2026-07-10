@@ -4,7 +4,12 @@
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Icon from "../components/common/Icon.svelte";
-  import { APPLICATION_VERSION, parseAndValidateBackup, type BackupValidationResult } from "../data/backup";
+  import {
+    APPLICATION_VERSION,
+    MAX_BACKUP_CHARS,
+    parseAndValidateBackup,
+    type BackupValidationResult
+  } from "../data/backup";
   import { COLOR_THEMES } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { formatTimestamp } from "../utils/dates";
@@ -101,13 +106,29 @@
     }
   }
 
-  async function exportBackup() {
+  async function setBoardColumnMapping(id: string, value: string) {
+    try {
+      await app.setBoardColumnStatusMapping(id, (value || undefined) as "open" | "waiting" | "complete" | undefined);
+      boardColumnError = "";
+    } catch (e) {
+      boardColumnError = e instanceof Error ? e.message : String(e);
+    }
+  }
+
+  // Record the backup after the browser accepts the download request. Errors
+  // still prevent a requested database replacement from continuing.
+  async function exportBackup(forReplace = false) {
     try {
       const pkg = await app.buildBackup();
-      downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
-      app.toast("Backup exported", "success");
+      const filename = backupFilename("RADAR_Backup", "json");
+      downloadJson(filename, pkg);
+      await app.markBackupCompleted(pkg);
+      app.toast(`Backup downloaded: ${filename}`, "success");
+      if (forReplace) confirmReplace = true;
+      return true;
     } catch (e) {
       app.toast(`Backup failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      return false;
     }
   }
 
@@ -115,6 +136,11 @@
     const input = e.currentTarget as HTMLInputElement;
     const file = input.files?.[0];
     if (!file) return;
+    if (file.size > MAX_BACKUP_CHARS) {
+      app.toast(`File is too large to import (${Math.round(file.size / 1024 / 1024)} MB).`, "error");
+      input.value = "";
+      return;
+    }
     importFileName = file.name;
     const reader = new FileReader();
     reader.onload = () => {
@@ -139,9 +165,10 @@
     }
   }
 
+  // "Export current data, then replace" only reaches the replace confirmation
+  // after the download request and backup metadata update both succeed.
   async function backupThenReplace() {
-    await exportBackup();
-    confirmReplace = true;
+    await exportBackup(true);
   }
 
   let counts = $derived(app.recordCounts());
@@ -267,6 +294,15 @@
       <option value="dark">Dark</option>
     </select>
 
+    <label class="shortcut-toggle">
+      <input
+        type="checkbox"
+        checked={app.settings.enableSingleKeyShortcuts}
+        onchange={(e) => void updateSetting("enableSingleKeyShortcuts", (e.currentTarget as HTMLInputElement).checked)}
+      />
+      Single-key shortcuts (N new task, Q quick add, P performance input, T/B/E/M navigation)
+    </label>
+
     <div class="palette-label" id="set-color-theme">Color theme</div>
     <div class="palette-row" role="group" aria-labelledby="set-color-theme">
       {#each COLOR_THEMES as t (t.value)}
@@ -314,7 +350,7 @@
       />
       <button type="submit" class="primary">Add competency</button>
     </form>
-    {#if competencyError}<div class="field-error">{competencyError}</div>{/if}
+    {#if competencyError}<div class="field-error" role="alert">{competencyError}</div>{/if}
     {#if app.competencyList.length === 0}
       <p class="small muted">No competencies are configured yet. Add one before creating employees.</p>
     {:else}
@@ -368,7 +404,9 @@
   <section class="card" style="margin-bottom:1rem">
     <h2>Board columns</h2>
     <p class="small muted">
-      Board columns organize cards visually. Task progress is stored separately as the task status.
+      Board columns organize cards visually. A column can also mark tasks with a status when cards are dropped
+      into it (and completed tasks move to the column marked Complete). Columns set to "No status change" only
+      organize cards.
     </p>
     <form
       class="settings-add"
@@ -386,10 +424,10 @@
       />
       <button type="submit" class="primary">Add column</button>
     </form>
-    {#if boardColumnError}<div class="field-error">{boardColumnError}</div>{/if}
+    {#if boardColumnError}<div class="field-error" role="alert">{boardColumnError}</div>{/if}
     <table class="data settings-table">
       <thead>
-        <tr><th>Name</th><th>Tasks</th><th>Order</th><th></th></tr>
+        <tr><th>Name</th><th>Marks tasks as</th><th>Tasks</th><th>Order</th><th></th></tr>
       </thead>
       <tbody>
         {#each app.boardColumnList as column, i (column.id)}
@@ -402,6 +440,19 @@
                 aria-label={`Board column name ${column.label}`}
                 onchange={(e) => void renameBoardColumn(column.id, (e.currentTarget as HTMLInputElement).value)}
               />
+            </td>
+            <td>
+              <select
+                aria-label={`Status mapping for board column ${column.label}`}
+                value={column.mapsToStatus ?? ""}
+                onchange={(e) =>
+                  void setBoardColumnMapping(column.id, (e.currentTarget as HTMLSelectElement).value)}
+              >
+                <option value="">No status change</option>
+                <option value="open">Open</option>
+                <option value="waiting">Waiting</option>
+                <option value="complete">Complete</option>
+              </select>
             </td>
             <td>{app.boardColumnTaskCount(column.id)}</td>
             <td>
@@ -559,6 +610,13 @@
     font-weight: 600;
     margin: .65rem 0 .2rem;
     font-size: .85rem;
+  }
+  .shortcut-toggle {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    font-weight: 400;
+    margin-top: .65rem;
   }
   .palette-row {
     display: flex;

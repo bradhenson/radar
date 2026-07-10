@@ -1,15 +1,17 @@
 import { describe, expect, it } from "vitest";
 import {
+  awardAttention,
   backupAttention,
   computeAttention,
   employeeAttention,
   taskAttention,
   teleworkAttention,
   trainingAttention,
+  travelAttention,
   type AttentionContext
 } from "../../src/domain/rules/attention";
 import { dueState } from "../../src/domain/rules/dueState";
-import { DEFAULT_SETTINGS, type Employee, type Task } from "../../src/domain/models";
+import { DEFAULT_SETTINGS, type AwardRecord, type Employee, type Task, type TravelRecord } from "../../src/domain/models";
 
 const TODAY = "2026-07-04";
 const TS = "2026-07-04T12:00:00.000Z";
@@ -56,6 +58,8 @@ function baseCtx(overrides: Partial<AttentionContext> = {}): AttentionContext {
     trainingRequirements: [],
     leaveRecords: [],
     teleworkRecords: [],
+    travelRecords: [],
+    awardRecords: [],
     changesSinceBackup: 0,
     snoozes: [],
     ...overrides
@@ -326,6 +330,125 @@ describe("backup attention rules", () => {
   it("flags change-count threshold", () => {
     const items = backupAttention(baseCtx({ lastBackupAt: "2026-07-04T12:00:00.000Z", changesSinceBackup: 10 }));
     expect(items[0]?.reasonCode).toBe("backup_change_threshold");
+  });
+});
+
+function makeTravel(overrides: Partial<TravelRecord>): TravelRecord {
+  return {
+    id: overrides.id ?? "tr1",
+    employeeId: "e1",
+    destination: "Norfolk, VA",
+    startDate: "2026-07-20",
+    endDate: "2026-07-24",
+    iptConcurrence: "concurred",
+    dtsAuthorizationStatus: "approved",
+    createdAt: TS,
+    updatedAt: TS,
+    ...overrides
+  };
+}
+
+function makeAward(overrides: Partial<AwardRecord>): AwardRecord {
+  return {
+    id: overrides.id ?? "aw1",
+    employeeId: "e1",
+    title: "Great work award",
+    status: "Drafting",
+    relatedPerformanceInputIds: [],
+    createdAt: TS,
+    updatedAt: TS,
+    ...overrides
+  };
+}
+
+describe("travel attention rules", () => {
+  const employees = [makeEmployee({ id: "e1" })];
+
+  it("flags overdue vouchers", () => {
+    const items = travelAttention(
+      baseCtx({
+        employees,
+        travelRecords: [makeTravel({ startDate: "2026-06-20", endDate: "2026-06-25", voucherDueDate: "2026-06-30" })]
+      })
+    );
+    const overdue = items.find((i) => i.reasonCode === "travel_voucher_overdue");
+    expect(overdue).toBeDefined();
+    expect(overdue!.reasonText).toBe("Travel voucher overdue by 4 days");
+    expect(overdue!.severity).toBe("high");
+  });
+
+  it("flags vouchers due soon after return", () => {
+    const items = travelAttention(
+      baseCtx({
+        employees,
+        travelRecords: [makeTravel({ startDate: "2026-06-28", endDate: "2026-07-02", voucherDueDate: "2026-07-07" })]
+      })
+    );
+    expect(items.some((i) => i.reasonCode === "travel_voucher_due")).toBe(true);
+  });
+
+  it("flags incomplete paperwork within a week of departure", () => {
+    const items = travelAttention(
+      baseCtx({
+        employees,
+        travelRecords: [
+          makeTravel({ startDate: "2026-07-06", endDate: "2026-07-10", iptConcurrence: "pending", dtsAuthorizationStatus: "created" })
+        ]
+      })
+    );
+    const paperwork = items.find((i) => i.reasonCode === "travel_paperwork_incomplete");
+    expect(paperwork).toBeDefined();
+    expect(paperwork!.reasonText).toContain("IPT concurrence pending");
+    expect(paperwork!.reasonText).toContain("DTS authorization not approved");
+  });
+
+  it("shows an awareness item for upcoming trips with paperwork complete", () => {
+    const items = travelAttention(
+      baseCtx({ employees, travelRecords: [makeTravel({ startDate: "2026-07-10", endDate: "2026-07-12" })] })
+    );
+    expect(items.map((i) => i.reasonCode)).toEqual(["travel_begins_soon"]);
+    expect(items[0]!.severity).toBe("info");
+  });
+
+  it("skips archived trips", () => {
+    const items = travelAttention(
+      baseCtx({ employees, travelRecords: [makeTravel({ startDate: "2026-07-06", isArchived: true })] })
+    );
+    expect(items).toHaveLength(0);
+  });
+});
+
+describe("award attention rules", () => {
+  const employees = [makeEmployee({ id: "e1" })];
+
+  it("flags overdue nominations for in-progress awards", () => {
+    const items = awardAttention(
+      baseCtx({ employees, awardRecords: [makeAward({ nominationDueDate: "2026-07-01" })] })
+    );
+    const overdue = items.find((i) => i.reasonCode === "award_nomination_overdue");
+    expect(overdue).toBeDefined();
+    expect(overdue!.severity).toBe("high");
+  });
+
+  it("flags nominations due within two weeks", () => {
+    const items = awardAttention(
+      baseCtx({ employees, awardRecords: [makeAward({ nominationDueDate: "2026-07-14" })] })
+    );
+    expect(items.some((i) => i.reasonCode === "award_nomination_due_soon")).toBe(true);
+  });
+
+  it("ignores awards in final statuses and awards without deadlines", () => {
+    const items = awardAttention(
+      baseCtx({
+        employees,
+        awardRecords: [
+          makeAward({ id: "a", nominationDueDate: "2026-07-01", status: "Submitted" }),
+          makeAward({ id: "b", nominationDueDate: "2026-07-01", status: "Complete" }),
+          makeAward({ id: "c" })
+        ]
+      })
+    );
+    expect(items).toHaveLength(0);
   });
 });
 

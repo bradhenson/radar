@@ -6,6 +6,8 @@ import type { PerformanceInput, Task } from "../domain/models";
 class UiState {
   newTaskOpen = $state(false);
   newTaskDefaults = $state<Partial<Task>>({});
+  /** Title-first quick capture dialog (global). */
+  quickAddOpen = $state(false);
   /** Task id currently open in the detail dialog. */
   detailTaskId = $state<string | undefined>(undefined);
   /** Completed task for the "create performance input?" prompt. */

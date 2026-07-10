@@ -23,7 +23,13 @@
     onclose
   }: { input?: PerformanceInput; prefill?: Partial<PerformanceInput>; onclose: () => void } = $props();
 
-  const base: Partial<PerformanceInput> = input ?? prefill;
+  // This dialog is mounted for one record at a time. Put the initial-prop
+  // lookup behind a function so Svelte understands that we intentionally take
+  // a one-time draft rather than accidentally retaining a stale prop.
+  function initialBase(): Partial<PerformanceInput> {
+    return input ?? prefill;
+  }
+  const base = initialBase();
   let employeeId = $state(base.employeeId ?? "");
   let inputDate = $state(base.inputDate ?? todayIso());
   // Distinguish the untouched default date from a chosen one, so a task import
@@ -41,6 +47,30 @@
   let importNote = $state("");
   let error = $state("");
   let confirmDelete = $state(false);
+
+  // Snapshot of the values the form opened with, for the unsaved-changes guard.
+  function formSnapshot(): string {
+    return JSON.stringify([
+      employeeId,
+      inputDate,
+      situationOrContext,
+      actionOrAccomplishment,
+      result,
+      projectId,
+      performanceElementId,
+      recognitionPotential
+    ]);
+  }
+  const openedSnapshot = JSON.stringify([
+    base.employeeId ?? "",
+    base.inputDate ?? todayIso(),
+    base.situationOrContext ?? "",
+    base.actionOrAccomplishment ?? "",
+    base.result ?? "",
+    base.projectId ?? "",
+    base.performanceElementId ?? "",
+    base.recognitionPotential ?? false
+  ]);
 
   // Task import candidates: when an employee is selected, their tasks plus
   // unassigned ones; most recently completed/updated first.
@@ -158,7 +188,12 @@
   }
 </script>
 
-<Dialog title={input ? "Edit Performance Input" : "Performance Input"} wide {onclose}>
+<Dialog
+  title={input ? "Edit Performance Input" : "Performance Input"}
+  wide
+  {onclose}
+  unsavedGuard={() => formSnapshot() !== openedSnapshot}
+>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -222,7 +257,7 @@
 
     <label for="pi-action">Action <span class="req">*</span> <span class="field-hint">What did the employee do?</span></label>
     <textarea id="pi-action" bind:value={actionOrAccomplishment} rows="2" maxlength="10000" style="width:100%"></textarea>
-    {#if error}<div class="field-error">{error}</div>{/if}
+    {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <label for="pi-result-impact">
       Result / Impact

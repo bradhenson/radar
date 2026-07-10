@@ -19,7 +19,7 @@
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"overview" | "profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "awards" | "activity">("overview");
+  let tab = $state<"overview" | "profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("overview");
   let editOpen = $state(false);
   let confirmDeleteOpen = $state(false);
   let profileOpen = $state(false);
@@ -59,6 +59,11 @@
     app.leaveRecords.filter((l) => l.employeeId === employeeId).sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
   );
   let telework = $derived(app.teleworkRecords.filter((t) => t.employeeId === employeeId));
+  let travel = $derived(
+    app.travelRecords
+      .filter((t) => t.employeeId === employeeId && !t.isArchived)
+      .sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
+  );
   let awards = $derived(app.awardRecords.filter((a) => a.employeeId === employeeId));
   let interactions = $derived(
     app.employeeInteractions.filter((i) => i.employeeId === employeeId).sort((a, b) => (a.interactionDate < b.interactionDate ? 1 : -1))
@@ -202,6 +207,13 @@
     if (counts.linkedTasks > 0) {
       message += ` ${counts.linkedTasks} task(s) will be kept but no longer linked to an employee.`;
     }
+    const unlinked: [number, string][] = [
+      [counts.meetingAttendances, "meeting attendee link(s)"],
+      [counts.projectLeads, "project lead assignment(s)"],
+      [counts.trainingAssignments, "training assignment(s)"]
+    ];
+    const unlinkedParts = unlinked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
+    if (unlinkedParts.length) message += ` The following will be kept but unlinked: ${unlinkedParts.join(", ")}.`;
     message += " This cannot be undone. Consider marking the employee inactive instead if you may need this history.";
     return message;
   }
@@ -210,6 +222,19 @@
     confirmDeleteOpen = false;
     await app.deleteEmployee(employeeId);
     router.go("employees");
+  }
+
+  // Roving-tabindex keyboard support for the tab list (WAI-ARIA tabs pattern).
+  function onTabKeydown(e: KeyboardEvent, index: number) {
+    if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    let next = index;
+    if (e.key === "ArrowRight") next = (index + 1) % TABS.length;
+    else if (e.key === "ArrowLeft") next = (index - 1 + TABS.length) % TABS.length;
+    else if (e.key === "Home") next = 0;
+    else next = TABS.length - 1;
+    tab = TABS[next]![0];
+    document.getElementById(`emp-tab-${TABS[next]![0]}`)?.focus();
   }
 
   const TABS = [
@@ -221,6 +246,7 @@
     ["training", "Training"],
     ["leave", "Leave"],
     ["telework", "Telework"],
+    ["travel", "Travel"],
     ["awards", "Awards"],
     ["activity", "Activity"]
   ] as const;
@@ -255,12 +281,23 @@
       <div class="stat"><div class="num">{formatDate(employee.lastCheckInDate) || "—"}</div><div class="lbl">Last check-in</div></div>
     </div>
 
-    <nav class="tabs" aria-label="Employee sections">
-      {#each TABS as [value, label] (value)}
-        <button type="button" class:active={tab === value} onclick={() => (tab = value)}>{label}</button>
+    <div class="tabs" role="tablist" aria-label="Employee sections">
+      {#each TABS as [value, label], i (value)}
+        <button
+          type="button"
+          role="tab"
+          id={`emp-tab-${value}`}
+          aria-selected={tab === value}
+          aria-controls="emp-tabpanel"
+          tabindex={tab === value ? 0 : -1}
+          class:active={tab === value}
+          onclick={() => (tab = value)}
+          onkeydown={(e) => onTabKeydown(e, i)}
+        >{label}</button>
       {/each}
-    </nav>
+    </div>
 
+    <div id="emp-tabpanel" role="tabpanel" aria-labelledby={`emp-tab-${tab}`}>
     {#if tab === "overview"}
       <div class="notes-header">
         <h2>Notes</h2>
@@ -547,6 +584,32 @@
           </tbody>
         </table>
       {/if}
+    {:else if tab === "travel"}
+      {#if travel.length === 0}
+        <EmptyState message="No travel records." hint="Track trips and DTS paperwork from the Travel page." />
+      {:else}
+        <table class="data">
+          <thead><tr><th>Destination</th><th>Start</th><th>End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th></tr></thead>
+          <tbody>
+            {#each travel as t (t.id)}
+              <tr>
+                <td><button type="button" class="link" onclick={() => router.go("travel", t.id)}>{t.destination}</button></td>
+                <td>{formatDate(t.startDate)}</td>
+                <td>{formatDate(t.endDate)}</td>
+                <td>{t.iptConcurrence.replace(/_/g, " ")}</td>
+                <td>{t.dtsAuthorizationStatus.replace(/_/g, " ")}</td>
+                <td>
+                  {#if t.voucherDueDate && compareDates(t.voucherDueDate, app.today) < 0}
+                    <span class="badge overdue">{formatDate(t.voucherDueDate)}</span>
+                  {:else}
+                    {formatDate(t.voucherDueDate)}
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      {/if}
     {:else if tab === "awards"}
       {#if awards.length === 0}
         <EmptyState message="No award records." hint="Track nominations from the Awards page." />
@@ -571,6 +634,7 @@
         </ul>
       {/if}
     {/if}
+    </div>
   </div>
 
   {#if editOpen}

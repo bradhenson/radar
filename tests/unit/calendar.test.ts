@@ -61,6 +61,15 @@ describe("monthGrid", () => {
     expect(weeks.flat().every((c) => c.inMonth)).toBe(true);
   });
 
+  it("produces six weeks for six-row months (regression: 5-week hard-coding)", () => {
+    // August 2026 starts on a Saturday and has 31 days, so it needs 6 rows.
+    const weeks = monthGrid(2026, 8);
+    expect(weeks.length).toBe(6);
+    const dates = weeks.flat().map((c) => c.date);
+    expect(dates).toContain("2026-08-30");
+    expect(dates).toContain("2026-08-31");
+  });
+
   it("crosses year boundaries in the padding", () => {
     const weeks = monthGrid(2026, 1);
     expect(weeks[0]![0]!.date).toBe("2025-12-28");

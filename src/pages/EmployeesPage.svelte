@@ -3,6 +3,7 @@
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import { compareDates, daysBetween, formatDate } from "../utils/dates";
@@ -44,9 +45,16 @@
         });
         const inputs = app.performanceInputs.filter((p) => p.employeeId === e.id && !p.isArchived);
         const lastInput = inputs.map((p) => p.inputDate).sort().at(-1);
-        const upcomingLeave = app.leaveRecords.find(
-          (l) => l.employeeId === e.id && !["cancelled", "complete"].includes(l.status) && compareDates(l.endDate, app.today) >= 0
-        );
+        // Prefer leave happening now; otherwise select the nearest future
+        // absence. Array insertion order is not a scheduling rule.
+        const upcomingLeave = app.leaveRecords
+          .filter((l) => l.employeeId === e.id && !["cancelled", "complete"].includes(l.status) && compareDates(l.endDate, app.today) >= 0)
+          .sort((a, b) => {
+            const aNow = compareDates(a.startDate, app.today) <= 0;
+            const bNow = compareDates(b.startDate, app.today) <= 0;
+            if (aNow !== bNow) return aNow ? -1 : 1;
+            return compareDates(a.startDate, b.startDate) || compareDates(a.endDate, b.endDate);
+          })[0];
         const onLeaveNow = Boolean(upcomingLeave && compareDates(upcomingLeave.startDate, app.today) <= 0);
         const staleInput = !lastInput || daysBetween(lastInput, app.today) > STALE_INPUT_DAYS;
         return {
@@ -118,74 +126,119 @@
     return value === undefined ? "" : value ? "Yes" : "No";
   }
 
+  // CSV export with explicit column selection. The default is a minimal
+  // operational dataset; administrative and sensitive personal fields must be
+  // opted into per export and are never remembered.
+  type ExportRow = (typeof rows)[number];
+  interface ExportColumn {
+    id: string;
+    header: string;
+    value: (r: ExportRow) => string | number | undefined;
+  }
+  interface ExportGroup {
+    id: string;
+    label: string;
+    sensitive?: boolean;
+    defaultOn: boolean;
+    columns: ExportColumn[];
+  }
+
+  const EXPORT_GROUPS: ExportGroup[] = [
+    {
+      id: "operational",
+      label: "Operational",
+      defaultOn: true,
+      columns: [
+        { id: "name", header: "Employee", value: (r) => r.e.displayName },
+        { id: "competency", header: "Competency", value: (r) => app.competencyCode(r.e.competencyId) },
+        { id: "title", header: "Title", value: (r) => r.e.positionTitle },
+        { id: "status", header: "Active status", value: (r) => r.e.activeStatus },
+        { id: "ipt", header: "Integrated Product Team", value: (r) => r.e.team },
+        { id: "open", header: "Open tasks", value: (r) => r.openCount },
+        { id: "overdue", header: "Overdue tasks", value: (r) => r.overdueCount },
+        { id: "training", header: "Training due", value: (r) => r.trainingDueCount },
+        { id: "lastInput", header: "Last performance input", value: (r) => r.lastInput },
+        { id: "lastCheckIn", header: "Last check-in", value: (r) => r.e.lastCheckInDate }
+      ]
+    },
+    {
+      id: "contact",
+      label: "Contact and location",
+      defaultOn: true,
+      columns: [
+        { id: "workEmail", header: "Work email", value: (r) => r.e.workEmail },
+        { id: "workPhone", header: "Work phone", value: (r) => r.e.workPhone },
+        { id: "workCell", header: "Work cell phone", value: (r) => r.e.workCellPhone },
+        { id: "building", header: "Building", value: (r) => r.e.locationBuilding },
+        { id: "cube", header: "Cube", value: (r) => r.e.locationCube },
+        { id: "iptLead", header: "IPT Lead", value: (r) => r.e.iptLead },
+        { id: "project", header: "Project", value: (r) => r.e.employeeProject },
+        { id: "projectLead", header: "Project Lead", value: (r) => r.e.employeeProjectLead }
+      ]
+    },
+    {
+      id: "admin",
+      label: "Administrative",
+      defaultOn: false,
+      columns: [
+        { id: "series", header: "Series", value: (r) => r.e.series },
+        { id: "asset", header: "Computer asset", value: (r) => optionLabel(COMPUTER_ASSET_OPTIONS, r.e.computerAsset) },
+        { id: "govPhone", header: "Gov phone", value: (r) => yesNo(r.e.govPhone) },
+        { id: "cswfCode", header: "CSWF code", value: (r) => r.e.cswfCode },
+        { id: "cswfLevel", header: "CSWF level", value: (r) => r.e.cswfLevel },
+        { id: "twAgreement", header: "Telework agreement valid through", value: (r) => r.e.teleworkAgreementValidThrough }
+      ]
+    },
+    {
+      id: "sensitive",
+      label: "Sensitive personal information",
+      sensitive: true,
+      defaultOn: false,
+      columns: [
+        { id: "edipi", header: "EDIPI", value: (r) => r.e.edipi },
+        { id: "pernr", header: "PERNR", value: (r) => r.e.pernr },
+        { id: "personalPhone", header: "Personal cell phone", value: (r) => r.e.personalPhone },
+        { id: "clearance", header: "Clearance", value: (r) => optionLabel(CLEARANCE_OPTIONS, r.e.clearance) },
+        { id: "finStatement", header: "Financial statement required", value: (r) => yesNo(r.e.financialStatementRequired) },
+        { id: "drugTest", header: "Drug test required", value: (r) => yesNo(r.e.drugTestRequired) }
+      ]
+    }
+  ];
+
+  let exportOpen = $state(false);
+  let exportSelected = $state<Record<string, boolean>>({});
+
+  function openExportDialog() {
+    const selection: Record<string, boolean> = {};
+    for (const group of EXPORT_GROUPS) {
+      for (const col of group.columns) selection[col.id] = group.defaultOn;
+    }
+    exportSelected = selection;
+    exportOpen = true;
+  }
+
+  function setGroup(group: ExportGroup, on: boolean) {
+    for (const col of group.columns) exportSelected[col.id] = on;
+  }
+
+  function groupState(group: ExportGroup): "all" | "some" | "none" {
+    const on = group.columns.filter((c) => exportSelected[c.id]).length;
+    return on === group.columns.length ? "all" : on === 0 ? "none" : "some";
+  }
+
+  let selectedColumns = $derived(EXPORT_GROUPS.flatMap((g) => g.columns).filter((c) => exportSelected[c.id]));
+  let sensitiveSelected = $derived(
+    EXPORT_GROUPS.filter((g) => g.sensitive).some((g) => g.columns.some((c) => exportSelected[c.id]))
+  );
+
   function exportCsv() {
+    if (selectedColumns.length === 0) return;
     const csv = toCsv(
-      [
-        "Employee",
-        "Competency",
-        "Title",
-        "Active status",
-        "Integrated Product Team",
-        "IPT Lead",
-        "Project",
-        "Project Lead",
-        "Building",
-        "Cube",
-        "Work email",
-        "Work phone",
-        "Work cell phone",
-        "Personal cell phone",
-        "EDIPI",
-        "PERNR",
-        "Series",
-        "Computer asset",
-        "Gov phone",
-        "CSWF code",
-        "CSWF level",
-        "Financial statement required",
-        "Drug test required",
-        "Telework agreement valid through",
-        "Clearance",
-        "Open tasks",
-        "Overdue tasks",
-        "Training due",
-        "Last performance input",
-        "Last check-in"
-      ],
-      sorted.map((r) => [
-        r.e.displayName,
-        app.competencyCode(r.e.competencyId),
-        r.e.positionTitle,
-        r.e.activeStatus,
-        r.e.team,
-        r.e.iptLead,
-        r.e.employeeProject,
-        r.e.employeeProjectLead,
-        r.e.locationBuilding,
-        r.e.locationCube,
-        r.e.workEmail,
-        r.e.workPhone,
-        r.e.workCellPhone,
-        r.e.personalPhone,
-        r.e.edipi,
-        r.e.pernr,
-        r.e.series,
-        optionLabel(COMPUTER_ASSET_OPTIONS, r.e.computerAsset),
-        yesNo(r.e.govPhone),
-        r.e.cswfCode,
-        r.e.cswfLevel,
-        yesNo(r.e.financialStatementRequired),
-        yesNo(r.e.drugTestRequired),
-        r.e.teleworkAgreementValidThrough,
-        optionLabel(CLEARANCE_OPTIONS, r.e.clearance),
-        r.openCount,
-        r.overdueCount,
-        r.trainingDueCount,
-        r.lastInput,
-        r.e.lastCheckInDate
-      ])
+      selectedColumns.map((c) => c.header),
+      sorted.map((r) => selectedColumns.map((c) => c.value(r)))
     );
     downloadText(backupFilename("RADAR_Employees", "csv"), csv, "text/csv");
+    exportOpen = false;
   }
 </script>
 
@@ -235,7 +288,7 @@
       <input type="checkbox" bind:checked={showInactive} /> Show inactive
     </label>
     <span class="spacer"></span>
-    <button type="button" onclick={exportCsv}>Export CSV</button>
+    <button type="button" onclick={openExportDialog}>Export CSV…</button>
     <button
       type="button"
       class="primary"
@@ -249,7 +302,10 @@
   {#if rows.length === 0}
     <EmptyState message="No employees match." hint="Add an employee, or load sample data from Settings." />
   {:else}
-    <table class="data">
+    <!-- Wide table scrolls inside this container; the Name column and the
+         header row stay pinned so rows remain identifiable. -->
+    <div class="table-scroll">
+    <table class="data employee-table">
       <thead>
         <tr>
           <th aria-sort={ariaSort("name")}>{@render sortHeader("name", "Name")}</th>
@@ -331,11 +387,56 @@
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
 </div>
 
 {#if formOpen}
   <EmployeeForm employee={editing} onclose={() => (formOpen = false)} />
+{/if}
+
+{#if exportOpen}
+  <Dialog title="Export employees (CSV)" onclose={() => (exportOpen = false)}>
+    <p class="small muted" style="margin-top:0">
+      Choose which columns to include. The export covers the {sorted.length} employee(s) currently shown.
+      Sensitive fields are off by default and must be selected for each export.
+    </p>
+    {#each EXPORT_GROUPS as group (group.id)}
+      <fieldset class="export-group" class:sensitive={group.sensitive}>
+        <legend>
+          <label class="group-toggle">
+            <input
+              type="checkbox"
+              checked={groupState(group) === "all"}
+              indeterminate={groupState(group) === "some"}
+              onchange={(e) => setGroup(group, (e.currentTarget as HTMLInputElement).checked)}
+            />
+            {group.label}
+          </label>
+        </legend>
+        <div class="export-columns">
+          {#each group.columns as col (col.id)}
+            <label class="col-toggle">
+              <input type="checkbox" bind:checked={exportSelected[col.id]} />
+              {col.header}
+            </label>
+          {/each}
+        </div>
+      </fieldset>
+    {/each}
+    {#if sensitiveSelected}
+      <p class="field-error" role="alert">
+        This export will include sensitive personal information (PII). Only export it when required, store the
+        file in an approved location, and delete it when no longer needed.
+      </p>
+    {/if}
+    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem">
+      <button type="button" onclick={() => (exportOpen = false)}>Cancel</button>
+      <button type="button" class="primary" onclick={exportCsv} disabled={selectedColumns.length === 0}>
+        Export {selectedColumns.length} column{selectedColumns.length === 1 ? "" : "s"}
+      </button>
+    </div>
+  </Dialog>
 {/if}
 
 <style>
@@ -372,5 +473,57 @@
   }
   tbody tr {
     cursor: pointer;
+  }
+  .table-scroll {
+    overflow-x: auto;
+    max-width: 100%;
+  }
+  .employee-table {
+    min-width: 56rem;
+  }
+  .employee-table thead th {
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 2;
+  }
+  .employee-table th:first-child,
+  .employee-table td:first-child {
+    position: sticky;
+    left: 0;
+    background: var(--surface);
+    z-index: 1;
+    box-shadow: 1px 0 0 var(--border);
+  }
+  .employee-table thead th:first-child {
+    z-index: 3;
+  }
+  .export-group {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: .4rem .7rem .6rem;
+    margin: 0 0 .6rem;
+  }
+  .export-group.sensitive {
+    border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
+  }
+  .export-group legend {
+    padding: 0 .3rem;
+  }
+  .group-toggle,
+  .col-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    font-weight: 400;
+    margin: 0;
+  }
+  .group-toggle {
+    font-weight: 700;
+  }
+  .export-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(13rem, 1fr));
+    gap: .2rem .8rem;
   }
 </style>

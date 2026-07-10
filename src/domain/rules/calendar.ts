@@ -1,7 +1,7 @@
 // Combined month-calendar rules: which records appear on which day.
 // Pure and unit-tested; no DOM or store imports (plan section 38 layout rules).
 
-import type { IsoDate, LeaveRecord, Task, TeleworkRecord } from "../models";
+import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../models";
 import { addDays } from "../../utils/dates";
 
 export interface CalendarCell {
@@ -102,6 +102,44 @@ export function leaveDayMap(records: LeaveRecord[], start: IsoDate, end: IsoDate
       pushTo(map, day, leave);
       day = addDays(day, 1);
     }
+  }
+  return map;
+}
+
+/**
+ * Travel records expanded to every day of the trip (clamped to [start, end]).
+ * Archived trips are excluded; an end before the start renders on the start
+ * date only.
+ */
+export function travelDayMap(records: TravelRecord[], start: IsoDate, end: IsoDate): Map<IsoDate, TravelRecord[]> {
+  const map = new Map<IsoDate, TravelRecord[]>();
+  for (const trip of records) {
+    if (trip.isArchived) continue;
+    const rangeEnd = trip.endDate < trip.startDate ? trip.startDate : trip.endDate;
+    if (rangeEnd < start || trip.startDate > end) continue;
+    let day = trip.startDate < start ? start : trip.startDate;
+    const last = rangeEnd > end ? end : rangeEnd;
+    while (day <= last) {
+      pushTo(map, day, trip);
+      day = addDays(day, 1);
+    }
+  }
+  return map;
+}
+
+/** Award statuses whose nomination deadline no longer needs action. */
+export const AWARD_FINAL_STATUSES = new Set(["Submitted", "Approved", "Not selected", "Complete", "Cancelled"]);
+
+/**
+ * Awards bucketed by nomination due date within [start, end]. Awards in a
+ * final status are excluded — their deadline no longer needs attention.
+ */
+export function awardDueMap(records: AwardRecord[], start: IsoDate, end: IsoDate): Map<IsoDate, AwardRecord[]> {
+  const map = new Map<IsoDate, AwardRecord[]>();
+  for (const award of records) {
+    if (AWARD_FINAL_STATUSES.has(award.status)) continue;
+    if (!award.nominationDueDate || award.nominationDueDate < start || award.nominationDueDate > end) continue;
+    pushTo(map, award.nominationDueDate, award);
   }
   return map;
 }
