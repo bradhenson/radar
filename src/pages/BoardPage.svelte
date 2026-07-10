@@ -404,7 +404,7 @@
                         <span class="badge">{formatDate(task.dueDate)}</span>
                       {/if}
                       {#if task.status === "waiting"}
-                        <span class="badge warning" title={task.waitingOn ? `Waiting on ${task.waitingOn}` : "Waiting"}>
+                        <span class="badge warning" title="Waiting">
                           Waiting {daysSinceTimestamp(task.waitingSince ?? task.updatedAt, app.today)}d
                         </span>
                       {/if}

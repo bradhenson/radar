@@ -83,9 +83,6 @@
       dueDate: draft.dueDate || undefined,
       startDate: draft.startDate || undefined,
       reminderDate: draft.reminderDate || undefined,
-      followUpDate: draft.followUpDate || undefined,
-      waitingReason: draft.waitingReason?.trim() || undefined,
-      waitingOn: draft.waitingOn?.trim() || undefined,
       showOnCard: draft.showOnCard,
       tags: normalizedTags()
     };
@@ -103,9 +100,6 @@
       dueDate: t.dueDate || undefined,
       startDate: t.startDate || undefined,
       reminderDate: t.reminderDate || undefined,
-      followUpDate: t.followUpDate || undefined,
-      waitingReason: t.waitingReason?.trim() || undefined,
-      waitingOn: t.waitingOn?.trim() || undefined,
       showOnCard: t.showOnCard,
       tags: [...t.tags]
     };
@@ -123,8 +117,7 @@
     for (const [label, v] of [
       ["Due date", fields.dueDate],
       ["Start date", fields.startDate],
-      ["Reminder date", fields.reminderDate],
-      ["Follow-up date", fields.followUpDate]
+      ["Reminder date", fields.reminderDate]
     ] as const) {
       if (v && !isValidIsoDate(v)) {
         error = `${label} is not a valid date.`;
@@ -154,9 +147,6 @@
     dueDate: "due date",
     startDate: "start date",
     reminderDate: "reminder date",
-    followUpDate: "follow-up date",
-    waitingReason: "waiting reason",
-    waitingOn: "waiting on",
     showOnCard: "show on card",
     tags: "tags"
   };
@@ -399,20 +389,6 @@
         <label for="td-tags">Tags <span class="field-hint">(comma separated)</span></label>
         <input id="td-tags" type="text" bind:value={tagsText} style="width:100%" />
       </div>
-      {#if draft.status === "waiting"}
-        <div>
-          <label for="td-waitingon">Waiting on</label>
-          <input id="td-waitingon" type="text" bind:value={draft.waitingOn} maxlength="200" style="width:100%" />
-        </div>
-        <div>
-          <label for="td-waitingreason">Waiting reason</label>
-          <input id="td-waitingreason" type="text" bind:value={draft.waitingReason} maxlength="500" style="width:100%" />
-        </div>
-        <div>
-          <label for="td-followup">Follow-up date</label>
-          <input id="td-followup" type="date" bind:value={draft.followUpDate} style="width:100%" />
-        </div>
-      {/if}
     </div>
 
     <div style="display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap;">

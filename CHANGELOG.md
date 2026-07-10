@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Changed
+
+- Removed the task-level **Waiting on**, **Waiting reason**, and **Follow-up date** fields and the
+  follow-up-date alert. Existing values are removed when the app starts or an older backup is
+  imported; the Waiting status and its age-based attention alert remain.
+
 ### Fixed
 
 - Editing an imported or previously detailed project, award, leave, telework, or travel record no

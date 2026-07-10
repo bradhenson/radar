@@ -150,17 +150,6 @@ export function taskAttention(ctx: Pick<AttentionContext, "today" | "settings" |
       });
     }
 
-    if (task.followUpDate && compareDates(task.followUpDate, today) <= 0) {
-      items.push({
-        ...base,
-        reasonCode: "follow_up_reached",
-        reasonText: `Follow-up date reached (${formatDate(task.followUpDate)})`,
-        severity: "medium",
-        sortScore: SEVERITY_SCORE.medium + 50 + priorityBonus,
-        suggestedAction: task.waitingOn ? `Follow up with ${task.waitingOn}` : "Follow up on this task"
-      });
-    }
-
     if (task.status === "waiting") {
       const since = task.waitingSince ?? task.updatedAt;
       const waitingDays = daysSinceTimestamp(since, today);
@@ -168,7 +157,7 @@ export function taskAttention(ctx: Pick<AttentionContext, "today" | "settings" |
         items.push({
           ...base,
           reasonCode: "waiting_too_long",
-          reasonText: `Waiting for ${waitingDays} days${task.waitingOn ? ` on ${task.waitingOn}` : ""}`,
+          reasonText: `Waiting for ${waitingDays} days`,
           severity: "medium",
           sortScore: SEVERITY_SCORE.medium + Math.min(waitingDays, 60) * 5 + priorityBonus,
           suggestedAction: "Check status with the blocking party"

@@ -96,13 +96,9 @@ describe("task attention rules", () => {
     expect(taskAttention(baseCtx({ tasks }))).toHaveLength(0);
   });
 
-  it("flags reminder and follow-up dates on or before today", () => {
-    const items = taskAttention(
-      baseCtx({
-        tasks: [makeTask({ reminderDate: "2026-07-04", followUpDate: "2026-07-01" })]
-      })
-    );
-    expect(items.map((i) => i.reasonCode).sort()).toEqual(["follow_up_reached", "reminder_reached"]);
+  it("flags reminder dates on or before today", () => {
+    const items = taskAttention(baseCtx({ tasks: [makeTask({ reminderDate: "2026-07-04" })] }));
+    expect(items.map((i) => i.reasonCode)).toEqual(["reminder_reached"]);
   });
 
   it("flags waiting tasks only past the threshold", () => {

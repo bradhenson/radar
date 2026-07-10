@@ -11,8 +11,9 @@ import { COLLECTION_NAMES, emptyCollections, type CollectionName, type DatabaseS
 
 export const BACKUP_FORMAT = "SupervisorAssistantBackup";
 // v2: integrity checksum; required arrays/booleans/enums validated strictly.
-// v1 backups are migrated on import (missing collections and arrays filled).
-export const BACKUP_FORMAT_VERSION = 2;
+// v3: retired task follow-up/wait-detail fields are removed on import.
+// Older backups are migrated on import.
+export const BACKUP_FORMAT_VERSION = 3;
 export const APPLICATION_VERSION = "0.1.0";
 
 /** Hard ceiling on accepted backup file size (characters of JSON text). */
@@ -30,6 +31,39 @@ export interface BackupPackage {
   integrity: { recordCounts: Record<string, number>; checksum?: string };
 }
 
+const RETIRED_TASK_FIELDS = ["waitingOn", "waitingReason", "followUpDate"] as const;
+
+/** Omit retired task fields from exports and restored snapshots. */
+function stripRetiredTaskFields(tasks: readonly unknown[]): unknown[] {
+  return tasks.map((task) => {
+    if (typeof task !== "object" || task === null || Array.isArray(task)) return task;
+    const cleaned = { ...(task as Record<string, unknown>) };
+    for (const field of RETIRED_TASK_FIELDS) delete cleaned[field];
+    return cleaned;
+  });
+}
+
+/** Remove retired data from every import, including a malformed current-version backup. */
+function stripRetiredTaskFieldsFromImport(data: Record<string, unknown>, warnings: string[]): void {
+  const tasks = data.tasks;
+  if (!Array.isArray(tasks)) return;
+
+  let removed = 0;
+  for (const task of tasks) {
+    if (typeof task !== "object" || task === null || Array.isArray(task)) continue;
+    const record = task as Record<string, unknown>;
+    for (const field of RETIRED_TASK_FIELDS) {
+      if (field in record) {
+        delete record[field];
+        removed++;
+      }
+    }
+  }
+  if (removed > 0) {
+    warnings.push(`${removed} retired task field value(s) were removed during import.`);
+  }
+}
+
 /** FNV-1a 32-bit hash of the serialized data section (corruption detection). */
 export function backupChecksum(serializedData: string): string {
   let hash = 0x811c9dc5;
@@ -44,7 +78,8 @@ export function createBackupPackage(snapshot: DatabaseSnapshot): BackupPackage {
   const data = {} as BackupPackage["data"];
   const recordCounts: Record<string, number> = {};
   for (const name of COLLECTION_NAMES) {
-    (data as Record<string, unknown>)[name] = snapshot.collections[name];
+    (data as Record<string, unknown>)[name] =
+      name === "tasks" ? stripRetiredTaskFields(snapshot.collections.tasks) : snapshot.collections[name];
     recordCounts[name] = snapshot.collections[name].length;
   }
   data.settings = snapshot.settings;
@@ -98,7 +133,7 @@ const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = 
 };
 
 const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
-  tasks: ["startDate", "dueDate", "reminderDate", "followUpDate", "completedDate", "lastVerifiedDate"],
+  tasks: ["startDate", "dueDate", "reminderDate", "completedDate", "lastVerifiedDate"],
   employees: ["startDate", "lastCheckInDate", "teleworkAgreementValidThrough"],
   projects: ["startDate", "targetEndDate", "lastVerifiedDate"],
   evaluationCycles: ["startDate", "endDate", "midyearDate"],
@@ -283,6 +318,10 @@ function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
     version = 2;
     warnings.push("Backup migrated from format version 1 to 2.");
   }
+  if (version === 2) {
+    version = 3;
+    warnings.push("Backup migrated from format version 2 to 3.");
+  }
   pkg.formatVersion = version;
 }
 
@@ -351,6 +390,7 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
   migrateBackup(pkg, result.warnings);
 
   const data = pkg.data as Record<string, unknown>;
+  stripRetiredTaskFieldsFromImport(data, result.warnings);
   const recordedCounts =
     typeof integrity?.recordCounts === "object" && integrity.recordCounts !== null
       ? (integrity.recordCounts as Record<string, unknown>)
@@ -603,7 +643,8 @@ function validateSettings(raw: unknown, errors: string[]): void {
 export function snapshotFromBackup(pkg: BackupPackage): DatabaseSnapshot {
   const collections = emptyCollections();
   for (const name of COLLECTION_NAMES) {
-    (collections[name] as unknown[]) = (pkg.data[name] as unknown[]) ?? [];
+    const records = (pkg.data[name] as unknown[]) ?? [];
+    (collections[name] as unknown[]) = name === "tasks" ? stripRetiredTaskFields(records) : records;
   }
   return {
     collections,
