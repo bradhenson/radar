@@ -9,6 +9,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WindowControls from "../components/common/WindowControls.svelte";
   import TodayPage from "../pages/TodayPage.svelte";
   import BoardPage from "../pages/BoardPage.svelte";
   import CalendarPage from "../pages/CalendarPage.svelte";
@@ -27,6 +28,9 @@
   import { daysSinceTimestamp, formatTimestamp } from "../utils/dates";
   import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
+  import { isWailsHost, toggleMaximiseDesktopWindow } from "../data/wailsBridge";
+
+  const desktopHost = isWailsHost();
 
   $effect(() => {
     void app.initialize();
@@ -116,6 +120,10 @@
 
   function toggleTheme() {
     void app.saveSettings({ ...app.settings, theme: isDark ? "light" : "dark" });
+  }
+
+  function handleTitlebarDoubleClick() {
+    if (desktopHost) toggleMaximiseDesktopWindow();
   }
 
   async function exportBackup() {
@@ -213,6 +221,12 @@
 
 <svelte:window onkeydown={globalKeydown} onclick={closeMoreOnOutsideClick} />
 
+{#if desktopHost && !app.initialized}
+  <div class="startup-titlebar">
+    <strong>RADAR</strong><span class="spacer"></span><WindowControls />
+  </div>
+{/if}
+
 {#if app.storageFault === "blocked"}
   <div class="page fault-screen">
     <h1>RADAR can't open its database</h1>
@@ -264,22 +278,26 @@
 {:else if !app.initialized}
   <div class="page"><p class="muted">Initializing data…</p></div>
 {:else}
-  <div class="shell">
-    <header class="topbar">
-      <span class="brand">
-        <span class="brand-mark" aria-hidden="true">
-          <span class="brand-sweep"></span>
-          <svg class="brand-icon" viewBox="0 0 24 24" focusable="false">
-            <path d="M4.8 18.7A10 10 0 1 1 19.2 18.7" />
-            <path d="M8.1 15.5A5.6 5.6 0 1 1 15.9 15.5" />
-            <path d="M12 12l6.2-6.2" />
-            <circle class="radar-fill" cx="12" cy="12" r="1.7" />
-            <circle class="radar-fill" cx="18.2" cy="5.8" r="1.35" />
-          </svg>
+  <div class="shell" class:desktop-shell={desktopHost}>
+    <header class="topbar" class:desktop-titlebar={desktopHost}>
+      <!-- The maximize button remains the keyboard-accessible alternative to this native title-bar gesture. -->
+      <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <div class="titlebar-brand-region" ondblclick={handleTitlebarDoubleClick}>
+        <span class="brand">
+          <span class="brand-mark" aria-hidden="true">
+            <span class="brand-sweep"></span>
+            <svg class="brand-icon" viewBox="0 0 24 24" focusable="false">
+              <path d="M4.8 18.7A10 10 0 1 1 19.2 18.7" />
+              <path d="M8.1 15.5A5.6 5.6 0 1 1 15.9 15.5" />
+              <path d="M12 12l6.2-6.2" />
+              <circle class="radar-fill" cx="12" cy="12" r="1.7" />
+              <circle class="radar-fill" cx="18.2" cy="5.8" r="1.35" />
+            </svg>
+          </span>
+          <span>{app.settings.applicationName}</span>
         </span>
-        <span>{app.settings.applicationName}</span>
-      </span>
-      <span class="spacer"></span>
+        <span class="spacer"></span>
+      </div>
       <span
         class="chip save-status"
         data-status={app.saveStatus}
@@ -307,6 +325,7 @@
       <button type="button" class="icon-btn" onclick={toggleTheme} title="Toggle light/dark theme" aria-label="Toggle theme">
         <Icon name={isDark ? "sun" : "moon"} size={17} />
       </button>
+      {#if desktopHost}<WindowControls />{/if}
     </header>
     <div class="body">
       {#if isNarrow}
@@ -481,6 +500,32 @@
     background:
       radial-gradient(80rem 22rem at 18% -6rem, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent),
       var(--bg);
+  }
+  .desktop-shell { --topbar-h: 2.75rem; }
+  .desktop-shell .topbar { padding-top: .2rem; padding-bottom: .2rem; }
+  .desktop-titlebar { --wails-draggable: no-drag; }
+  .startup-titlebar {
+    --wails-draggable: drag;
+    user-select: none;
+  }
+  .desktop-titlebar button { --wails-draggable: no-drag; }
+  .titlebar-brand-region { display: contents; }
+  .desktop-titlebar .titlebar-brand-region {
+    --wails-draggable: drag;
+    display: flex;
+    align-items: center;
+    align-self: stretch;
+    flex: 1;
+    min-width: 0;
+    user-select: none;
+  }
+  .startup-titlebar {
+    display: flex;
+    align-items: center;
+    height: 2.75rem;
+    padding: .2rem 1rem;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
   }
   .topbar {
     display: flex;

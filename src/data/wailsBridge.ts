@@ -48,6 +48,11 @@ interface WailsWindow {
       App?: Partial<AppBindings>;
     };
   };
+  runtime?: {
+    WindowMinimise?: () => void;
+    WindowToggleMaximise?: () => void;
+    Quit?: () => void;
+  };
 }
 
 function wailsGlobals(): WailsWindow["go"] {
@@ -68,4 +73,21 @@ export function wailsAppBindings(): AppBindings | undefined {
 
 export function isWailsHost(): boolean {
   return wailsStoreBindings() !== undefined;
+}
+
+function wailsRuntime(): WailsWindow["runtime"] {
+  if (typeof window === "undefined") return undefined;
+  return (window as unknown as WailsWindow).runtime;
+}
+
+export function minimiseDesktopWindow(): void {
+  wailsRuntime()?.WindowMinimise?.();
+}
+
+export function toggleMaximiseDesktopWindow(): void {
+  wailsRuntime()?.WindowToggleMaximise?.();
+}
+
+export function closeDesktopWindow(): void {
+  wailsRuntime()?.Quit?.();
 }

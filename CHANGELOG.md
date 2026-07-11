@@ -4,6 +4,13 @@
 
 ### Changed
 
+- Replaced the duplicate native Wails title bar with a frameless desktop window. RADAR's existing
+  header is now the draggable title area with minimize, maximize/restore, and close controls, while
+  the RADAR title remains available to the Windows taskbar. Replaced the default Wails taskbar icon
+  with the same blue-gradient radar mark used in the application header. Double-clicking the open
+  header area now toggles the desktop window between maximized and restored sizes. The desktop
+  header is also more compact to preserve additional vertical workspace.
+
 - Redesigned Meeting Notes and Performance for faster review. Both now use compact, keyboard-accessible
   record lists with a selected-record detail panel and responsive stacking. Performance adds searchable
   All Inputs, By Employee, and Coverage views with sorting and integrated coverage navigation.

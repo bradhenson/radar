@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="tile" x1="120" y1="100" x2="900" y2="920" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5aa7ff"/>
+      <stop offset="0.52" stop-color="#4f6fe8"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0" cy="0" r="1" gradientTransform="translate(292 214) rotate(48) scale(740)">
+      <stop stop-color="#ffffff" stop-opacity="0.22"/>
+      <stop offset="0.72" stop-color="#ffffff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect x="64" y="64" width="896" height="896" rx="220" fill="url(#tile)"/>
+  <rect x="64" y="64" width="896" height="896" rx="220" fill="url(#glow)"/>
+  <g fill="none" stroke="#fff" stroke-width="68" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M220 792A410 410 0 1 1 804 792"/>
+    <path d="M352 660A224 224 0 1 1 672 660"/>
+    <path d="M512 512 768 256"/>
+  </g>
+  <circle cx="512" cy="512" r="58" fill="#fff"/>
+  <circle cx="768" cy="256" r="46" fill="#fff"/>
+</svg>
