@@ -4,8 +4,10 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -304,7 +306,7 @@ func TestUnknownCollectionRejectedEverywhere(t *testing.T) {
 	}
 }
 
-func TestDatabaseInfoAndWALMode(t *testing.T) {
+func TestDatabaseInfoAndSingleFileJournalMode(t *testing.T) {
 	store := openTestStore(t)
 	raw, err := store.GetDatabaseInfo()
 	if err != nil {
@@ -318,11 +320,91 @@ func TestDatabaseInfoAndWALMode(t *testing.T) {
 	if err := json.Unmarshal([]byte(raw), &info); err != nil {
 		t.Fatalf("info is not valid JSON: %v", err)
 	}
-	if info.JournalMode != "wal" {
-		t.Fatalf("journal mode = %q, want wal", info.JournalMode)
+	if info.JournalMode != "delete" {
+		t.Fatalf("journal mode = %q, want delete", info.JournalMode)
 	}
 	if info.Path == "" || info.SizeBytes <= 0 {
 		t.Fatalf("unexpected info: %+v", info)
+	}
+}
+
+func TestDatabaseFileCopyContainsCommittedRecordsWhileOpen(t *testing.T) {
+	sourcePath := filepath.Join(t.TempDir(), "radar.db")
+	store, err := OpenStore(sourcePath)
+	if err != nil {
+		t.Fatalf("OpenStore source: %v", err)
+	}
+	t.Cleanup(func() { store.closeDB() })
+	if err := store.Put("tasks", task("portable", "copied record")); err != nil {
+		t.Fatalf("Put: %v", err)
+	}
+
+	copyPath := filepath.Join(t.TempDir(), "radar.db")
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		t.Fatalf("open source database: %v", err)
+	}
+	destination, err := os.Create(copyPath)
+	if err != nil {
+		source.Close()
+		t.Fatalf("create copied database: %v", err)
+	}
+	if _, err := io.Copy(destination, source); err != nil {
+		t.Fatalf("copy database: %v", err)
+	}
+	if err := source.Close(); err != nil {
+		t.Fatalf("close source database file: %v", err)
+	}
+	if err := destination.Close(); err != nil {
+		t.Fatalf("close copied database file: %v", err)
+	}
+
+	copyStore, err := OpenStore(copyPath)
+	if err != nil {
+		t.Fatalf("OpenStore copy: %v", err)
+	}
+	t.Cleanup(func() { copyStore.closeDB() })
+	expectIDs(t, copyStore, "tasks", "portable")
+}
+
+func TestValidateRadarDatabaseAcceptsRadarAndRejectsUnrelatedSQLite(t *testing.T) {
+	radarPath := filepath.Join(t.TempDir(), "existing.db")
+	store, err := OpenStore(radarPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.closeDB(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRadarDatabase(radarPath); err != nil {
+		t.Fatalf("valid RADAR database rejected: %v", err)
+	}
+
+	unrelatedPath := filepath.Join(t.TempDir(), "unrelated.db")
+	unrelated, err := sql.Open("sqlite", unrelatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := unrelated.Exec(`CREATE TABLE unrelated (id TEXT)`); err != nil {
+		t.Fatal(err)
+	}
+	if err := unrelated.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateRadarDatabase(unrelatedPath); err == nil {
+		t.Fatal("unrelated SQLite database should be rejected")
+	}
+	probe, err := sql.Open("sqlite", unrelatedPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer probe.Close()
+	var count int
+	if err := probe.QueryRow(`SELECT count(*) FROM sqlite_master WHERE type = 'table' AND name = 'app_meta'`).Scan(&count); err != nil {
+		t.Fatal(err)
+	}
+	if count != 0 {
+		t.Fatal("validation modified the unrelated database")
 	}
 }
 

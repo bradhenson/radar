@@ -54,8 +54,11 @@ cd .. && npm run smoke:desktop
 and uses Wails' `error` WebView2 strategy so the executable never downloads a runtime. The target
 machine must already have WebView2. By default data is stored in
 `%LOCALAPPDATA%\RADAR\radar.db`; placing an existing `radar.db` beside `RADAR.exe` selects portable
-mode. Settings shows the active database path and size. JSON backups remain the canonical portable
-copy, and desktop exports use the native Windows save dialog.
+mode. The desktop store uses single-file rollback journaling so committed records remain in that
+file without a separate `-wal` companion. Settings shows the active database path and size. JSON
+backups remain the canonical portable copy, and desktop exports use the native Windows save dialog.
+Desktop Settings can open an existing validated RADAR `.db`, create a new database at an exact
+filename and location, remember that file for future launches, or open its folder in File Explorer.
 
 The desktop smoke launches the packaged executable with an isolated portable database, verifies
 that the frontend crossed the Wails bridge and initialized SQLite, then relaunches and confirms the

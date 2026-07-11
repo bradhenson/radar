@@ -11,6 +11,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -69,11 +70,14 @@ func OpenStore(dbPath string) (*Store, error) {
 	if err != nil {
 		return nil, fmt.Errorf("open database: %w", err)
 	}
-	// One connection serializes all access; combined with WAL and a busy
-	// timeout this removes SQLITE_BUSY from a single-user desktop app.
+	// One connection serializes all access. Keep the rollback journal in
+	// DELETE mode so radar.db is the complete portable database at every
+	// committed write. WAL would allow recent records to live only in a
+	// radar.db-wal companion, making a copied radar.db open successfully but
+	// appear empty or stale beside the executable.
 	db.SetMaxOpenConns(1)
 	for _, pragma := range []string{
-		"PRAGMA journal_mode=WAL",
+		"PRAGMA journal_mode=DELETE",
 		"PRAGMA busy_timeout=5000",
 		"PRAGMA synchronous=NORMAL",
 	} {
@@ -101,6 +105,32 @@ func OpenStore(dbPath string) (*Store, error) {
 		return nil, fmt.Errorf("write schema version: %w", err)
 	}
 	return &Store{db: db, dbPath: dbPath}, nil
+}
+
+// ValidateRadarDatabase checks an existing file before OpenStore is allowed
+// to run schema DDL. This prevents an accidentally selected, unrelated
+// SQLite database from being modified by RADAR.
+func ValidateRadarDatabase(dbPath string) error {
+	stat, err := os.Stat(dbPath)
+	if err != nil {
+		return fmt.Errorf("open selected database: %w", err)
+	}
+	if stat.IsDir() {
+		return errors.New("selected database is a directory")
+	}
+	db, err := sql.Open("sqlite", dbPath)
+	if err != nil {
+		return fmt.Errorf("inspect selected database: %w", err)
+	}
+	defer db.Close()
+	var schemaVersion string
+	if err := db.QueryRow(`SELECT value FROM app_meta WHERE key = 'schema_version'`).Scan(&schemaVersion); err != nil {
+		return errors.New("selected file is not a RADAR database")
+	}
+	if schemaVersion != "1" {
+		return fmt.Errorf("unsupported RADAR database schema version %q", schemaVersion)
+	}
+	return nil
 }
 
 // closeDB is deliberately unexported: exported methods on Store are bound

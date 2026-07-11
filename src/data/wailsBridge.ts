@@ -33,6 +33,12 @@ export interface StoreBindings {
 export interface AppBindings {
   /** Native save dialog + write. Returns the saved path, or "" on cancel. */
   SaveTextFile(defaultFilename: string, content: string): Promise<string>;
+  /** Selects and opens an existing RADAR .db file. Returns "" on cancel. */
+  OpenDatabaseFile(): Promise<string>;
+  /** Creates and switches to a new RADAR .db file. Returns "" on cancel. */
+  CreateDatabaseFile(): Promise<string>;
+  /** Opens the directory containing the active radar.db in File Explorer. */
+  OpenDatabaseFolder(): Promise<void>;
 }
 
 interface WailsWindow {

@@ -35,7 +35,7 @@ func main() {
 	}
 	defer store.closeDB()
 
-	app := NewApp()
+	app := NewApp(store)
 	err = wails.Run(&options.App{
 		Title:  "RADAR",
 		Width:  1280,

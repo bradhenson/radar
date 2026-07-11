@@ -23,7 +23,14 @@ copyFileSync(builtExe, exe);
 writeFileSync(db, ""); // Presence beside the executable selects portable mode.
 
 function launch() {
-  const child = spawn(exe, [], { detached: true, stdio: "ignore" });
+  // Isolate both the portable database and the remembered database-path
+  // preference. A developer's real selection must never redirect this test
+  // away from its temporary radar.db.
+  const child = spawn(exe, [], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, LOCALAPPDATA: workDir }
+  });
   child.unref();
   return child.pid;
 }

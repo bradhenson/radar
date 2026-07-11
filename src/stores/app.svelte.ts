@@ -33,7 +33,7 @@ import { COLLECTION_NAMES, deleteOp, putOp } from "../data/DataStore";
 import { IndexedDbDataStore, StorageBlockedError, StorageLockedError, type ConnectionLossReason } from "../data/IndexedDbDataStore";
 import { InMemoryDataStore } from "../data/InMemoryDataStore";
 import { WailsDataStore } from "../data/WailsDataStore";
-import { wailsStoreBindings } from "../data/wailsBridge";
+import { wailsAppBindings, wailsStoreBindings } from "../data/wailsBridge";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import { newId } from "../utils/ids";
@@ -428,6 +428,47 @@ export class AppStore {
     } catch (e) {
       await this.refreshStoragePersistence();
       this.toast(`Persistent storage request failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async openDesktopDatabaseFile(): Promise<void> {
+    if (this.storageKind !== "sqlite") return;
+    const bindings = wailsAppBindings();
+    if (!bindings) return;
+    try {
+      const path = await bindings.OpenDatabaseFile();
+      if (path === "") return;
+      await this.loadAll();
+      await this.refreshDesktopInfo();
+      this.toast("Database opened", "success");
+    } catch (e) {
+      this.toast(`Could not open database: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async createDesktopDatabaseFile(): Promise<void> {
+    if (this.storageKind !== "sqlite") return;
+    const bindings = wailsAppBindings();
+    if (!bindings) return;
+    try {
+      const path = await bindings.CreateDatabaseFile();
+      if (path === "") return;
+      await this.loadAll();
+      await this.refreshDesktopInfo();
+      this.toast("New database created", "success");
+    } catch (e) {
+      this.toast(`Could not create database: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async openDesktopDatabaseFolder(): Promise<void> {
+    if (this.storageKind !== "sqlite") return;
+    const bindings = wailsAppBindings();
+    if (!bindings) return;
+    try {
+      await bindings.OpenDatabaseFolder();
+    } catch (e) {
+      this.toast(`Could not open database folder: ${e instanceof Error ? e.message : String(e)}`, "error");
     }
   }
 

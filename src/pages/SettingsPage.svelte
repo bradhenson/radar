@@ -256,6 +256,13 @@
         <strong>Database file:</strong> {app.desktopInfo?.path ?? "unknown"}
         · <strong>Size:</strong> {formatBytes(app.desktopInfo?.sizeBytes)}
       </p>
+      <p class="small muted">
+        Advanced database controls change which SQLite file RADAR is actively using. Opening another database
+        immediately replaces the fields shown in the app with that file's data; it does not copy, merge, or delete
+        records in either database. Create a new database to start with an empty dataset at an exact location. RADAR
+        remembers the selected file for the next launch. Export a JSON backup before switching if you need a portable
+        recovery copy.
+      </p>
     {:else}
       <p class="small muted">
         <strong>Browser persistence:</strong> {persistenceLabel}. {storageEstimate}. Persistent storage can reduce normal
@@ -265,6 +272,11 @@
     <div style="display:flex; gap:.5rem; flex-wrap:wrap">
       <button type="button" class="primary" onclick={() => void exportBackup()}>Export backup (JSON)</button>
       <button type="button" onclick={() => fileInput?.click()}>Import backup...</button>
+      {#if app.storageKind === "sqlite"}
+        <button type="button" onclick={() => void app.openDesktopDatabaseFile()}>Open existing database...</button>
+        <button type="button" onclick={() => void app.createDesktopDatabaseFile()}>Create new database...</button>
+        <button type="button" onclick={() => void app.openDesktopDatabaseFolder()}>Open containing folder</button>
+      {/if}
       {#if app.storageKind !== "sqlite"}
         <button
           type="button"

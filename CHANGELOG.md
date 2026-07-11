@@ -4,6 +4,14 @@
 
 ### Changed
 
+- Added advanced desktop Settings actions to open a validated existing RADAR `.db`, create a new
+  database at an exact filename and location, remember the active file, and open its containing
+  folder in File Explorer. Settings now explains database switching behavior and safeguards.
+
+- Fixed portable desktop databases opening at the correct path but appearing empty or stale when
+  `radar.db` had been copied without SQLite's WAL companion file. Desktop commits now remain in the
+  single `.db` file, and a regression test verifies a live database-file copy retains its records.
+
 - New browser and desktop databases now start in dark mode by default. Existing saved theme
   preferences remain unchanged.
 
