@@ -44,6 +44,10 @@
   --shadow: 0 1px 2px rgba(18, 26, 43, 0.05), 0 4px 16px rgba(18, 26, 43, 0.06);
   --shadow-lg: 0 4px 12px rgba(18, 26, 43, 0.1), 0 20px 48px rgba(18, 26, 43, 0.14);
 
+  /* Motion — compositor-friendly curve shared across components. Everything
+     animated with it is neutralized by the reduced-motion gate below. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+
   --topbar-h: 3.4rem;
 }
 
@@ -357,6 +361,10 @@ table.data td { border-bottom: 1px solid var(--border); }
 table.data tbody tr:last-child td { border-bottom: none; }
 table.data tbody tr { transition: background-color .1s ease; }
 table.data tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 38%, transparent); }
+/* Accent tick that slides in along the row's leading edge on hover — a second
+   (non-color) cue that the row is interactive. */
+table.data td:first-child { box-shadow: inset 0 0 0 transparent; transition: box-shadow .16s var(--ease-out); }
+table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
 
 /* ---------- surfaces ---------- */
 
@@ -460,3 +468,16 @@ table.data tbody tr:hover { background: color-mix(in srgb, var(--accent-soft) 38
 .summary-cards .stat.alert .num { color: var(--danger); }
 .summary-cards .stat.warn { --stat-color: var(--warning); }
 .summary-cards .stat.warn .num { color: var(--warning); }
+
+/* ---------- reduced motion ----------
+   Global gate: every decorative animation and transition in the app collapses
+   to an instant state change. Nothing in the app depends on animation events
+   for logic, so this is purely presentational. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
