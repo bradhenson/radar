@@ -231,14 +231,17 @@
     EXPORT_GROUPS.filter((g) => g.sensitive).some((g) => g.columns.some((c) => exportSelected[c.id]))
   );
 
-  function exportCsv() {
+  async function exportCsv() {
     if (selectedColumns.length === 0) return;
     const csv = toCsv(
       selectedColumns.map((c) => c.header),
       sorted.map((r) => selectedColumns.map((c) => c.value(r)))
     );
-    downloadText(backupFilename("RADAR_Employees", "csv"), csv, "text/csv");
-    exportOpen = false;
+    try {
+      if (await downloadText(backupFilename("RADAR_Employees", "csv"), csv, "text/csv")) exportOpen = false;
+    } catch {
+      app.toast("Employee export failed", "error");
+    }
   }
 </script>
 

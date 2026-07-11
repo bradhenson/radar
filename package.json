@@ -7,12 +7,15 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/build-single-file.mjs && node scripts/verify-no-network.mjs",
+    "prepare:desktop": "npm run build && node scripts/copy-desktop-assets.mjs",
+    "build:desktop": "cd desktop && wails build -clean -platform windows/amd64 -webview2 error",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "verify": "npm run check && npm test && npm run build",
-    "smoke:file": "node scripts/smoke-file.mjs"
+    "smoke:file": "node scripts/smoke-file.mjs",
+    "smoke:desktop": "node scripts/smoke-desktop.mjs"
   },
   "engines": {
     "node": "^20.19.0 || >=22.12.0"

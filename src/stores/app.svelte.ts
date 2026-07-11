@@ -32,6 +32,8 @@ import type { CollectionName, CollectionTypes, DataStore, DatabaseSnapshot, Muta
 import { COLLECTION_NAMES, deleteOp, putOp } from "../data/DataStore";
 import { IndexedDbDataStore, StorageBlockedError, StorageLockedError, type ConnectionLossReason } from "../data/IndexedDbDataStore";
 import { InMemoryDataStore } from "../data/InMemoryDataStore";
+import { WailsDataStore } from "../data/WailsDataStore";
+import { wailsStoreBindings } from "../data/wailsBridge";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import { newId } from "../utils/ids";
@@ -96,12 +98,14 @@ export class AppStore {
   settings = $state<AppSettings>({ ...DEFAULT_SETTINGS });
   meta = $state<StoreMeta>({ databaseId: "", changesSinceBackup: 0 });
   saveStatus = $state<SaveStatus>("saved");
-  storageKind = $state<"indexeddb" | "memory" | "unknown">("unknown");
+  storageKind = $state<"indexeddb" | "memory" | "sqlite" | "unknown">("unknown");
   storagePersistence = $state<StoragePersistenceStatus>({
     supported: false,
     persistAvailable: false,
     estimateAvailable: false
   });
+  /** Database file details when running in the desktop (Wails) shell. */
+  desktopInfo = $state<{ path: string; sizeBytes: number } | undefined>(undefined);
   /**
     * Blocking storage fault. "blocked": another window holds an older database
    * version open. "locked": another window holds the writer lease. The
@@ -274,7 +278,16 @@ export class AppStore {
     this.storageFault = undefined;
     this.initError = undefined;
     try {
-      if (IndexedDbDataStore.isSupported()) {
+      const desktopBindings = wailsStoreBindings();
+      if (desktopBindings) {
+        // Desktop shell (Wails): SQLite via the Go bridge. Deliberately no
+        // fallback to IndexedDB here — that would silently split data into
+        // the WebView2 profile. A failed bridge surfaces as initError.
+        const desktop = new WailsDataStore(desktopBindings);
+        await desktop.initialize();
+        this.store = desktop;
+        this.storageKind = "sqlite";
+      } else if (IndexedDbDataStore.isSupported()) {
         try {
           const idb = new IndexedDbDataStore({
             forceWriterLease: options.takeOverWriterLease,
@@ -305,6 +318,7 @@ export class AppStore {
       }
       await this.loadAll();
       await this.refreshStoragePersistence();
+      await this.refreshDesktopInfo();
       this.initialized = true;
     } catch (e) {
       this.initError = e instanceof Error ? e.message : String(e);
@@ -379,6 +393,19 @@ export class AppStore {
         estimateAvailable: typeof storage.estimate === "function",
         error: e instanceof Error ? e.message : String(e)
       };
+    }
+  }
+
+  /** Refresh database file details from the desktop shell, if present. */
+  private async refreshDesktopInfo(): Promise<void> {
+    if (this.storageKind !== "sqlite") return;
+    const bindings = wailsStoreBindings();
+    if (!bindings) return;
+    try {
+      const info = JSON.parse(await bindings.GetDatabaseInfo()) as { path: string; sizeBytes: number };
+      this.desktopInfo = { path: info.path, sizeBytes: info.sizeBytes };
+    } catch {
+      this.desktopInfo = undefined;
     }
   }
 

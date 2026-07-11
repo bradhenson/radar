@@ -49,7 +49,7 @@
     return ids.map((id) => app.employeeName(id)).filter(Boolean).join("; ");
   }
 
-  function exportCsv() {
+  async function exportCsv() {
     const csv = toCsv(
       [
         "Date",
@@ -70,7 +70,11 @@
         note.actionItems
       ])
     );
-    downloadText(backupFilename("RADAR_MeetingNotes", "csv"), csv, "text/csv");
+    try {
+      await downloadText(backupFilename("RADAR_MeetingNotes", "csv"), csv, "text/csv");
+    } catch {
+      app.toast("Meeting export failed", "error");
+    }
   }
 
   async function archive(note: MeetingNote) {

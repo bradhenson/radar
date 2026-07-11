@@ -4,6 +4,9 @@
 
 ### Changed
 
+- New browser and desktop databases now start in dark mode by default. Existing saved theme
+  preferences remain unchanged.
+
 - Visual polish pass (decorative only; all motion respects reduced-motion preferences):
   - The board now fills the window exactly — no permanent window scrollbar; long lanes scroll
     their own cards internally.
@@ -39,6 +42,11 @@
   minimal operational column set; sensitive columns require an explicit choice.
 
 ### Added
+
+- Optional Wails v2 Windows desktop distribution backed by a local SQLite database, with atomic
+  DataStore operations, native save dialogs, portable-database mode, Settings database details,
+  Go/TypeScript contract tests, and desktop build/launch smoke commands. The existing self-contained
+  `file://` browser artifact remains supported and has no desktop runtime dependency.
 
 - Title-first **Quick Add** task dialog (`Q`) for rapid capture without opening the full task editor.
 - Attention severity/summary filters, collapsible top-N groups, Travel and Award lookahead items,

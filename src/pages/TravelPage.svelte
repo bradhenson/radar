@@ -209,7 +209,7 @@
     calendarMonth = addMonths(calendarMonth, offset);
   }
 
-  function exportCsv() {
+  async function exportCsv() {
     const csv = toCsv(
       ["Employee", "Destination", "Start", "End", "IPT concurrence", "DTS authorization", "DTS auth ID", "Voucher due", "Notes"],
       rows.map((t) => [
@@ -224,7 +224,11 @@
         t.notes
       ])
     );
-    downloadText(backupFilename("RADAR_Travel", "csv"), csv, "text/csv");
+    try {
+      await downloadText(backupFilename("RADAR_Travel", "csv"), csv, "text/csv");
+    } catch {
+      app.toast("Travel export failed", "error");
+    }
   }
 
   function editFromRow(t: TravelRecord) {

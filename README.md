@@ -35,6 +35,33 @@ network request or console error.
 To deploy to the operational machine, transfer `dist/radar.html` through an authorized process and
 open it in the managed browser.
 
+## Optional Windows desktop artifact
+
+RADAR can also be packaged as a Wails v2 desktop executable backed by SQLite. This is an optional
+distribution; the self-contained browser artifact above remains supported and unchanged.
+
+Prerequisites on the development machine are Go 1.25+, Wails CLI 2.13.x, Node/npm, and the normal
+Windows Wails toolchain. Build and test it with:
+
+```
+npm ci
+npm run build:desktop
+cd desktop && go vet ./... && go test ./...
+cd .. && npm run smoke:desktop
+```
+
+`npm run build:desktop` creates `desktop/build/bin/RADAR.exe`, embeds the same single-file frontend,
+and uses Wails' `error` WebView2 strategy so the executable never downloads a runtime. The target
+machine must already have WebView2. By default data is stored in
+`%LOCALAPPDATA%\RADAR\radar.db`; placing an existing `radar.db` beside `RADAR.exe` selects portable
+mode. Settings shows the active database path and size. JSON backups remain the canonical portable
+copy, and desktop exports use the native Windows save dialog.
+
+The desktop smoke launches the packaged executable with an isolated portable database, verifies
+that the frontend crossed the Wails bridge and initialized SQLite, then relaunches and confirms the
+same database lineage remains. UI workflows should also be checked in the real executable for
+release changes.
+
 ## Phase 0 — environment test (run this in a managed environment first)
 
 `environment-test/index.html` is a standalone page (no build step) that verifies what the managed
@@ -57,7 +84,8 @@ tracking data, and choose the storage posture accordingly (plan section 9.5):
 - **Edits are transactional.** A record change, its activity entry, and the backup-change count
   commit together. Cascading deletes either complete as one operation or leave the database intact.
 - All persistence goes through the `DataStore` interface (`src/data/DataStore.ts`);
-  `IndexedDbDataStore` is the working store, `InMemoryDataStore` the fallback and test double.
+  `IndexedDbDataStore` is the browser working store, `WailsDataStore` uses SQLite in the desktop
+  shell, and `InMemoryDataStore` is the browser fallback and test double.
 - Only one RADAR window may edit a database at a time. A second window offers a safe retry or an
   explicit takeover rather than silently allowing stale writes.
 - "Reset all data" requires typing a confirmation phrase.

@@ -53,7 +53,7 @@
       .sort((a, b) => a.e.displayName.localeCompare(b.e.displayName))
   );
 
-  function exportText() {
+  async function exportText() {
     const lines: string[] = ["RADAR - PERFORMANCE INPUT EXPORT", `Generated: ${formatDate(app.today)}`, ""];
     for (const group of byEmployee) {
       lines.push("=".repeat(60), group.name.toUpperCase(), "=".repeat(60), "");
@@ -66,7 +66,11 @@
         lines.push(`Status: ${p.inputStatus}`, "");
       }
     }
-    downloadText(backupFilename("RADAR_Performance", "txt"), lines.join("\r\n"), "text/plain");
+    try {
+      await downloadText(backupFilename("RADAR_Performance", "txt"), lines.join("\r\n"), "text/plain");
+    } catch {
+      app.toast("Performance export failed", "error");
+    }
   }
 
   async function setStatus(id: string, inputStatus: string) {
