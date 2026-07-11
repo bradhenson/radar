@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Redesigned Meeting Notes and Performance for faster review. Both now use compact, keyboard-accessible
+  record lists with a selected-record detail panel and responsive stacking. Performance adds searchable
+  All Inputs, By Employee, and Coverage views with sorting and integrated coverage navigation.
+
 - Added advanced desktop Settings actions to open a validated existing RADAR `.db`, create a new
   database at an exact filename and location, remember the active file, and open its containing
   folder in File Explorer. Settings now explains database switching behavior and safeguards.
