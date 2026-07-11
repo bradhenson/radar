@@ -275,7 +275,7 @@
       {#if app.storageKind === "sqlite"}
         <button type="button" onclick={() => void app.openDesktopDatabaseFile()}>Open existing database...</button>
         <button type="button" onclick={() => void app.createDesktopDatabaseFile()}>Create new database...</button>
-        <button type="button" onclick={() => void app.openDesktopDatabaseFolder()}>Open containing folder</button>
+        <button type="button" onclick={() => void app.openDesktopDatabaseFolder()}>Open Database Folder</button>
       {/if}
       {#if app.storageKind !== "sqlite"}
         <button
