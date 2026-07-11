@@ -404,7 +404,7 @@
                         <span class="badge">{formatDate(task.dueDate)}</span>
                       {/if}
                       {#if task.status === "waiting"}
-                        <span class="badge warning" title={task.waitingOn ? `Waiting on ${task.waitingOn}` : "Waiting"}>
+                        <span class="badge warning" title="Waiting">
                           Waiting {daysSinceTimestamp(task.waitingSince ?? task.updatedAt, app.today)}d
                         </span>
                       {/if}
@@ -500,9 +500,19 @@
 </div>
 
 <style>
+  /* The board fills the space under the top bar exactly: header and toolbar
+     take their natural height and the column row absorbs the rest, so columns
+     always end at the window edge and cards scroll inside their lane. This
+     replaces viewport math (100vh minus estimated chrome) that overestimated
+     the fit and left the page ~2rem taller than the window, so the app always
+     showed a scrollbar with nothing meaningful to scroll to. The height must
+     be definite (not min-height) for the columns' max-height to resolve. */
   .board-page {
     max-width: none;
-    padding: 1rem 1.25rem 3.5rem;
+    padding: 1rem 1.25rem 1.1rem;
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - var(--topbar-h));
   }
   .board-header {
     display: grid;
@@ -611,8 +621,10 @@
     gap: .85rem;
     align-items: flex-start;
     overflow-x: auto;
-    padding: .15rem .15rem 1rem;
-    min-height: calc(100vh - 15rem);
+    padding: .15rem .15rem .5rem;
+    flex: 1;
+    /* Floor for absurdly short windows; the page then scrolls inside main. */
+    min-height: 14rem;
   }
   .column {
     background: var(--bucket-bg);
@@ -621,7 +633,7 @@
     min-width: 17.5rem;
     width: 17.5rem;
     flex-shrink: 0;
-    max-height: calc(100vh - 15.5rem);
+    max-height: 100%;
     display: flex;
     flex-direction: column;
     box-shadow: var(--shadow);
@@ -640,6 +652,9 @@
     padding: .7rem .75rem .45rem;
     cursor: grab;
     user-select: none;
+    /* Wash of the column's own status color fading down from the top edge. */
+    background: linear-gradient(180deg, color-mix(in srgb, var(--bucket-color, var(--accent)) 9%, transparent), transparent);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
   .bucket-header:active {
     cursor: grabbing;
@@ -664,6 +679,7 @@
     border-radius: 999px;
     background: var(--bucket-color, var(--accent));
     flex: 0 0 auto;
+    box-shadow: 0 0 7px color-mix(in srgb, var(--bucket-color, var(--accent)) 60%, transparent);
   }
   .column .count {
     background: var(--surface);
@@ -898,8 +914,11 @@
     }
   }
   @media (max-width: 760px) {
+    /* Narrow windows use the compact nav and a wrapping top bar, so a fixed
+       viewport height would misfit; let the page take natural height. */
     .board-page {
       padding-inline: .75rem;
+      height: auto;
     }
     .board-header {
       grid-template-columns: 1fr;
@@ -915,7 +934,8 @@
       grid-template-columns: 1fr;
     }
     .columns {
-      min-height: calc(100vh - 19rem);
+      min-height: 0;
+      flex: none;
     }
     .column {
       min-width: min(86vw, 18rem);

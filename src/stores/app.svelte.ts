@@ -340,6 +340,7 @@ export class AppStore {
     }
     await this.ensureBoardColumns();
     await this.migrateTaskStatuses();
+    await this.removeRetiredTaskFields();
   }
 
   private migrateSettings(settings: unknown): AppSettings {
@@ -532,6 +533,29 @@ export class AppStore {
     await this.store.bulkPut("tasks", this.plainRecords(migrated));
     for (const task of migrated) {
       const idx = this.tasks.findIndex((t) => t.id === task.id);
+      if (idx >= 0) this.tasks[idx] = task;
+    }
+  }
+
+  /** Remove task fields retired from the product, including data from local pre-change records. */
+  private async removeRetiredTaskFields(): Promise<void> {
+    type LegacyTask = Task & { waitingOn?: unknown; waitingReason?: unknown; followUpDate?: unknown };
+    const migrated = this.tasks
+      .filter((task) => {
+        const legacy = task as LegacyTask;
+        return "waitingOn" in legacy || "waitingReason" in legacy || "followUpDate" in legacy;
+      })
+      .map((task) => {
+        const legacy = { ...(task as LegacyTask) };
+        delete legacy.waitingOn;
+        delete legacy.waitingReason;
+        delete legacy.followUpDate;
+        return legacy as Task;
+      });
+    if (!migrated.length) return;
+    await this.store.bulkPut("tasks", this.plainRecords(migrated));
+    for (const task of migrated) {
+      const idx = this.tasks.findIndex((current) => current.id === task.id);
       if (idx >= 0) this.tasks[idx] = task;
     }
   }

@@ -263,6 +263,7 @@
     <header class="topbar">
       <span class="brand">
         <span class="brand-mark" aria-hidden="true">
+          <span class="brand-sweep"></span>
           <svg class="brand-icon" viewBox="0 0 24 24" focusable="false">
             <path d="M4.8 18.7A10 10 0 1 1 19.2 18.7" />
             <path d="M8.1 15.5A5.6 5.6 0 1 1 15.9 15.5" />
@@ -505,11 +506,29 @@
     color: #fff;
     flex: 0 0 auto;
     box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Live radar sweep rotating behind the icon — the app's signature move. */
+  .brand-sweep {
+    position: absolute;
+    inset: -30%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg,
+      transparent 0 72%,
+      rgba(255, 255, 255, .05) 80%,
+      rgba(255, 255, 255, .5) 97%,
+      transparent 100%);
+    animation: radar-sweep 4.6s linear infinite;
+  }
+  @keyframes radar-sweep {
+    to { transform: rotate(360deg); }
   }
   .brand-icon {
     width: 1.28rem;
     height: 1.28rem;
     overflow: visible;
+    position: relative;
   }
   .brand-icon path {
     fill: none;

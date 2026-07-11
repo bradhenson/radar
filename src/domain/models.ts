@@ -113,14 +113,11 @@ export interface Task {
   startDate?: IsoDate;
   dueDate?: IsoDate;
   reminderDate?: IsoDate;
-  followUpDate?: IsoDate;
   completedDate?: IsoDate;
   sourceSystem?: string;
   sourceReference?: string;
   lastVerifiedDate?: IsoDate;
   verificationStatus?: VerificationStatus;
-  waitingReason?: string;
-  waitingOn?: string;
   waitingSince?: IsoTimestamp;
   recurrenceTemplateId?: Id;
   recurrenceInstanceKey?: string;

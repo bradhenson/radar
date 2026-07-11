@@ -195,8 +195,6 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     }),
     task("Review customer demo logistics", "waiting", "high", {
       projectId: projects.harbor.id,
-      waitingOn: "Customer agenda confirmation",
-      waitingReason: "Need final attendee list before assigning demo roles.",
       waitingSince: atNoon(addDays(today, -18)),
       sourceSystem: "Email"
     }),
@@ -222,8 +220,6 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     task("Verify annual cybersecurity training record", "waiting", "normal", {
       employeeId: employees[2]!.id,
       competencyId: employees[2]!.competencyId,
-      waitingOn: "Updated training transcript",
-      waitingReason: "Transcript has not refreshed after completion entry.",
       waitingSince: atNoon(addDays(today, -16)),
       sourceSystem: "SWAT"
     }),

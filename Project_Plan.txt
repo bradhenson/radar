@@ -1532,13 +1532,6 @@ WAITING
 Definition:
 Work blocked by another person, event, approval, system, or dependency.
 
-Required field:
-Waiting reason should be encouraged.
-
-Optional fields:
-- Waiting on.
-- Follow-up date.
-
 NEEDS REVIEW
 
 Definition:
@@ -1708,9 +1701,6 @@ Default categories:
 - sourceReference.
 - sourceUrl.
 - lastVerifiedDate.
-- waitingReason.
-- waitingOn.
-- followUpDate.
 - recurrenceTemplateId.
 - performanceInputCreated.
 - tags.
@@ -2406,11 +2396,6 @@ STALE TASK
 Condition:
 Task is incomplete and updatedAt exceeds threshold.
 
-FOLLOW-UP DATE REACHED
-
-Condition:
-Task has followUpDate today or earlier.
-
 22.4 Default personnel rules
 
 NO RECENT PERFORMANCE INPUT
@@ -2925,15 +2910,12 @@ interface Task {
   startDate?: IsoDate;
   dueDate?: IsoDate;
   reminderDate?: IsoDate;
-  followUpDate?: IsoDate;
   completedDate?: IsoDate;
   sourceSystem?: string;
   sourceReference?: string;
   sourceUrl?: string;
   lastVerifiedDate?: IsoDate;
   verificationStatus?: "not_required" | "unverified" | "verified" | "needs_recheck";
-  waitingReason?: string;
-  waitingOn?: string;
   recurrenceTemplateId?: Id;
   recurrenceInstanceKey?: string;
   performanceInputCreated: boolean;

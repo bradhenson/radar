@@ -2,6 +2,23 @@
 
 ## Unreleased
 
+### Changed
+
+- Visual polish pass (decorative only; all motion respects reduced-motion preferences):
+  - The board now fills the window exactly — no permanent window scrollbar; long lanes scroll
+    their own cards internally.
+  - Hovering a row in any data table (Today, Employees, Training, Leave, …) slides a small
+    accent tick into the row's leading edge as a second, non-color cue that the row is clickable.
+  - The brand tile shows a slow rotating radar sweep behind the icon.
+  - Board column headers carry a soft wash of their own status color, and the header status dot
+    gets a matching glow.
+  - Every dialog carries a thin accent gradient hairline across its top edge.
+  - Empty-state panels show an animated radar "ping" (steady accent dot with expanding rings).
+
+- Removed the task-level **Waiting on**, **Waiting reason**, and **Follow-up date** fields and the
+  follow-up-date alert. Existing values are removed when the app starts or an older backup is
+  imported; the Waiting status and its age-based attention alert remain.
+
 ### Fixed
 
 - Editing an imported or previously detailed project, award, leave, telework, or travel record no

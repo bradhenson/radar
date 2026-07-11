@@ -131,6 +131,19 @@
     display: flex;
     flex-direction: column;
     animation: dialog-in .16s cubic-bezier(.16, 1, .3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  /* Accent hairline across the dialog's top edge, matching the brand mark. */
+  .dialog::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2.5px;
+    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
+    pointer-events: none;
   }
   .dialog.wide { max-width: 52rem; }
   /* The container is focused programmatically as the focus-trap entry point;

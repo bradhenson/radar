@@ -140,6 +140,24 @@ describe("format v1 migration", () => {
     expect(r.valid).toBe(false);
     expect(r.errors.some((e) => e.includes('"awardRecords" must be an array'))).toBe(true);
   });
+
+  it("removes retired task follow-up fields from legacy imports", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.formatVersion = 2;
+    const task = pkg.data.tasks[0] as Record<string, unknown>;
+    task.waitingOn = "Example person";
+    task.waitingReason = "Example reason";
+    task.followUpDate = "2026-07-10";
+
+    const result = parseAndValidateBackup(reseal(pkg));
+
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("retired task field"))).toBe(true);
+    const restored = snapshotFromBackup(result.package!);
+    expect(restored.collections.tasks[0]).not.toHaveProperty("waitingOn");
+    expect(restored.collections.tasks[0]).not.toHaveProperty("waitingReason");
+    expect(restored.collections.tasks[0]).not.toHaveProperty("followUpDate");
+  });
 });
 
 describe("backup validation rejects bad input", () => {
