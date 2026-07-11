@@ -1,7 +1,8 @@
 // Storage abstraction (plan section 8.6). UI and services never touch
 // IndexedDB directly; they call a DataStore. Implementations:
-//   - IndexedDbDataStore: primary working storage.
+//   - IndexedDbDataStore: primary working storage in the browser.
 //   - InMemoryDataStore: fallback when IndexedDB is unavailable, and tests.
+//   - WailsDataStore: SQLite via the Go bridge in the desktop shell (plan 8.10).
 
 import type {
   ActivityEntry,
@@ -112,7 +113,7 @@ export function deleteOp(collection: CollectionName, id: string): MutationOp {
 }
 
 export interface DataStore {
-  readonly kind: "indexeddb" | "memory";
+  readonly kind: "indexeddb" | "memory" | "sqlite";
   initialize(): Promise<void>;
   getAll<K extends CollectionName>(name: K): Promise<CollectionTypes[K][]>;
   put<K extends CollectionName>(name: K, record: CollectionTypes[K]): Promise<void>;

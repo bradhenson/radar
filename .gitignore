@@ -3,6 +3,15 @@ dist/
 release/
 *.log
 
+# Desktop shell (Wails): embedded frontend copy and build outputs.
+# desktop/dist/.gitkeep stays committed so go:embed compiles on fresh clones.
+!desktop/dist/
+desktop/dist/*
+!desktop/dist/.gitkeep
+desktop/build/bin/
+desktop/wailsjs/
+package.json.md5
+
 # Never commit real data, backups, or exports (plan section 35.1)
 SupervisorAssistant_Backup_*.json
 SupervisorAssistant_EnvironmentReport_*.json

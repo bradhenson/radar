@@ -121,7 +121,12 @@
   async function exportBackup() {
     try {
       const pkg = await app.buildBackup();
-      downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
+      const saved = await downloadJson(backupFilename("RADAR_Backup", "json"), pkg);
+      if (!saved) {
+        // Cancelled native save dialog: the backup reminder must not reset.
+        app.toast("Backup export cancelled", "info");
+        return;
+      }
       await app.markBackupCompleted(pkg);
       app.toast("Backup exported", "success");
     } catch (e) {
@@ -366,8 +371,12 @@
         {#if !app.hasOperatorData}
           <section class="recovery-banner" role="status">
             <div>
-              <strong>No RADAR records found in this browser.</strong>
-              <span>If you expected existing data, browser storage may have been cleared. Import your latest JSON backup before creating new records.</span>
+              <strong>No RADAR records found in this {app.storageKind === "sqlite" ? "desktop database" : "browser"}.</strong>
+              <span>
+                If you expected existing data,
+                {app.storageKind === "sqlite" ? "the wrong database file may be open" : "browser storage may have been cleared"}.
+                Import your latest JSON backup before creating new records.
+              </span>
             </div>
             <button type="button" class="primary" onclick={() => router.go("settings")}>Restore backup</button>
           </section>

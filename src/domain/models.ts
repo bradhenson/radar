@@ -429,7 +429,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   backupChangeThreshold: 10,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
-  theme: "system",
+  theme: "dark",
   colorTheme: "default",
   enableSingleKeyShortcuts: true
 };

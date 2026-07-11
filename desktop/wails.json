@@ -1,0 +1,14 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "RADAR",
+  "outputfilename": "RADAR",
+  "frontend:dir": "..",
+  "frontend:install": "",
+  "frontend:build": "npm run prepare:desktop",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "http://localhost:5173",
+  "wailsjsdir": ".",
+  "author": {
+    "name": "RADAR"
+  }
+}

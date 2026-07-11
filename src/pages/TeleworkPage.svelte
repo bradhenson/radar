@@ -298,7 +298,7 @@
     calendarMonth = addMonths(calendarMonth, offset);
   }
 
-  function exportCsv() {
+  async function exportCsv() {
     const csv = toCsv(
       [
         "Employee",
@@ -321,7 +321,11 @@
         t.updatedAt.slice(0, 10)
       ])
     );
-    downloadText(backupFilename("RADAR_SituationalTelework", "csv"), csv, "text/csv");
+    try {
+      await downloadText(backupFilename("RADAR_SituationalTelework", "csv"), csv, "text/csv");
+    } catch {
+      app.toast("Telework export failed", "error");
+    }
   }
 
   function editFromRow(t: TeleworkRecord) {

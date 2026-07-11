@@ -115,15 +115,20 @@
     }
   }
 
-  // Record the backup after the browser accepts the download request. Errors
-  // still prevent a requested database replacement from continuing.
+  // Record the backup after the save is accepted (browser download handed
+  // off, or native save dialog confirmed in the desktop shell). Errors and
+  // cancels still prevent a requested database replacement from continuing.
   async function exportBackup(forReplace = false) {
     try {
       const pkg = await app.buildBackup();
       const filename = backupFilename("RADAR_Backup", "json");
-      downloadJson(filename, pkg);
+      const saved = await downloadJson(filename, pkg);
+      if (!saved) {
+        app.toast("Backup export cancelled", "info");
+        return false;
+      }
       await app.markBackupCompleted(pkg);
-      app.toast(`Backup downloaded: ${filename}`, "success");
+      app.toast(`Backup saved: ${filename}`, "success");
       if (forReplace) confirmReplace = true;
       return true;
     } catch (e) {
@@ -228,29 +233,47 @@
   <section class="card" style="margin-bottom:1rem">
     <h2>Backup and restore</h2>
     <p class="small muted">
-      Browser storage can be cleared by policy or profile changes. Exported JSON backups are the canonical copy of
-      your data. Export at the end of any day when records changed and store the file in an approved location.
+      {#if app.storageKind === "sqlite"}
+        Your data lives in a local SQLite database file. Exported JSON backups remain the canonical portable copy.
+        Export at the end of any day when records changed and store the file in an approved location.
+      {:else}
+        Browser storage can be cleared by policy or profile changes. Exported JSON backups are the canonical copy of
+        your data. Export at the end of any day when records changed and store the file in an approved location.
+      {/if}
     </p>
     <p>
       <strong>Storage:</strong>
-      {app.storageKind === "indexeddb" ? "IndexedDB (browser working storage)" : "In-memory only - data will NOT survive closing this tab"}
+      {app.storageKind === "sqlite"
+        ? "SQLite database file (desktop app)"
+        : app.storageKind === "indexeddb"
+          ? "IndexedDB (browser working storage)"
+          : "In-memory only - data will NOT survive closing this tab"}
       · <strong>Last backup:</strong> {app.meta.lastBackupAt ? formatTimestamp(app.meta.lastBackupAt) : "never"}
       · <strong>Changes since backup:</strong> {app.meta.changesSinceBackup}
     </p>
-    <p class="small muted">
-      <strong>Browser persistence:</strong> {persistenceLabel}. {storageEstimate}. Persistent storage can reduce normal
-      browser eviction, but enterprise cleanup or profile policy can still remove site data.
-    </p>
+    {#if app.storageKind === "sqlite"}
+      <p class="small muted">
+        <strong>Database file:</strong> {app.desktopInfo?.path ?? "unknown"}
+        · <strong>Size:</strong> {formatBytes(app.desktopInfo?.sizeBytes)}
+      </p>
+    {:else}
+      <p class="small muted">
+        <strong>Browser persistence:</strong> {persistenceLabel}. {storageEstimate}. Persistent storage can reduce normal
+        browser eviction, but enterprise cleanup or profile policy can still remove site data.
+      </p>
+    {/if}
     <div style="display:flex; gap:.5rem; flex-wrap:wrap">
       <button type="button" class="primary" onclick={() => void exportBackup()}>Export backup (JSON)</button>
       <button type="button" onclick={() => fileInput?.click()}>Import backup...</button>
-      <button
-        type="button"
-        onclick={() => void app.requestPersistentStorage()}
-        disabled={!app.storagePersistence.persistAvailable || app.storagePersistence.persisted === true}
-      >
-        {app.storagePersistence.persisted === true ? "Persistent storage granted" : "Request persistent storage"}
-      </button>
+      {#if app.storageKind !== "sqlite"}
+        <button
+          type="button"
+          onclick={() => void app.requestPersistentStorage()}
+          disabled={!app.storagePersistence.persistAvailable || app.storagePersistence.persisted === true}
+        >
+          {app.storagePersistence.persisted === true ? "Persistent storage granted" : "Request persistent storage"}
+        </button>
+      {/if}
       <input type="file" accept=".json,application/json" style="display:none" bind:this={fileInput} onchange={onImportFile} />
     </div>
   </section>

@@ -14,13 +14,13 @@ Former working title:
 Supervisor Assistant
 
 Document version:
-0.2
+0.3
 
 Prepared:
 July 4, 2026
 
 Last updated:
-July 5, 2026
+July 11, 2026
 
 Intended user:
 A single supervisor managing approximately 40 employees across configurable organizational competencies.
@@ -44,6 +44,7 @@ Current implemented application state:
   - dist/supervisor-assistant.html for legacy compatibility.
 - Build pipeline includes single-file inlining and no-network verification.
 - IndexedDB is the primary local store, with an in-memory fallback and a visible warning when persistent storage is unavailable.
+- An optional Wails v2 Windows build uses a local SQLite database while preserving the same frontend and DataStore contract.
 - Backup export/import, replace confirmation, database health checks, reset confirmation, and backup reminders are implemented.
 - Main navigation includes Today, Board, Calendar, Employees, Performance, Training, Leave, Telework, Awards, Meetings, Projects, Archive, and Settings.
 - Implemented major workflows include:
@@ -646,6 +647,10 @@ Optional production output:
 
 supervisor-assistant.html
 
+An additional optional Windows desktop distribution may be built as RADAR.exe. It embeds the same
+self-contained frontend in a Wails v2 shell and stores records in a local SQLite file. The browser
+artifact remains supported and must remain byte-for-byte independent of the desktop build.
+
 The single-file build is desirable for portability, but it must not become a hard requirement if it introduces unreliable storage or browser behavior. A small self-contained folder is acceptable.
 
 8.4 No web server assumption
@@ -726,7 +731,39 @@ Use locally generated UUID-style identifiers.
 
 Do not use array positions as identifiers.
 
-8.10 Browser support target
+8.10 Optional Wails desktop distribution
+
+RADAR has a second, optional Windows build for environments where a locally approved executable is
+preferable to browser file storage. This distribution does not replace the self-contained HTML
+artifact and does not change its runtime behavior.
+
+Desktop architecture:
+
+- Wails v2 embeds the same post-build dist/index.html used by the browser artifact.
+- The production executable does not run or listen on a backend server and makes no network calls.
+- WebView2 must already be installed; the release build uses Wails' error strategy rather than
+  downloading a runtime.
+- A WailsDataStore implements the same DataStore contract through bound Go methods.
+- The Go layer stores opaque JSON records in SQLite and contains no domain rules.
+- Mutate, replace, and clear operations use SQLite transactions.
+- The desktop shell never falls back to IndexedDB if the Wails bridge or SQLite initialization
+  fails, because doing so would silently split the user's data.
+- JSON backup import/export remains the portable recovery and interchange format.
+- Desktop exports use a native save dialog. Cancelling a backup save must not clear the backup
+  reminder.
+
+Database location:
+
+- If radar.db already exists beside RADAR.exe, the app uses it in portable mode.
+- Otherwise the app uses %LOCALAPPDATA%\RADAR\radar.db.
+- The database path and size are visible in Settings.
+- The application remains single-user and single-instance.
+
+Desktop build verification must include Go tests, the normal strict frontend verification, a Wails
+release build, a portable-database launch/relaunch smoke, and a real UI check that a created record
+survives a full application restart.
+
+8.11 Browser support target
 
 Primary browser target:
 
@@ -4135,7 +4172,8 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 
 4. Do not load scripts, styles, fonts, icons, or images from a CDN.
 
-5. Do not add a backend server.
+5. Do not add a backend server. The optional Wails shell may bind in-process Go methods and SQLite,
+   but it must not listen on a port or introduce a runtime network dependency.
 
 6. Do not require Node.js in the production environment.
 
@@ -4179,6 +4217,8 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
    - build,
    - no-network verification,
    before considering a task complete.
+   When desktop code changes, also run Go vet/tests, the Wails release build with the no-download
+   WebView2 strategy, and the desktop launch/relaunch smoke.
 
 25. Update CHANGELOG.md for user-visible changes.
 
@@ -4191,6 +4231,12 @@ These rules should be placed in AGENTS.md, CLAUDE.md, or the equivalent reposito
 29. When uncertain about managed environment compatibility, implement feature detection and a fallback.
 
 30. Backup and restore are first-class features, not optional utilities.
+
+31. Keep the browser artifact and its file:// workflow fully supported when changing the optional
+    desktop distribution.
+
+32. Desktop releases must use a WebView2 strategy that fails locally when the runtime is absent;
+    they must never download WebView2 at runtime.
 
 ======================================================================
 39. SUGGESTED CODING AGENT PROMPTS
@@ -4442,7 +4488,8 @@ These decisions should be revisited during operational validation. Current imple
 
 3. Should the production package be one HTML file or a folder?
    - Current decision: one self-contained HTML file, with dist/radar.html as the primary operator
-     artifact.
+     artifact. An optional RADAR.exe Wails/SQLite distribution is also available for approved
+     Windows environments; it does not replace the browser artifact.
 
 4. Is Svelte acceptable, or would plain TypeScript reduce build complexity enough to justify more manual UI work?
    - Current decision: Svelte 5 with TypeScript and Vite is the implemented stack.
@@ -4497,7 +4544,11 @@ These decisions should be revisited during operational validation. Current imple
     - Still open. No calendar-file export is implemented.
 
 20. Is encryption of backup files needed and technically supportable?
-    - Still open. Backup export is plain JSON and must be stored only in an approved location.
+   - Still open. Backup export is plain JSON and must be stored only in an approved location.
+
+21. Where should the optional desktop database live?
+   - Current decision: %LOCALAPPDATA%\RADAR\radar.db by default. A pre-existing radar.db beside
+     RADAR.exe explicitly selects portable mode. Settings displays the active location.
 
 ======================================================================
 43. DEFINITION OF DONE
@@ -4512,6 +4563,8 @@ A feature is done when:
 - Relevant component or integration tests pass.
 - Production build succeeds.
 - Production build opens through the intended local-file method.
+- When desktop code changes, the Wails executable builds without a runtime-download strategy and
+  its SQLite database survives an application restart.
 - No external network resource is added.
 - Persistent data goes through DataStore.
 - Error states are handled.

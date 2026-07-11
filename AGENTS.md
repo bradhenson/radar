@@ -6,10 +6,10 @@ from plan section 38 and are binding for every change.
 ## Hard constraints
 1. **No runtime network dependency.** No CDN scripts, fonts, icons, analytics, telemetry, remote
    logging, or update checks. `npm run build` runs `scripts/verify-no-network.mjs` and must pass.
-2. **No backend.** The production build must open from a local file path (`file://`) with no
-   server, no service workers, no Node on the operational machine. Keep asset paths relative.
-   Module scripts are inlined post-build (`scripts/build-single-file.mjs`) because external
-   module scripts do not load over `file://`.
+2. **No backend server.** The browser build must open from `file://` with no server, service
+   worker, or Node on the operational machine. The optional Wails desktop build may use in-process
+   Go bindings and SQLite, but must not listen on a port or require network access. Keep browser
+   asset paths relative. Module scripts are inlined post-build (`scripts/build-single-file.mjs`).
 3. **All persistence goes through the `DataStore` interface** (`src/data/DataStore.ts`). Never
    call IndexedDB from UI components or pages.
 4. **No real employee names or sensitive information** in code, tests, fixtures, screenshots,
@@ -32,6 +32,9 @@ npm run check   # 0 errors required
 npm test        # all tests pass
 npm run build   # includes single-file inline + no-network verification
 ```
+For desktop changes also run `go vet ./...` and `go test ./...` in `desktop/`, then
+`npm run build:desktop` and `npm run smoke:desktop`. Wails builds must use the `error` WebView2
+strategy so the executable never downloads a runtime.
 Add unit tests for new domain rules (`tests/unit/`). Update `CHANGELOG.md` for user-visible
 changes. Do not add dependencies without explaining why; keep them dev-only and pinned via the
 lockfile.
@@ -43,6 +46,7 @@ lockfile.
 - `src/stores/app.svelte.ts` — reactive state + service layer; all mutations flow through here.
 - `src/pages/`, `src/components/` — Svelte 5 (runes) UI.
 - `environment-test/` — standalone Phase 0 capability probe; keep it dependency-free.
+- `desktop/` — optional Wails v2 shell and SQLite store; keep domain logic in TypeScript.
 
 ## Verification tip
 A full end-to-end smoke test of the built file over `file://` can be run with Playwright against

@@ -32,7 +32,21 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   page.on("request", (request) => requests.push(request.url()));
 
-  await page.goto(pathToFileURL(artifact).href);
+  await page.goto(`${pathToFileURL(artifact).href}#/settings`);
+  await page.getByRole("heading", { name: "Settings" }).waitFor();
+
+  // A fresh database must start dark before any user preference is saved.
+  if ((await page.locator("html").getAttribute("data-theme")) !== "dark") {
+    throw new Error("Fresh browser database did not start in dark mode.");
+  }
+  if ((await page.locator("#set-theme").inputValue()) !== "dark") {
+    throw new Error("Settings did not report Dark as the fresh default.");
+  }
+
+  // Seed through the real Settings workflow before exercising the board.
+  await page.getByRole("button", { name: "Load sample data" }).click();
+  await page.getByRole("dialog", { name: "Load sample data" }).getByRole("button", { name: "Load sample data" }).click();
+  await page.getByRole("link", { name: /board/i }).first().click();
   await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
 
   const navCount = await page.locator("nav a").count();
