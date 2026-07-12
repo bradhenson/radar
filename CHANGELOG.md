@@ -4,6 +4,8 @@
 
 ### Added
 
+- Employee profiles are now configurable in Settings. Organizations can rename and reorder sections and fields, add text, date, yes/no, contact, and choice fields, and archive fields without deleting saved employee values. Each section in the editor starts collapsed and expands with its hamburger toggle to keep the card manageable. Profile editing, display, search, backups, and employee CSV exports all use the configured structure. In the employee CSV export dialog, all profile columns are off by default and must be selected per export.
+
 - Employee Overview notes now use the shared rich-text editor for adding and editing notes, with safe formatted rendering for saved entries.
 
 - Employee profile records now open their existing editors directly from the relevant tab. Performance inputs and meeting notes open in place, while training, leave, telework, travel, and awards link to the exact record in their owning workflow; recent performance and meeting cards on Overview are editable too.

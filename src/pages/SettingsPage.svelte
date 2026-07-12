@@ -10,9 +10,10 @@
     parseAndValidateBackup,
     type BackupValidationResult
   } from "../data/backup";
-  import { COLOR_THEMES } from "../domain/models";
+  import { COLOR_THEMES, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { formatTimestamp } from "../utils/dates";
+  import { newId } from "../utils/ids";
 
   let importResult = $state<BackupValidationResult | undefined>(undefined);
   let importFileName = $state("");
@@ -25,6 +26,29 @@
   let competencyError = $state("");
   let newBoardColumnName = $state("");
   let boardColumnError = $state("");
+  let newProfileSection = $state("");
+  let newProfileFieldLabel = $state("");
+  let newProfileFieldSection = $state("");
+  let newProfileFieldType = $state<EmployeeProfileFieldType>("text");
+  let profileFieldError = $state("");
+  // Sections start collapsed to keep the card manageable (ephemeral UI state).
+  let expandedProfileSections = $state<Record<string, boolean>>({});
+
+  let profileSections = $derived(
+    app.settings.employeeProfileSections.slice().sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label))
+  );
+  let activeProfileSections = $derived(profileSections.filter((section) => !section.isArchived));
+
+  $effect(() => {
+    if (!activeProfileSections.some((section) => section.id === newProfileFieldSection)) {
+      newProfileFieldSection = activeProfileSections[0]?.id ?? "";
+    }
+  });
+
+  $effect(() => {
+    if (typeof document === "undefined" || location.hash !== "#/settings/employee-profile-fields") return;
+    requestAnimationFrame(() => document.getElementById("employee-profile-fields")?.scrollIntoView({ block: "start" }));
+  });
 
   // Local editable copy of settings; saved on change.
   async function updateSetting<K extends keyof typeof app.settings>(key: K, value: (typeof app.settings)[K]) {
@@ -36,6 +60,118 @@
       const v = parseInt((e.currentTarget as HTMLInputElement).value, 10);
       if (Number.isFinite(v) && v >= 0) void updateSetting(key, v as never);
     };
+  }
+
+  async function saveProfileConfiguration(sections: EmployeeProfileSection[], fields: EmployeeProfileField[]) {
+    await app.saveSettings({ ...app.settings, employeeProfileSections: sections, employeeProfileFields: fields });
+  }
+
+  async function addProfileSection() {
+    const label = newProfileSection.trim();
+    if (!label) return;
+    const sections = [...app.settings.employeeProfileSections, {
+      id: newId(), label, sortOrder: app.settings.employeeProfileSections.length, isArchived: false
+    }];
+    await saveProfileConfiguration(sections, app.settings.employeeProfileFields);
+    newProfileSection = "";
+    app.toast("Employee profile section added", "success");
+  }
+
+  async function updateProfileSection(section: EmployeeProfileSection, patch: Partial<EmployeeProfileSection>) {
+    const next = { ...section, ...patch };
+    if (!next.label.trim()) return;
+    await saveProfileConfiguration(
+      app.settings.employeeProfileSections.map((item) => item.id === section.id ? { ...next, label: next.label.trim() } : item),
+      app.settings.employeeProfileFields
+    );
+  }
+
+  async function moveProfileSection(section: EmployeeProfileSection, direction: -1 | 1) {
+    const ordered = profileSections.slice();
+    const index = ordered.findIndex((item) => item.id === section.id);
+    const other = ordered[index + direction];
+    if (index < 0 || !other) return;
+    const sections = app.settings.employeeProfileSections.map((item) =>
+      item.id === section.id ? { ...item, sortOrder: other.sortOrder } : item.id === other.id ? { ...item, sortOrder: section.sortOrder } : item
+    );
+    await saveProfileConfiguration(sections, app.settings.employeeProfileFields);
+  }
+
+  async function addProfileField() {
+    const label = newProfileFieldLabel.trim();
+    if (!label || !newProfileFieldSection) {
+      profileFieldError = "A label and section are required.";
+      return;
+    }
+    const siblings = app.settings.employeeProfileFields.filter((field) => field.sectionId === newProfileFieldSection);
+    const field: EmployeeProfileField = {
+      id: newId(), sectionId: newProfileFieldSection, label, type: newProfileFieldType,
+      sortOrder: siblings.length, options: ["choice", "multi_choice"].includes(newProfileFieldType) ? [] : undefined,
+      isArchived: false
+    };
+    await saveProfileConfiguration(app.settings.employeeProfileSections, [...app.settings.employeeProfileFields, field]);
+    expandedProfileSections[newProfileFieldSection] = true;
+    newProfileFieldLabel = "";
+    profileFieldError = "";
+    app.toast("Employee profile field added", "success");
+  }
+
+  async function updateProfileField(field: EmployeeProfileField, patch: Partial<EmployeeProfileField>) {
+    const next = { ...field, ...patch };
+    if (!next.label.trim()) return;
+    await saveProfileConfiguration(
+      app.settings.employeeProfileSections,
+      app.settings.employeeProfileFields.map((item) => item.id === field.id ? { ...next, label: next.label.trim() } : item)
+    );
+  }
+
+  function fieldsForSection(sectionId: string): EmployeeProfileField[] {
+    return app.settings.employeeProfileFields
+      .filter((field) => field.sectionId === sectionId)
+      .slice()
+      .sort((a, b) => a.sortOrder - b.sortOrder || a.label.localeCompare(b.label));
+  }
+
+  async function moveProfileField(field: EmployeeProfileField, direction: -1 | 1) {
+    const siblings = fieldsForSection(field.sectionId);
+    const index = siblings.findIndex((item) => item.id === field.id);
+    const other = siblings[index + direction];
+    if (index < 0 || !other) return;
+    await saveProfileConfiguration(
+      app.settings.employeeProfileSections,
+      app.settings.employeeProfileFields.map((item) =>
+        item.id === field.id ? { ...item, sortOrder: other.sortOrder } : item.id === other.id ? { ...item, sortOrder: field.sortOrder } : item
+      )
+    );
+  }
+
+  function optionLabels(field: EmployeeProfileField): string {
+    return (field.options ?? []).map((option) => option.label).join(", ");
+  }
+
+  async function updateProfileOptions(field: EmployeeProfileField, raw: string) {
+    const seenLabels = new Set<string>();
+    const labels = raw.split(",").map((label) => label.trim()).filter((label) => {
+      const key = label.toLocaleLowerCase();
+      if (!label || seenLabels.has(key)) return false;
+      seenLabels.add(key);
+      return true;
+    }).slice(0, 50);
+    const current = field.options ?? [];
+    const exactMatches = new Map(current.map((option) => [option.label.toLocaleLowerCase(), option]));
+    const reserved = new Set(labels.map((label) => exactMatches.get(label.toLocaleLowerCase())?.value).filter(Boolean));
+    const used = new Set<string>();
+    const options = labels.map((label, index) => {
+      const exact = exactMatches.get(label.toLocaleLowerCase());
+      const samePosition = current[index];
+      const existing = exact && !used.has(exact.value)
+        ? exact
+        : samePosition && !reserved.has(samePosition.value) && !used.has(samePosition.value) ? samePosition : undefined;
+      const value = existing?.value ?? newId();
+      used.add(value);
+      return { value, label };
+    });
+    await updateProfileField(field, { options });
   }
 
   async function addCompetency() {
@@ -352,6 +488,117 @@
           {t.label}
           {#if (app.settings.colorTheme ?? "default") === t.value}<span aria-hidden="true">✓</span>{/if}
         </button>
+      {/each}
+    </div>
+  </section>
+
+  <section class="card profile-fields-settings" id="employee-profile-fields" style="margin-bottom:1rem">
+    <h2>Employee profile fields</h2>
+    <p class="small muted">
+      Define the sections and fields used by every employee profile. Labels and order can change without affecting saved
+      values. Archived fields disappear from profiles but retain their data and can be restored later. Core employee
+      identity, status, competency, tags, and linked records remain built in.
+    </p>
+
+    <div class="profile-config-adders">
+      <form class="settings-add" onsubmit={(event) => { event.preventDefault(); void addProfileSection(); }}>
+        <input type="text" bind:value={newProfileSection} maxlength="100" placeholder="New section" aria-label="New employee profile section" />
+        <button type="submit">Add section</button>
+      </form>
+      <form class="profile-field-add" onsubmit={(event) => { event.preventDefault(); void addProfileField(); }}>
+        <input type="text" bind:value={newProfileFieldLabel} maxlength="100" placeholder="New field label" aria-label="New employee profile field label" />
+        <select bind:value={newProfileFieldSection} aria-label="New field section">
+          {#each activeProfileSections as section (section.id)}<option value={section.id}>{section.label}</option>{/each}
+        </select>
+        <select bind:value={newProfileFieldType} aria-label="New field type">
+          {#each EMPLOYEE_PROFILE_FIELD_TYPES as type (type.value)}<option value={type.value}>{type.label}</option>{/each}
+        </select>
+        <button type="submit" class="primary" disabled={activeProfileSections.length === 0}>Add field</button>
+      </form>
+    </div>
+    {#if profileFieldError}<div class="field-error" role="alert">{profileFieldError}</div>{/if}
+
+    <div class="profile-section-list">
+      {#each profileSections as section, sectionIndex (section.id)}
+        <section class="profile-config-section" class:inactive={section.isArchived}>
+          <div class="profile-section-heading">
+            <button
+              type="button"
+              class="icon-btn"
+              aria-expanded={Boolean(expandedProfileSections[section.id])}
+              aria-label={`${expandedProfileSections[section.id] ? "Collapse" : "Expand"} fields for section ${section.label}`}
+              title={expandedProfileSections[section.id] ? "Collapse fields" : "Expand fields"}
+              onclick={() => (expandedProfileSections[section.id] = !expandedProfileSections[section.id])}
+            ><Icon name="menu" size={16} /></button>
+            <input
+              type="text"
+              value={section.label}
+              maxlength="100"
+              aria-label={`Profile section name ${section.label}`}
+              onchange={(event) => void updateProfileSection(section, { label: event.currentTarget.value })}
+            />
+            <span class="small muted field-count">{fieldsForSection(section.id).length} field{fieldsForSection(section.id).length === 1 ? "" : "s"}</span>
+            <button type="button" onclick={() => void moveProfileSection(section, -1)} disabled={sectionIndex === 0}>Up</button>
+            <button type="button" onclick={() => void moveProfileSection(section, 1)} disabled={sectionIndex === profileSections.length - 1}>Down</button>
+            <button
+              type="button"
+              onclick={() => void updateProfileSection(section, { isArchived: !section.isArchived })}
+              disabled={!section.isArchived && activeProfileSections.length <= 1}
+            >{section.isArchived ? "Restore section" : "Archive section"}</button>
+          </div>
+
+          {#if expandedProfileSections[section.id]}
+            {#if fieldsForSection(section.id).length === 0}
+            <p class="small muted">No fields in this section.</p>
+            {:else}
+            <div class="profile-field-list">
+              {#each fieldsForSection(section.id) as field, fieldIndex (field.id)}
+                <div class="profile-field-row" class:inactive={field.isArchived}>
+                  <input
+                    type="text"
+                    value={field.label}
+                    maxlength="100"
+                    aria-label={`Profile field label ${field.label}`}
+                    onchange={(event) => void updateProfileField(field, { label: event.currentTarget.value })}
+                  />
+                  <select
+                    aria-label={`Profile field type ${field.label}`}
+                    value={field.type}
+                    disabled={Boolean(field.builtInKey)}
+                    title={field.builtInKey ? "Built-in field types cannot be changed" : "Field type"}
+                    onchange={(event) => void updateProfileField(field, { type: event.currentTarget.value as EmployeeProfileFieldType })}
+                  >
+                    {#each EMPLOYEE_PROFILE_FIELD_TYPES as type (type.value)}<option value={type.value}>{type.label}</option>{/each}
+                  </select>
+                  <select
+                    aria-label={`Profile field section ${field.label}`}
+                    value={field.sectionId}
+                    onchange={(event) => void updateProfileField(field, { sectionId: event.currentTarget.value, sortOrder: fieldsForSection(event.currentTarget.value).length })}
+                  >
+                    {#each activeProfileSections as target (target.id)}<option value={target.id}>{target.label}</option>{/each}
+                  </select>
+                  <div class="settings-actions">
+                    <button type="button" aria-label={`Move ${field.label} up`} onclick={() => void moveProfileField(field, -1)} disabled={fieldIndex === 0}>↑</button>
+                    <button type="button" aria-label={`Move ${field.label} down`} onclick={() => void moveProfileField(field, 1)} disabled={fieldIndex === fieldsForSection(section.id).length - 1}>↓</button>
+                    <button type="button" onclick={() => void updateProfileField(field, { isArchived: !field.isArchived })}>{field.isArchived ? "Restore" : "Archive"}</button>
+                  </div>
+                  {#if field.type === "choice" || field.type === "multi_choice"}
+                    <input
+                      class="profile-options"
+                      type="text"
+                      value={optionLabels(field)}
+                      maxlength="2000"
+                      placeholder="Choices, separated by commas"
+                      aria-label={`Choices for ${field.label}`}
+                      onchange={(event) => void updateProfileOptions(field, event.currentTarget.value)}
+                    />
+                  {/if}
+                </div>
+              {/each}
+            </div>
+            {/if}
+          {/if}
+        </section>
       {/each}
     </div>
   </section>
@@ -709,5 +956,26 @@
     display: flex;
     gap: .35rem;
     flex-wrap: wrap;
+  }
+  .profile-fields-settings { scroll-margin-top: .75rem; }
+  .profile-config-adders { display: grid; gap: .5rem; margin: .8rem 0 1rem; }
+  .profile-field-add { display: grid; grid-template-columns: minmax(12rem, 1fr) minmax(10rem, .7fr) minmax(9rem, .6fr) auto; gap: .5rem; }
+  .profile-section-list { display: grid; gap: .8rem; }
+  .profile-config-section { border: 1px solid var(--border); border-radius: var(--radius); padding: .7rem; background: var(--surface-2); }
+  .profile-config-section.inactive, .profile-field-row.inactive { opacity: .62; }
+  .profile-section-heading { display: flex; align-items: center; gap: .4rem; margin-bottom: .55rem; }
+  .profile-section-heading > input { flex: 1; min-width: 12rem; font-weight: 700; }
+  .profile-field-list { display: grid; gap: .4rem; }
+  .profile-field-row {
+    display: grid; grid-template-columns: minmax(10rem, 1.2fr) minmax(8rem, .75fr) minmax(9rem, .8fr) auto;
+    align-items: center; gap: .4rem; padding: .45rem; border-top: 1px solid var(--border);
+  }
+  .profile-field-row > :is(input, select) { width: 100%; min-width: 0; }
+  .profile-field-row .profile-options { grid-column: 1 / -1; }
+  .field-count { white-space: nowrap; }
+  @media (max-width: 900px) {
+    .profile-field-add { grid-template-columns: 1fr 1fr; }
+    .profile-field-row { grid-template-columns: 1fr 1fr; }
+    .profile-field-row .settings-actions, .profile-field-row .profile-options { grid-column: 1 / -1; }
   }
 </style>

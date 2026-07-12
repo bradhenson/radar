@@ -13,7 +13,8 @@
   import Icon from "../components/common/Icon.svelte";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
-  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
+  import { INTERACTION_TYPES, statusLabel, type EmployeeNote, type EmployeeProfileField, type MeetingNote } from "../domain/models";
+  import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
@@ -80,6 +81,8 @@
       .filter((note) => note.employeeId === employeeId && !note.isArchived)
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   );
+  let profileSections = $derived(activeProfileSections(app.settings));
+  let profileFields = $derived(activeProfileFields(app.settings));
   let activity = $derived(
     app.activityEntries
       .filter(
@@ -100,24 +103,8 @@
     return formatDate(t.effectiveDate ?? end);
   }
 
-  function optionLabel(options: { value: string; label: string }[], value: string | undefined): string {
-    if (!value) return "";
-    return options.find((option) => option.value === value)?.label ?? value;
-  }
-
-  function profileValue(value: string | undefined): string {
-    return value?.trim() || "";
-  }
-
-  // A telework agreement is flagged as expired (past) or expiring soon (within
-  // 30 days) so a lapsing agreement stands out instead of reading as plain text.
-  function teleworkExpiry(iso: string | undefined): { text: string; cls: string } | null {
-    if (!iso) return null;
-    const label = formatDate(iso);
-    const days = daysBetween(app.today, iso);
-    if (days < 0) return { text: `Expired ${label}`, cls: "overdue" };
-    if (days <= 30) return { text: `Expires ${label}`, cls: "warning" };
-    return { text: label, cls: "" };
+  function fieldsForProfileSection(sectionId: string): EmployeeProfileField[] {
+    return profileFields.filter((field) => field.sectionId === sectionId);
   }
 
   async function saveCheckIn() {
@@ -401,90 +388,33 @@
     {:else if tab === "profile"}
       <div class="tab-title-row">
         <h2>Profile details</h2>
+        {#if employee.competencyId}<span class="badge">{app.competencyCode(employee.competencyId)}</span>{/if}
         <button type="button" class="icon-btn" aria-label="Edit profile" title="Edit profile" onclick={() => (profileOpen = true)}><Icon name="edit" size={17} /></button>
       </div>
-      {#snippet field(label: string, value: string)}
-        <div>
-          <dt>{label}</dt>
-          {#if value}<dd>{value}</dd>{:else}<dd class="empty">—</dd>{/if}
-        </div>
-      {/snippet}
-      {#snippet linkField(label: string, value: string, href: string)}
-        <div>
-          <dt>{label}</dt>
-          {#if value}<dd><a {href}>{value}</a></dd>{:else}<dd class="empty">—</dd>{/if}
-        </div>
-      {/snippet}
-      {#snippet flagField(label: string, value: boolean | undefined)}
-        <div>
-          <dt>{label}</dt>
-          <dd>
-            {#if value === undefined}<span class="empty">—</span>
-            {:else if value}<span class="badge flag-yes">Yes</span>
-            {:else}<span class="badge">No</span>{/if}
-          </dd>
-        </div>
-      {/snippet}
-      {#snippet badgeField(label: string, value: string)}
-        <div>
-          <dt>{label}</dt>
-          {#if value}<dd><span class="badge">{value}</span></dd>{:else}<dd class="empty">—</dd>{/if}
-        </div>
-      {/snippet}
-      {#snippet expiryField(label: string, status: { text: string; cls: string } | null)}
-        <div>
-          <dt>{label}</dt>
-          {#if status}<dd><span class="badge {status.cls}">{status.text}</span></dd>{:else}<dd class="empty">—</dd>{/if}
-        </div>
-      {/snippet}
 
       <div class="profile-detail-grid">
-        <section class="profile-group">
-          <h3>Identity</h3>
-          <dl>
-            {@render field("Title", profileValue(employee.positionTitle))}
-            {@render field("Series", profileValue(employee.series))}
-            {@render field("EDIPI", profileValue(employee.edipi))}
-            {@render field("PERNR", profileValue(employee.pernr))}
-            {@render badgeField("Competency", app.competencyCode(employee.competencyId))}
-          </dl>
-        </section>
-
-        <section class="profile-group">
-          <h3>Location and contact</h3>
-          <dl>
-            {@render field("Building", profileValue(employee.locationBuilding))}
-            {@render field("Cube", profileValue(employee.locationCube))}
-            {@render linkField("Work email", profileValue(employee.workEmail), `mailto:${employee.workEmail}`)}
-            {@render linkField("Work phone", profileValue(employee.workPhone), `tel:${employee.workPhone}`)}
-            {@render linkField("Work cell phone", profileValue(employee.workCellPhone), `tel:${employee.workCellPhone}`)}
-            {@render linkField("Personal cell phone", profileValue(employee.personalPhone), `tel:${employee.personalPhone}`)}
-            {@render flagField("Government phone", employee.govPhone)}
-          </dl>
-        </section>
-
-        <section class="profile-group">
-          <h3>Organization and project</h3>
-          <dl>
-            {@render field("Integrated Product Team", profileValue(employee.team))}
-            {@render field("IPT Lead", profileValue(employee.iptLead))}
-            {@render field("Project", profileValue(employee.employeeProject))}
-            {@render field("Project Lead", profileValue(employee.employeeProjectLead))}
-          </dl>
-        </section>
-
-        <section class="profile-group">
-          <h3>Assets and requirements</h3>
-          <dl>
-            {@render badgeField("Computer Asset", optionLabel(COMPUTER_ASSET_OPTIONS, employee.computerAsset))}
-            {@render badgeField("Clearance", optionLabel(CLEARANCE_OPTIONS, employee.clearance))}
-            {@render field("CSWF Code", profileValue(employee.cswfCode))}
-            {@render field("CSWF Level", profileValue(employee.cswfLevel))}
-            {@render flagField("Financial Statement Required", employee.financialStatementRequired)}
-            {@render flagField("Drug Test Required", employee.drugTestRequired)}
-            {@render expiryField("Telework Agreement Valid Through", teleworkExpiry(employee.teleworkAgreementValidThrough))}
-          </dl>
-        </section>
+        {#each profileSections as section (section.id)}
+          {@const sectionFields = fieldsForProfileSection(section.id)}
+          {#if sectionFields.length}
+            <section class="profile-group">
+              <h3>{section.label}</h3>
+              <dl>
+                {#each sectionFields as field (field.id)}
+                  {@const rawValue = formattedProfileValue(employee, field)}
+                  {@const value = field.type === "date" ? formatDate(rawValue) : rawValue}
+                  {@const href = profileFieldHref(field, rawValue)}
+                  <div>
+                    <dt>{field.label}</dt>
+                    {#if !value}<dd class="empty">—</dd>
+                    {:else if href}<dd><a {href}>{value}</a></dd>
+                    {:else if field.type === "boolean" || field.type === "choice" || field.type === "multi_choice"}<dd><span class="badge">{value}</span></dd>
+                    {:else}<dd class:multiline-value={field.type === "multiline"}>{value}</dd>{/if}
+                  </div>
+                {/each}
+              </dl>
+            </section>
+          {/if}
+        {/each}
       </div>
     {:else if tab === "tasks"}
       {#if tasks.length === 0}
@@ -744,11 +674,7 @@
   .profile-group .empty {
     color: var(--text-muted);
   }
-  .profile-group .badge.flag-yes {
-    background: var(--accent-soft);
-    color: var(--accent);
-    border-color: transparent;
-  }
+  .multiline-value { white-space: pre-wrap; }
   .activity-list { list-style: none; padding: 0; }
   .activity-list li { padding: .2rem 0; border-bottom: 1px solid var(--border); }
   @media (max-width: 900px) {

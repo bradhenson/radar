@@ -5,7 +5,7 @@
 // verified against the recorded integrity counts and checksum, and only then
 // accepted. The UI always renders imported text as text.
 
-import { DEFAULT_SETTINGS, normalizeAppSettings, type AppSettings } from "../domain/models";
+import { DEFAULT_SETTINGS, EMPLOYEE_PROFILE_FIELD_TYPES, normalizeAppSettings, type AppSettings } from "../domain/models";
 import { isValidIsoDate } from "../utils/dates";
 import { COLLECTION_NAMES, emptyCollections, type CollectionName, type DatabaseSnapshot } from "./DataStore";
 
@@ -497,6 +497,9 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
           result.errors.push(`${name}[${i}].warningDays must be an array of numbers.`);
         }
       }
+      if (name === "employees" && rec.profileValues !== undefined) {
+        validateEmployeeProfileValues(rec.profileValues, `employees[${i}].profileValues`, result.errors);
+      }
     });
   }
 
@@ -636,6 +639,79 @@ function validateSettings(raw: unknown, errors: string[]): void {
   }
   if (settings.enableSingleKeyShortcuts !== undefined && typeof settings.enableSingleKeyShortcuts !== "boolean") {
     errors.push("settings.enableSingleKeyShortcuts must be true or false.");
+  }
+  validateEmployeeProfileSettings(settings, errors);
+}
+
+function validateEmployeeProfileValues(raw: unknown, path: string, errors: string[]): void {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    errors.push(`${path} must be an object.`);
+    return;
+  }
+  const entries = Object.entries(raw as Record<string, unknown>);
+  if (entries.length > 200) errors.push(`${path} has more than 200 fields.`);
+  for (const [id, value] of entries) {
+    if (!id || id.length > 100) errors.push(`${path} contains an invalid field id.`);
+    if (typeof value === "string") {
+      if (value.length > 10_000) errors.push(`${path}.${id} exceeds 10,000 characters.`);
+    } else if (typeof value === "boolean") {
+      // Supported primitive.
+    } else if (Array.isArray(value)) {
+      if (value.length > 50 || value.some((item) => typeof item !== "string" || item.length > 100)) {
+        errors.push(`${path}.${id} must be an array of at most 50 short strings.`);
+      }
+    } else {
+      errors.push(`${path}.${id} must be text, true/false, or an array of text values.`);
+    }
+  }
+}
+
+function validateEmployeeProfileSettings(settings: Record<string, unknown>, errors: string[]): void {
+  const sections = settings.employeeProfileSections;
+  const fields = settings.employeeProfileFields;
+  if (sections === undefined && fields === undefined) return; // Legacy backup receives defaults.
+  if (!Array.isArray(sections) || sections.length === 0 || sections.length > 50) {
+    errors.push("settings.employeeProfileSections must contain 1 to 50 sections.");
+    return;
+  }
+  const sectionIds = new Set<string>();
+  for (const [index, value] of sections.entries()) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      errors.push(`settings.employeeProfileSections[${index}] must be an object.`);
+      continue;
+    }
+    const section = value as Record<string, unknown>;
+    if (typeof section.id !== "string" || !section.id || section.id.length > 100 || sectionIds.has(section.id)) {
+      errors.push(`settings.employeeProfileSections[${index}].id is invalid or duplicated.`);
+    } else sectionIds.add(section.id);
+    if (typeof section.label !== "string" || !section.label.trim() || section.label.length > 100) errors.push(`settings.employeeProfileSections[${index}].label is invalid.`);
+    if (typeof section.sortOrder !== "number" || !Number.isFinite(section.sortOrder)) errors.push(`settings.employeeProfileSections[${index}].sortOrder must be a number.`);
+    if (typeof section.isArchived !== "boolean") errors.push(`settings.employeeProfileSections[${index}].isArchived must be true or false.`);
+  }
+  if (!Array.isArray(fields) || fields.length > 200) {
+    errors.push("settings.employeeProfileFields must be an array of at most 200 fields.");
+    return;
+  }
+  const types = new Set(EMPLOYEE_PROFILE_FIELD_TYPES.map((item) => item.value));
+  const fieldIds = new Set<string>();
+  for (const [index, value] of fields.entries()) {
+    if (typeof value !== "object" || value === null || Array.isArray(value)) {
+      errors.push(`settings.employeeProfileFields[${index}] must be an object.`);
+      continue;
+    }
+    const field = value as Record<string, unknown>;
+    if (typeof field.id !== "string" || !field.id || field.id.length > 100 || fieldIds.has(field.id)) errors.push(`settings.employeeProfileFields[${index}].id is invalid or duplicated.`);
+    else fieldIds.add(field.id);
+    if (typeof field.sectionId !== "string" || !sectionIds.has(field.sectionId)) errors.push(`settings.employeeProfileFields[${index}].sectionId is not recognized.`);
+    if (typeof field.label !== "string" || !field.label.trim() || field.label.length > 100) errors.push(`settings.employeeProfileFields[${index}].label is invalid.`);
+    if (typeof field.type !== "string" || !types.has(field.type as never)) errors.push(`settings.employeeProfileFields[${index}].type is not recognized.`);
+    if (typeof field.sortOrder !== "number" || !Number.isFinite(field.sortOrder)) errors.push(`settings.employeeProfileFields[${index}].sortOrder must be a number.`);
+    if (typeof field.isArchived !== "boolean") errors.push(`settings.employeeProfileFields[${index}].isArchived must be true or false.`);
+    if (field.options !== undefined && (!Array.isArray(field.options) || field.options.length > 50 || field.options.some((option) => {
+      if (typeof option !== "object" || option === null || Array.isArray(option)) return true;
+      const entry = option as Record<string, unknown>;
+      return typeof entry.value !== "string" || !entry.value || entry.value.length > 100 || typeof entry.label !== "string" || !entry.label.trim() || entry.label.length > 100;
+    }))) errors.push(`settings.employeeProfileFields[${index}].options is invalid.`);
   }
 }
 

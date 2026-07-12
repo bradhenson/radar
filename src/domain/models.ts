@@ -17,6 +17,7 @@ export interface Competency {
 export type EmployeeActiveStatus = "active" | "temporary_inactive" | "departed" | "archived";
 export type ComputerAsset = "rdte" | "nmci";
 export type ClearanceLevel = "s" | "ts" | "ts_sci";
+export type EmployeeProfileValue = string | boolean | string[];
 
 export interface Employee {
   id: Id;
@@ -48,6 +49,8 @@ export interface Employee {
   drugTestRequired?: boolean;
   teleworkAgreementValidThrough?: IsoDate;
   clearance?: ClearanceLevel;
+  /** Values for organization-defined profile fields, keyed by stable field id. */
+  profileValues?: Record<string, EmployeeProfileValue>;
   startDate?: IsoDate;
   evaluationCycleId?: Id;
   activeStatus: EmployeeActiveStatus;
@@ -400,6 +403,40 @@ export interface AppSettings {
   colorTheme: ColorTheme;
   /** Unmodified N/P/Q/T/B/E/M shortcuts; can be disabled for accessibility. */
   enableSingleKeyShortcuts: boolean;
+  employeeProfileSections: EmployeeProfileSection[];
+  employeeProfileFields: EmployeeProfileField[];
+}
+
+export type EmployeeProfileFieldType = "text" | "multiline" | "date" | "boolean" | "email" | "phone" | "url" | "choice" | "multi_choice";
+
+export type BuiltInEmployeeProfileKey =
+  | "positionTitle" | "series" | "edipi" | "pernr"
+  | "locationBuilding" | "locationCube" | "workEmail" | "workPhone" | "workCellPhone" | "personalPhone" | "govPhone"
+  | "team" | "iptLead" | "employeeProject" | "employeeProjectLead"
+  | "computerAsset" | "clearance" | "cswfCode" | "cswfLevel" | "financialStatementRequired" | "drugTestRequired"
+  | "teleworkAgreementValidThrough";
+
+export interface EmployeeProfileSection {
+  id: string;
+  label: string;
+  sortOrder: number;
+  isArchived: boolean;
+}
+
+export interface EmployeeProfileChoice {
+  value: string;
+  label: string;
+}
+
+export interface EmployeeProfileField {
+  id: string;
+  sectionId: string;
+  label: string;
+  type: EmployeeProfileFieldType;
+  sortOrder: number;
+  options?: EmployeeProfileChoice[];
+  builtInKey?: BuiltInEmployeeProfileKey;
+  isArchived: boolean;
 }
 
 export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
@@ -417,7 +454,7 @@ export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; s
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
@@ -431,12 +468,156 @@ export const DEFAULT_SETTINGS: AppSettings = {
   leaveLookaheadDays: 14,
   theme: "dark",
   colorTheme: "default",
-  enableSingleKeyShortcuts: true
+  enableSingleKeyShortcuts: true,
+  employeeProfileSections: [
+    { id: "identity", label: "Identity", sortOrder: 0, isArchived: false },
+    { id: "contact", label: "Location and contact", sortOrder: 1, isArchived: false },
+    { id: "organization", label: "Organization and project", sortOrder: 2, isArchived: false },
+    { id: "requirements", label: "Assets and requirements", sortOrder: 3, isArchived: false }
+  ],
+  employeeProfileFields: [
+    profileField("position-title", "identity", "Title", "text", 0, "positionTitle"),
+    profileField("series", "identity", "Series", "text", 1, "series"),
+    profileField("edipi", "identity", "EDIPI", "text", 2, "edipi"),
+    profileField("pernr", "identity", "PERNR", "text", 3, "pernr"),
+    profileField("building", "contact", "Building", "text", 0, "locationBuilding"),
+    profileField("cube", "contact", "Cube", "text", 1, "locationCube"),
+    profileField("work-email", "contact", "Work email", "email", 2, "workEmail"),
+    profileField("work-phone", "contact", "Work phone", "phone", 3, "workPhone"),
+    profileField("work-cell", "contact", "Work cell phone", "phone", 4, "workCellPhone"),
+    profileField("personal-phone", "contact", "Personal cell phone", "phone", 5, "personalPhone"),
+    profileField("gov-phone", "contact", "Government phone", "boolean", 6, "govPhone"),
+    profileField("team", "organization", "Integrated Product Team", "text", 0, "team"),
+    profileField("ipt-lead", "organization", "IPT Lead", "text", 1, "iptLead"),
+    profileField("employee-project", "organization", "Project", "text", 2, "employeeProject"),
+    profileField("employee-project-lead", "organization", "Project Lead", "text", 3, "employeeProjectLead"),
+    profileChoiceField("computer-asset", "requirements", "Computer Asset", 0, "computerAsset", [
+      { value: "rdte", label: "RDT&E" }, { value: "nmci", label: "NMCI" }
+    ]),
+    profileChoiceField("clearance", "requirements", "Clearance", 1, "clearance", [
+      { value: "s", label: "Secret" }, { value: "ts", label: "Top Secret" }, { value: "ts_sci", label: "TS/SCI" }
+    ]),
+    profileField("cswf-code", "requirements", "CSWF Code", "text", 2, "cswfCode"),
+    profileField("cswf-level", "requirements", "CSWF Level", "text", 3, "cswfLevel"),
+    profileField("financial-statement", "requirements", "Financial Statement Required", "boolean", 4, "financialStatementRequired"),
+    profileField("drug-test", "requirements", "Drug Test Required", "boolean", 5, "drugTestRequired"),
+    profileField("telework-valid", "requirements", "Telework Agreement Valid Through", "date", 6, "teleworkAgreementValidThrough")
+  ]
 };
+
+function profileField(
+  id: string, sectionId: string, label: string, type: EmployeeProfileFieldType, sortOrder: number,
+  builtInKey: BuiltInEmployeeProfileKey
+): EmployeeProfileField {
+  return { id, sectionId, label, type, sortOrder, builtInKey, isArchived: false };
+}
+
+function profileChoiceField(
+  id: string, sectionId: string, label: string, sortOrder: number, builtInKey: BuiltInEmployeeProfileKey,
+  options: EmployeeProfileChoice[]
+): EmployeeProfileField {
+  return { ...profileField(id, sectionId, label, "choice", sortOrder, builtInKey), options };
+}
+
+export const EMPLOYEE_PROFILE_FIELD_TYPES: { value: EmployeeProfileFieldType; label: string }[] = [
+  { value: "text", label: "Short text" },
+  { value: "multiline", label: "Long text" },
+  { value: "date", label: "Date" },
+  { value: "boolean", label: "Yes / No" },
+  { value: "email", label: "Email" },
+  { value: "phone", label: "Phone" },
+  { value: "url", label: "Web link" },
+  { value: "choice", label: "Single choice" },
+  { value: "multi_choice", label: "Multiple choice" }
+];
+
+const PROFILE_TYPES = new Set(EMPLOYEE_PROFILE_FIELD_TYPES.map((item) => item.value));
+const BUILT_IN_PROFILE_KEYS = new Set<BuiltInEmployeeProfileKey>([
+  "positionTitle", "series", "edipi", "pernr", "locationBuilding", "locationCube", "workEmail", "workPhone",
+  "workCellPhone", "personalPhone", "govPhone", "team", "iptLead", "employeeProject", "employeeProjectLead",
+  "computerAsset", "clearance", "cswfCode", "cswfLevel", "financialStatementRequired", "drugTestRequired",
+  "teleworkAgreementValidThrough"
+]);
+
+function defaultProfileSections(): EmployeeProfileSection[] {
+  return DEFAULT_SETTINGS.employeeProfileSections.map((section) => ({ ...section }));
+}
+
+function defaultProfileFields(): EmployeeProfileField[] {
+  return DEFAULT_SETTINGS.employeeProfileFields.map((field) => ({
+    ...field,
+    options: field.options?.map((option) => ({ ...option }))
+  }));
+}
+
+function normalizeProfileSections(raw: unknown): EmployeeProfileSection[] {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > 50) return defaultProfileSections();
+  const seen = new Set<string>();
+  const sections: EmployeeProfileSection[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return defaultProfileSections();
+    const src = item as Record<string, unknown>;
+    if (typeof src.id !== "string" || !src.id || seen.has(src.id) || typeof src.label !== "string" || !src.label.trim()) {
+      return defaultProfileSections();
+    }
+    seen.add(src.id);
+    sections.push({
+      id: src.id.slice(0, 100),
+      label: src.label.trim().slice(0, 100),
+      sortOrder: typeof src.sortOrder === "number" && Number.isFinite(src.sortOrder) ? src.sortOrder : sections.length,
+      isArchived: src.isArchived === true
+    });
+  }
+  return sections;
+}
+
+function normalizeProfileFields(raw: unknown, sections: EmployeeProfileSection[]): EmployeeProfileField[] {
+  if (!Array.isArray(raw) || raw.length > 200) return defaultProfileFields();
+  const sectionIds = new Set(sections.map((section) => section.id));
+  const seen = new Set<string>();
+  const fields: EmployeeProfileField[] = [];
+  for (const item of raw) {
+    if (typeof item !== "object" || item === null || Array.isArray(item)) return defaultProfileFields();
+    const src = item as Record<string, unknown>;
+    if (
+      typeof src.id !== "string" || !src.id || seen.has(src.id) ||
+      typeof src.sectionId !== "string" || !sectionIds.has(src.sectionId) ||
+      typeof src.label !== "string" || !src.label.trim() ||
+      typeof src.type !== "string" || !PROFILE_TYPES.has(src.type as EmployeeProfileFieldType)
+    ) return defaultProfileFields();
+    const builtInKey = typeof src.builtInKey === "string" && BUILT_IN_PROFILE_KEYS.has(src.builtInKey as BuiltInEmployeeProfileKey)
+      ? src.builtInKey as BuiltInEmployeeProfileKey
+      : undefined;
+    const options = Array.isArray(src.options)
+      ? src.options.flatMap((option) => {
+          if (typeof option !== "object" || option === null || Array.isArray(option)) return [];
+          const entry = option as Record<string, unknown>;
+          if (typeof entry.value !== "string" || !entry.value || typeof entry.label !== "string" || !entry.label.trim()) return [];
+          return [{ value: entry.value.slice(0, 100), label: entry.label.trim().slice(0, 100) }];
+        }).slice(0, 50)
+      : undefined;
+    seen.add(src.id);
+    fields.push({
+      id: src.id.slice(0, 100),
+      sectionId: src.sectionId,
+      label: src.label.trim().slice(0, 100),
+      type: src.type as EmployeeProfileFieldType,
+      sortOrder: typeof src.sortOrder === "number" && Number.isFinite(src.sortOrder) ? src.sortOrder : fields.length,
+      options,
+      builtInKey,
+      isArchived: src.isArchived === true
+    });
+  }
+  return fields;
+}
 
 /** Normalize persisted/imported settings and apply schema migrations. */
 export function normalizeAppSettings(raw: unknown): AppSettings {
-  const out: AppSettings = { ...DEFAULT_SETTINGS };
+  const out: AppSettings = {
+    ...DEFAULT_SETTINGS,
+    employeeProfileSections: defaultProfileSections(),
+    employeeProfileFields: defaultProfileFields()
+  };
   if (typeof raw !== "object" || raw === null) return out;
 
   const src = raw as Record<string, unknown>;
@@ -448,6 +629,8 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     }
   }
   if (typeof src.userDisplayName === "string") out.userDisplayName = src.userDisplayName;
+  out.employeeProfileSections = normalizeProfileSections(src.employeeProfileSections);
+  out.employeeProfileFields = normalizeProfileFields(src.employeeProfileFields, out.employeeProfileSections);
 
   if (LEGACY_DEFAULT_APPLICATION_NAMES.has(out.applicationName)) {
     out.applicationName = DEFAULT_SETTINGS.applicationName;

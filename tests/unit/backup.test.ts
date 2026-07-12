@@ -296,7 +296,7 @@ describe("backup validation rejects bad input", () => {
     };
     const r = parseAndValidateBackup(reseal(pkg));
     expect(r.valid).toBe(true);
-    expect(r.package!.data.settings.schemaVersion).toBe(2);
+    expect(r.package!.data.settings.schemaVersion).toBe(3);
     expect(r.package!.data.settings.backupReminderDays).toBe(1);
     expect(r.package!.data.settings.backupChangeThreshold).toBe(10);
   });
@@ -324,6 +324,43 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors.some((e) => e.includes("settings.dueSoonDays"))).toBe(true);
     expect(r.errors.some((e) => e.includes("settings.theme"))).toBe(true);
     expect(r.errors.some((e) => e.includes("enableSingleKeyShortcuts"))).toBe(true);
+  });
+
+  it("round-trips custom employee profile fields and values", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.data.settings.employeeProfileSections.push({ id: "company", label: "Company details", sortOrder: 10, isArchived: false });
+    pkg.data.settings.employeeProfileFields.push({
+      id: "office-region",
+      sectionId: "company",
+      label: "Office region",
+      type: "choice",
+      sortOrder: 0,
+      // Legacy flags from older backups must still validate.
+      isSensitive: false,
+      includeInExport: true,
+      isArchived: false,
+      options: [{ value: "east", label: "East" }]
+    } as unknown as (typeof pkg.data.settings.employeeProfileFields)[number]);
+    (pkg.data.employees[0] as Record<string, unknown>).profileValues = { "office-region": "east" };
+    const r = parseAndValidateBackup(reseal(pkg));
+    expect(r.valid).toBe(true);
+    expect((r.package!.data.employees[0] as Record<string, unknown>).profileValues).toEqual({ "office-region": "east" });
+  });
+
+  it("rejects unsupported custom employee profile values", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.employees[0] as Record<string, unknown>).profileValues = { unsafe: { nested: true } };
+    const r = parseAndValidateBackup(reseal(pkg));
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes("profileValues.unsafe"))).toBe(true);
+  });
+
+  it("rejects profile fields assigned to an unknown section", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.data.settings.employeeProfileFields[0] = { ...pkg.data.settings.employeeProfileFields[0]!, sectionId: "missing" };
+    const r = parseAndValidateBackup(reseal(pkg));
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes("sectionId is not recognized"))).toBe(true);
   });
 
   it("rejects duplicate employee-training records for the same requirement", () => {

@@ -9,7 +9,8 @@
   import { compareDates, daysBetween, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
-  import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, type Employee } from "../domain/models";
+  import type { Employee } from "../domain/models";
+  import { activeProfileFields, activeProfileSections, formattedProfileValue } from "../domain/employeeProfile";
 
   const NO_COMPETENCY_FILTER = "__none";
   const STALE_INPUT_DAYS = 30;
@@ -30,7 +31,13 @@
         if (!showInactive && (e.activeStatus !== "active" || e.isArchived)) return false;
         if (filterCompetency === NO_COMPETENCY_FILTER && e.competencyId) return false;
         if (filterCompetency && filterCompetency !== NO_COMPETENCY_FILTER && e.competencyId !== filterCompetency) return false;
-        if (search && !e.displayName.toLowerCase().includes(search.toLowerCase())) return false;
+        if (search) {
+          const needle = search.toLowerCase();
+          const profileMatch = activeProfileFields(app.settings).some((field) =>
+            formattedProfileValue(e, field).toLowerCase().includes(needle)
+          );
+          if (!e.displayName.toLowerCase().includes(needle) && !profileMatch) return false;
+        }
         return true;
       })
       .map((e) => {
@@ -117,18 +124,9 @@
     return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
-  function optionLabel(options: { value: string; label: string }[], value: string | undefined): string {
-    if (!value) return "";
-    return options.find((option) => option.value === value)?.label ?? value;
-  }
-
-  function yesNo(value: boolean | undefined): string {
-    return value === undefined ? "" : value ? "Yes" : "No";
-  }
-
   // CSV export with explicit column selection. The default is a minimal
-  // operational dataset; administrative and sensitive personal fields must be
-  // opted into per export and are never remembered.
+  // operational dataset; profile fields must be opted into per export and
+  // are never remembered.
   type ExportRow = (typeof rows)[number];
   interface ExportColumn {
     id: string;
@@ -138,79 +136,45 @@
   interface ExportGroup {
     id: string;
     label: string;
-    sensitive?: boolean;
     defaultOn: boolean;
     columns: ExportColumn[];
   }
 
-  const EXPORT_GROUPS: ExportGroup[] = [
-    {
+  let exportGroups = $derived.by<ExportGroup[]>(() => {
+    const groups: ExportGroup[] = [{
       id: "operational",
       label: "Operational",
       defaultOn: true,
       columns: [
         { id: "name", header: "Employee", value: (r) => r.e.displayName },
         { id: "competency", header: "Competency", value: (r) => app.competencyCode(r.e.competencyId) },
-        { id: "title", header: "Title", value: (r) => r.e.positionTitle },
         { id: "status", header: "Active status", value: (r) => r.e.activeStatus },
-        { id: "ipt", header: "Integrated Product Team", value: (r) => r.e.team },
         { id: "open", header: "Open tasks", value: (r) => r.openCount },
         { id: "overdue", header: "Overdue tasks", value: (r) => r.overdueCount },
         { id: "training", header: "Training due", value: (r) => r.trainingDueCount },
         { id: "lastInput", header: "Last performance input", value: (r) => r.lastInput },
         { id: "lastCheckIn", header: "Last check-in", value: (r) => r.e.lastCheckInDate }
       ]
-    },
-    {
-      id: "contact",
-      label: "Contact and location",
-      defaultOn: true,
-      columns: [
-        { id: "workEmail", header: "Work email", value: (r) => r.e.workEmail },
-        { id: "workPhone", header: "Work phone", value: (r) => r.e.workPhone },
-        { id: "workCell", header: "Work cell phone", value: (r) => r.e.workCellPhone },
-        { id: "building", header: "Building", value: (r) => r.e.locationBuilding },
-        { id: "cube", header: "Cube", value: (r) => r.e.locationCube },
-        { id: "iptLead", header: "IPT Lead", value: (r) => r.e.iptLead },
-        { id: "project", header: "Project", value: (r) => r.e.employeeProject },
-        { id: "projectLead", header: "Project Lead", value: (r) => r.e.employeeProjectLead }
-      ]
-    },
-    {
-      id: "admin",
-      label: "Administrative",
-      defaultOn: false,
-      columns: [
-        { id: "series", header: "Series", value: (r) => r.e.series },
-        { id: "asset", header: "Computer asset", value: (r) => optionLabel(COMPUTER_ASSET_OPTIONS, r.e.computerAsset) },
-        { id: "govPhone", header: "Gov phone", value: (r) => yesNo(r.e.govPhone) },
-        { id: "cswfCode", header: "CSWF code", value: (r) => r.e.cswfCode },
-        { id: "cswfLevel", header: "CSWF level", value: (r) => r.e.cswfLevel },
-        { id: "twAgreement", header: "Telework agreement valid through", value: (r) => r.e.teleworkAgreementValidThrough }
-      ]
-    },
-    {
-      id: "sensitive",
-      label: "Sensitive personal information",
-      sensitive: true,
-      defaultOn: false,
-      columns: [
-        { id: "edipi", header: "EDIPI", value: (r) => r.e.edipi },
-        { id: "pernr", header: "PERNR", value: (r) => r.e.pernr },
-        { id: "personalPhone", header: "Personal cell phone", value: (r) => r.e.personalPhone },
-        { id: "clearance", header: "Clearance", value: (r) => optionLabel(CLEARANCE_OPTIONS, r.e.clearance) },
-        { id: "finStatement", header: "Financial statement required", value: (r) => yesNo(r.e.financialStatementRequired) },
-        { id: "drugTest", header: "Drug test required", value: (r) => yesNo(r.e.drugTestRequired) }
-      ]
+    }];
+    const fields = activeProfileFields(app.settings);
+    for (const section of activeProfileSections(app.settings)) {
+      const sectionFields = fields.filter((field) => field.sectionId === section.id);
+      if (sectionFields.length) groups.push({
+        id: `profile-${section.id}`,
+        label: section.label,
+        defaultOn: false,
+        columns: sectionFields.map((field) => ({ id: `profile-${field.id}`, header: field.label, value: (row) => formattedProfileValue(row.e, field) }))
+      });
     }
-  ];
+    return groups;
+  });
 
   let exportOpen = $state(false);
   let exportSelected = $state<Record<string, boolean>>({});
 
   function openExportDialog() {
     const selection: Record<string, boolean> = {};
-    for (const group of EXPORT_GROUPS) {
+    for (const group of exportGroups) {
       for (const col of group.columns) selection[col.id] = group.defaultOn;
     }
     exportSelected = selection;
@@ -226,9 +190,9 @@
     return on === group.columns.length ? "all" : on === 0 ? "none" : "some";
   }
 
-  let selectedColumns = $derived(EXPORT_GROUPS.flatMap((g) => g.columns).filter((c) => exportSelected[c.id]));
-  let sensitiveSelected = $derived(
-    EXPORT_GROUPS.filter((g) => g.sensitive).some((g) => g.columns.some((c) => exportSelected[c.id]))
+  let selectedColumns = $derived(exportGroups.flatMap((g) => g.columns).filter((c) => exportSelected[c.id]));
+  let profileSelected = $derived(
+    exportGroups.filter((g) => g.id.startsWith("profile-")).some((g) => g.columns.some((c) => exportSelected[c.id]))
   );
 
   async function exportCsv() {
@@ -402,10 +366,10 @@
   <Dialog title="Export employees (CSV)" onclose={() => (exportOpen = false)}>
     <p class="small muted" style="margin-top:0">
       Choose which columns to include. The export covers the {sorted.length} employee(s) currently shown.
-      Sensitive fields are off by default and must be selected for each export.
+      Profile fields are off by default and must be selected for each export.
     </p>
-    {#each EXPORT_GROUPS as group (group.id)}
-      <fieldset class="export-group" class:sensitive={group.sensitive}>
+    {#each exportGroups as group (group.id)}
+      <fieldset class="export-group">
         <legend>
           <label class="group-toggle">
             <input
@@ -427,9 +391,9 @@
         </div>
       </fieldset>
     {/each}
-    {#if sensitiveSelected}
+    {#if profileSelected}
       <p class="field-error" role="alert">
-        This export will include sensitive personal information (PII). Only export it when required, store the
+        This export may include personal information (PII). Only export it when required, store the
         file in an approved location, and delete it when no longer needed.
       </p>
     {/if}
@@ -506,9 +470,6 @@
     border-radius: var(--radius);
     padding: .4rem .7rem .6rem;
     margin: 0 0 .6rem;
-  }
-  .export-group.sensitive {
-    border-color: color-mix(in srgb, var(--danger) 45%, var(--border));
   }
   .export-group legend {
     padding: 0 .3rem;
