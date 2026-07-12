@@ -53,9 +53,11 @@
   });
 
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
-    { page: "board", label: "Board", icon: "board" },
+    { page: "board", label: "Board", icon: "board", section: "Work" },
     { page: "calendar", label: "Calendar", icon: "calendar" },
     { page: "today", label: "Today", icon: "today" },
+    { page: "projects", label: "Projects", icon: "projects" },
+    { page: "meetings", label: "Meetings", icon: "meetings" },
     { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },
@@ -63,8 +65,6 @@
     { page: "telework", label: "Telework", icon: "telework" },
     { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "meetings", label: "Meetings", icon: "meetings", section: "Work" },
-    { page: "projects", label: "Projects", icon: "projects" },
     { page: "archive", label: "Archive", icon: "archive", section: "System" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
@@ -701,6 +701,7 @@
     font-weight: 750;
     opacity: .8;
   }
+  .sidenav .section:first-child { margin-top: 0; }
   .sidenav-footer {
     margin-top: auto;
     padding: 1rem .7rem 0;

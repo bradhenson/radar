@@ -20,6 +20,8 @@
 
 ### Changed
 
+- Reorganized the sidebar navigation: the Work section (Board, Calendar, Today, Projects, Meetings) now sits above the People section, and Board, Calendar, and Today — previously ungrouped at the top — are part of Work.
+
 - The Wails desktop app now starts maximized by default while retaining the Windows taskbar and RADAR window controls. The maximize/restore button can return it to the configured 1280×860 window.
 
 - Extended rich-text editing to the performance input Context, Action, and Result / Impact fields, and rendered those fields as formatted text on the performance detail panel and employee accomplishments. Plain-text exports and search continue to read the flattened text, so formatting never leaks into reports or filters.
