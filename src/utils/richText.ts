@@ -42,6 +42,18 @@ export function parseRichTextInline(text: string): RichTextInline[] {
       continue;
     }
 
+    if (text.startsWith("***", i) && text[i + 3] !== "*") {
+      const close = findUnescaped(text, "***", i + 3);
+      if (close > i + 3) {
+        nodes.push({
+          kind: "strong",
+          children: [{ kind: "emphasis", children: parseRichTextInline(text.slice(i + 3, close)) }]
+        });
+        i = close + 3;
+        continue;
+      }
+    }
+
     if (text.startsWith("**", i)) {
       const close = findUnescaped(text, "**", i + 2);
       if (close > i + 2) {

@@ -12,6 +12,15 @@ describe("parseRichTextInline", () => {
     ]);
   });
 
+  it("parses triple markers as bold italic", () => {
+    expect(parseRichTextInline("***both*** and **bold *****mix***")).toEqual([
+      { kind: "strong", children: [{ kind: "emphasis", children: [{ kind: "text", text: "both" }] }] },
+      { kind: "text", text: " and " },
+      { kind: "strong", children: [{ kind: "text", text: "bold " }] },
+      { kind: "strong", children: [{ kind: "emphasis", children: [{ kind: "text", text: "mix" }] }] }
+    ]);
+  });
+
   it("supports escaped formatting markers", () => {
     expect(parseRichTextInline("\\*not italic\\* and \\**not bold\\**")).toEqual([
       { kind: "text", text: "*not italic* and **not bold**" }
