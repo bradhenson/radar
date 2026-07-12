@@ -11,6 +11,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
@@ -312,7 +313,7 @@
       {#each employeeNotes as note (note.id)}
         <div class="card" style="margin-bottom:.5rem">
           {#if editingNoteId === note.id}
-            <textarea bind:value={editNoteDraft} rows="3" maxlength="10000" style="width:100%" aria-label="Edit note"></textarea>
+            <RichTextEditor id={`employee-note-edit-${note.id}`} bind:value={editNoteDraft} rows={3} maxlength={10000} ariaLabel="Edit note" />
             <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
               <button type="button" onclick={() => (editingNoteId = undefined)}>Cancel</button>
               <button type="button" class="primary" disabled={!editNoteDraft.trim()} onclick={() => void saveNoteEdit(note)}>Save</button>
@@ -320,7 +321,7 @@
           {:else}
             <div style="display:flex; gap:.5rem; align-items:flex-start">
               <div style="flex:1; min-width:0">
-                <div style="white-space:pre-wrap">{note.noteText}</div>
+                <RichTextView value={note.noteText} compact />
                 <div class="small muted">Added {formatTimestamp(note.createdAt)}{note.updatedAt !== note.createdAt ? " · edited" : ""}</div>
               </div>
               <button type="button" class="icon-btn" aria-label="Edit note" title="Edit" onclick={() => startNoteEdit(note)}><Icon name="edit" size={16} /></button>
@@ -331,7 +332,7 @@
       {/each}
       {#if noteFormOpen}
         <div class="card" style="margin-bottom:.5rem">
-          <textarea bind:value={noteDraft} rows="3" maxlength="10000" style="width:100%" aria-label="New note" placeholder="Something to remember about {employee.displayName}"></textarea>
+          <RichTextEditor id="employee-note-new" bind:value={noteDraft} rows={3} maxlength={10000} ariaLabel="New note" placeholder={`Something to remember about ${employee.displayName}`} />
           <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
             <button type="button" onclick={() => { noteFormOpen = false; noteDraft = ""; }}>Cancel</button>
             <button type="button" class="primary" disabled={!noteDraft.trim()} onclick={() => void addEmployeeNote()}>Add note</button>
@@ -361,7 +362,11 @@
       {:else}
         {#each inputs.slice(0, 3) as p (p.id)}
           <div class="card" style="margin-bottom:.5rem">
-            <div class="small muted">{formatDate(p.inputDate)}</div>
+            <div style="display:flex; gap:.5rem; align-items:center">
+              <div class="small muted">{formatDate(p.inputDate)}</div>
+              <span class="spacer"></span>
+              <button type="button" class="icon-btn" aria-label={`Edit performance input from ${formatDate(p.inputDate)}`} title="Edit" onclick={() => (ui.performanceFormInput = p)}><Icon name="edit" size={16} /></button>
+            </div>
             <RichTextView value={p.actionOrAccomplishment} compact />
             {#if p.result}<div class="small muted"><strong>Result / Impact:</strong><RichTextView value={p.result} compact /></div>{/if}
           </div>
@@ -384,7 +389,11 @@
         {#each meetingNotes.slice(0, 3) as note (note.id)}
           <div class="card" style="margin-bottom:.5rem">
             <div class="small muted">{formatDate(note.meetingDate)} · {note.meetingType}{#if note.projectId} · {app.projectName(note.projectId)}{/if}</div>
-            <div>{note.title}</div>
+            <div style="display:flex; gap:.5rem; align-items:center">
+              <button type="button" class="link" onclick={() => (editingMeetingNote = note)}>{note.title}</button>
+              <span class="spacer"></span>
+              <button type="button" class="icon-btn" aria-label={`Edit meeting note ${note.title}`} title="Edit" onclick={() => (editingMeetingNote = note)}><Icon name="edit" size={16} /></button>
+            </div>
             {#if note.actionItems}<div class="small muted"><strong>Actions:</strong><RichTextView value={note.actionItems} compact /></div>{/if}
           </div>
         {/each}
@@ -502,10 +511,14 @@
       {:else}
         {#each inputs as p (p.id)}
           <div class="card" style="margin-bottom:.6rem">
-            <div class="small muted">
-              {formatDate(p.inputDate)} · {p.inputStatus}
-              {#if p.projectId}· {app.projectName(p.projectId)}{/if}
-              {#if p.recognitionPotential}· <span class="badge success">Recognition potential</span>{/if}
+            <div style="display:flex; gap:.5rem; align-items:center">
+              <div class="small muted">
+                {formatDate(p.inputDate)} · {p.inputStatus}
+                {#if p.projectId}· {app.projectName(p.projectId)}{/if}
+                {#if p.recognitionPotential}· <span class="badge success">Recognition potential</span>{/if}
+              </div>
+              <span class="spacer"></span>
+              <button type="button" class="icon-btn" aria-label={`Edit performance input from ${formatDate(p.inputDate)}`} title="Edit" onclick={() => (ui.performanceFormInput = p)}><Icon name="edit" size={16} /></button>
             </div>
             {#if p.situationOrContext}<div><strong>Context:</strong><RichTextView value={p.situationOrContext} compact /></div>{/if}
             <div><strong>Action:</strong><RichTextView value={p.actionOrAccomplishment} compact /></div>
@@ -542,7 +555,7 @@
           <tbody>
             {#each training as r (r.requirement.id)}
               <tr>
-                <td>{r.requirement.name}</td>
+                <td><button type="button" class="link" onclick={() => router.go("training", `${employeeId}~${r.requirement.id}`)}>{r.requirement.name}</button></td>
                 <td>{TRAINING_STATE_LABELS[r.status.state]}</td>
                 <td>{formatDate(r.status.dueDate)}</td>
                 <td>{formatDate(r.status.completedDate ?? r.record?.completedDate)}</td>
@@ -561,7 +574,7 @@
           <tbody>
             {#each leave as l (l.id)}
               <tr>
-                <td>{formatDate(l.startDate)}</td><td>{formatDate(l.endDate)}</td>
+                <td><button type="button" class="link" aria-label={`Edit leave starting ${formatDate(l.startDate)}`} onclick={() => router.go("leave", l.id)}>{formatDate(l.startDate)}</button></td><td>{formatDate(l.endDate)}</td>
                 <td>{l.leaveType ?? ""}</td><td>{l.status}</td><td>{l.workloadImpactNote ?? ""}</td>
               </tr>
             {/each}
@@ -577,7 +590,7 @@
           <tbody>
             {#each telework as t (t.id)}
               <tr>
-                <td>{t.recordType}</td><td>{t.status.replace(/_/g, " ")}</td>
+                <td><button type="button" class="link" onclick={() => router.go("telework", t.id)}>{t.recordType}</button></td><td>{t.status.replace(/_/g, " ")}</td>
                 <td>{formatDate(t.requestDate)}</td><td>{teleworkRange(t)}</td>
                 <td>{t.scheduleSummary ?? ""}</td><td>{t.sourceReference ?? ""}</td>
               </tr>
@@ -619,7 +632,7 @@
           <thead><tr><th>Title</th><th>Status</th><th>Nomination due</th><th>Submitted</th></tr></thead>
           <tbody>
             {#each awards as a (a.id)}
-              <tr><td>{a.title}</td><td>{a.status}</td><td>{formatDate(a.nominationDueDate)}</td><td>{formatDate(a.submittedDate)}</td></tr>
+              <tr><td><button type="button" class="link" onclick={() => router.go("awards", a.id)}>{a.title}</button></td><td>{a.status}</td><td>{formatDate(a.nominationDueDate)}</td><td>{formatDate(a.submittedDate)}</td></tr>
             {/each}
           </tbody>
         </table>
