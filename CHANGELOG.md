@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+### Fixed
+
+- Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.
+
 ### Changed
 
 - Extended rich-text editing to the performance input Context, Action, and Result / Impact fields, and rendered those fields as formatted text on the performance detail panel and employee accomplishments. Plain-text exports and search continue to read the flattened text, so formatting never leaks into reports or filters.

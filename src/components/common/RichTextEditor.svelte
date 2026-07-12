@@ -87,12 +87,14 @@
   }
 
   /**
-   * Editing can displace checklist markers: Enter splits an li without its
-   * marker, Backspace can merge one into the middle of a line. Drop strays
-   * and restore a leading marker on every checklist item.
+   * Editing can leave lists in degenerate states: Enter splits a checklist li
+   * without its marker, Backspace can merge a marker mid-line or delete the
+   * last li leaving <ul><br></ul>, and commands can produce an empty li that
+   * cannot host the caret. Repair all of it after every change.
    */
-  function normalizeChecklists() {
+  function normalizeLists() {
     if (!editor) return;
+    // Markers belong only at the head of a checklist item.
     for (const m of Array.from(editor.querySelectorAll("[data-checked]"))) {
       const li = m.parentElement;
       const valid = li?.nodeName === "LI" && li.parentElement?.matches("ul.checklist") && li.firstChild === m;
@@ -100,6 +102,20 @@
     }
     for (const li of editor.querySelectorAll("ul.checklist > li")) {
       if (!li.querySelector(":scope > [data-checked]")) li.insertBefore(makeMarker(false), li.firstChild);
+    }
+    // Every list item must be able to host the caret.
+    for (const li of Array.from(editor.querySelectorAll("li"))) {
+      const hasContent = Array.from(li.childNodes).some(
+        (c) => !(c instanceof HTMLElement && c.dataset.checked != null)
+      );
+      if (!hasContent) li.appendChild(document.createElement("br"));
+    }
+    // Lists hold only list items; a list left with none goes away entirely.
+    for (const list of Array.from(editor.querySelectorAll("ul, ol"))) {
+      for (const child of Array.from(list.childNodes)) {
+        if (!(child instanceof HTMLElement && child.nodeName === "LI")) child.remove();
+      }
+      if (!list.firstChild) list.remove();
     }
   }
 
@@ -131,7 +147,10 @@
 
   function emit() {
     if (!editor) return;
-    normalizeChecklists();
+    normalizeLists();
+    // Normalization can remove the last block entirely; re-seed while focused
+    // so typing (and first-line autoformat) still has a block to land in.
+    if (!editor.firstChild && document.activeElement === editor) seedEmptyBlock();
     const next = serializeRichTextDom(editor);
     // Placeholder shows only when there is no text and no block structure
     // (an empty list item the user is filling in is not "empty").
@@ -164,6 +183,36 @@
     document.execCommand(command, false, arg);
     repairChecklistMerges();
     emit();
+  }
+
+  /**
+   * Bullet / numbered list commands. execCommand on a checklist strips both
+   * the markers and the items' <br>, leaving caret-less empty items — so
+   * checklist selections are converted manually, preserving item content.
+   */
+  function execList(kind: "ul" | "ol") {
+    if (!editor) return;
+    editor.focus();
+    const blocks = currentBlocks();
+    const checklists = blocks.filter((b) => b.matches("ul.checklist"));
+    if (checklists.length > 0 && checklists.length === blocks.length) {
+      let firstItem: HTMLElement | null = null;
+      for (const listEl of checklists) {
+        const list = document.createElement(kind);
+        for (const li of Array.from(listEl.querySelectorAll(":scope > li"))) {
+          const item = document.createElement("li");
+          contentWithoutMarker(Array.from(li.childNodes), item);
+          if (!item.hasChildNodes()) item.appendChild(document.createElement("br"));
+          list.appendChild(item);
+          firstItem ??= item;
+        }
+        listEl.replaceWith(list);
+      }
+      if (firstItem) placeCaretAtEnd(firstItem);
+      emit();
+      return;
+    }
+    exec(kind === "ul" ? "insertUnorderedList" : "insertOrderedList");
   }
 
   function currentBlocks(): HTMLElement[] {
@@ -352,6 +401,44 @@
     return null;
   }
 
+  function placeCaretAtStartOfItem(li: HTMLElement) {
+    const range = document.createRange();
+    const marker = li.querySelector(":scope > [data-checked]");
+    if (marker) range.setStartAfter(marker);
+    else range.setStart(li, 0);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  /**
+   * Backspace on an empty checklist item. The browser cannot do this cleanly:
+   * it deletes the non-editable marker (which normalization would resurrect)
+   * and can leave a list with no items. Remove the item ourselves and put the
+   * caret somewhere sensible.
+   */
+  function removeChecklistItem(li: HTMLLIElement) {
+    if (!editor) return;
+    const list = li.parentElement!;
+    const prevItem = li.previousElementSibling as HTMLElement | null;
+    const nextItem = li.nextElementSibling as HTMLElement | null;
+    li.remove();
+    if (prevItem) {
+      placeCaretAtEnd(prevItem);
+    } else if (nextItem) {
+      placeCaretAtStartOfItem(nextItem);
+    } else {
+      const prevBlock = list.previousElementSibling as HTMLElement | null;
+      const nextBlock = list.nextElementSibling as HTMLElement | null;
+      list.remove();
+      if (prevBlock) placeCaretAtEnd(prevBlock);
+      else if (nextBlock) placeCaretAtStartOfItem(nextBlock);
+      else seedEmptyBlock();
+    }
+    emit();
+  }
+
   function itemIsEmpty(li: HTMLLIElement): boolean {
     let text = "";
     for (const child of Array.from(li.childNodes)) {
@@ -403,10 +490,23 @@
       exec("italic");
       return;
     }
-    if ((e.key === "Enter" || e.key === " ") && e.target instanceof HTMLElement && e.target.dataset.checked != null) {
-      e.preventDefault();
-      toggleMarker(e.target);
-      return;
+    if (e.target instanceof HTMLElement && e.target.dataset.checked != null) {
+      // Keyboard focus is on a checklist marker (it has tabindex): toggle on
+      // Enter/Space, remove the item on Backspace/Delete. Without this the
+      // keys hit a non-editable element and silently do nothing.
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        toggleMarker(e.target);
+        return;
+      }
+      if (e.key === "Backspace" || e.key === "Delete") {
+        const li = e.target.closest("li");
+        if (li instanceof HTMLLIElement) {
+          e.preventDefault();
+          removeChecklistItem(li);
+          return;
+        }
+      }
     }
     if (e.key === "Enter" && !e.shiftKey) {
       const sel = window.getSelection();
@@ -414,6 +514,15 @@
       if (li && itemIsEmpty(li)) {
         e.preventDefault();
         exitChecklistItem(li);
+        return;
+      }
+    }
+    if (e.key === "Backspace") {
+      const sel = window.getSelection();
+      const li = sel?.isCollapsed ? checklistItemOf(sel.anchorNode) : null;
+      if (li && itemIsEmpty(li)) {
+        e.preventDefault();
+        removeChecklistItem(li);
         return;
       }
     }
@@ -445,8 +554,8 @@
     <button type="button" class="format emphasis" aria-label="Italic" title="Italic (Ctrl+I)" onmousedown={(e) => e.preventDefault()} onclick={() => exec("italic")}>I</button>
     <span class="separator" aria-hidden="true"></span>
     <button type="button" class="format" aria-label="Heading" title="Heading" onmousedown={(e) => e.preventDefault()} onclick={toggleHeading}>H</button>
-    <button type="button" class="format" aria-label="Bulleted list" title="Bulleted list" onmousedown={(e) => e.preventDefault()} onclick={() => exec("insertUnorderedList")}>•</button>
-    <button type="button" class="format" aria-label="Numbered list" title="Numbered list" onmousedown={(e) => e.preventDefault()} onclick={() => exec("insertOrderedList")}>1.</button>
+    <button type="button" class="format" aria-label="Bulleted list" title="Bulleted list" onmousedown={(e) => e.preventDefault()} onclick={() => execList("ul")}>•</button>
+    <button type="button" class="format" aria-label="Numbered list" title="Numbered list" onmousedown={(e) => e.preventDefault()} onclick={() => execList("ol")}>1.</button>
     <button type="button" class="format" aria-label="Checklist" title="Checklist" onmousedown={(e) => e.preventDefault()} onclick={toggleChecklist}>☐</button>
   </div>
   <div
