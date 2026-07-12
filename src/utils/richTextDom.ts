@@ -26,10 +26,10 @@ function isChecklistMarker(node: DomNodeLike): boolean {
 }
 
 function escapeInline(text: string): string {
-  return text.replace(/\\/g, "\\\\").replace(/\*/g, "\\*");
+  return text.replace(/\\/g, "\\\\").replace(/\*/g, "\\*").replace(/\+/g, "\\+");
 }
 
-type InlineSegment = { text: string; bold: boolean; italic: boolean };
+type InlineSegment = { text: string; bold: boolean; italic: boolean; underline: boolean };
 
 /**
  * Flatten an inline subtree into formatted text runs. contenteditable trees
@@ -37,44 +37,57 @@ type InlineSegment = { text: string; bold: boolean; italic: boolean };
  * run keeps the output canonical regardless of nesting. Unknown elements
  * contribute only their text, so unexpected markup can never persist.
  */
-function collectInline(node: DomNodeLike, bold: boolean, italic: boolean, out: InlineSegment[]): void {
+function collectInline(
+  node: DomNodeLike,
+  bold: boolean,
+  italic: boolean,
+  underline: boolean,
+  out: InlineSegment[]
+): void {
   if (node.nodeType === TEXT_NODE) {
-    out.push({ text: node.nodeValue ?? "", bold, italic });
+    out.push({ text: node.nodeValue ?? "", bold, italic, underline });
     return;
   }
   if (!isElement(node) || isChecklistMarker(node)) return;
   const name = node.nodeName;
   if (name === "BR") {
-    out.push({ text: "\n", bold, italic });
+    out.push({ text: "\n", bold, italic, underline });
     return;
   }
   // Nested block containers inside inline context still break the line.
-  if (name === "DIV" || name === "P") out.push({ text: "\n", bold: false, italic: false });
+  if (name === "DIV" || name === "P") out.push({ text: "\n", bold: false, italic: false, underline: false });
   const nextBold = bold || name === "B" || name === "STRONG";
   const nextItalic = italic || name === "I" || name === "EM";
-  for (const child of Array.from(node.childNodes)) collectInline(child, nextBold, nextItalic, out);
+  const nextUnderline = underline || name === "U";
+  for (const child of Array.from(node.childNodes)) collectInline(child, nextBold, nextItalic, nextUnderline, out);
 }
 
 function inlineOf(children: DomNodeLike[]): string {
   const segments: InlineSegment[] = [];
-  for (const child of children) collectInline(child, false, false, segments);
+  for (const child of children) collectInline(child, false, false, false, segments);
   // Whitespace-only runs carry no visible formatting; dropping their flags
   // merges them with neighbours and avoids emitting markers around spaces.
   const merged: InlineSegment[] = [];
   for (const seg of segments) {
     if (!seg.text) continue;
-    const flags = seg.text.trim() ? seg : { ...seg, bold: false, italic: false };
+    const flags = seg.text.trim() ? seg : { ...seg, bold: false, italic: false, underline: false };
     const last = merged[merged.length - 1];
-    if (last && last.bold === flags.bold && last.italic === flags.italic) last.text += flags.text;
+    if (
+      last &&
+      last.bold === flags.bold &&
+      last.italic === flags.italic &&
+      last.underline === flags.underline
+    ) last.text += flags.text;
     else merged.push({ ...flags });
   }
   return merged
     .map((seg) => {
       const text = escapeInline(seg.text);
-      if (seg.bold && seg.italic) return `***${text}***`;
-      if (seg.bold) return `**${text}**`;
-      if (seg.italic) return `*${text}*`;
-      return text;
+      let formatted = text;
+      if (seg.italic) formatted = `*${formatted}*`;
+      if (seg.bold) formatted = `**${formatted}**`;
+      if (seg.underline) formatted = `++${formatted}++`;
+      return formatted;
     })
     .join("");
 }
@@ -135,7 +148,7 @@ function serializeBlockElement(node: DomNodeLike): string {
 /**
  * Serialize a contenteditable subtree back to the rich-text source syntax
  * understood by parseRichText. Only whitelisted structures survive — bold,
- * italic, headings, and the three list kinds. Anything else collapses to its
+ * italic, underline, headings, and the three list kinds. Anything else collapses to its
  * plain text, so unexpected markup can never reach stored records.
  */
 export function serializeRichTextDom(root: DomNodeLike): string {

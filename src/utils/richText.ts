@@ -1,6 +1,6 @@
 export type RichTextInline =
   | { kind: "text"; text: string }
-  | { kind: "strong" | "emphasis"; children: RichTextInline[] };
+  | { kind: "strong" | "emphasis" | "underline"; children: RichTextInline[] };
 
 export type RichTextListItem = {
   content: RichTextInline[];
@@ -35,11 +35,21 @@ export function parseRichTextInline(text: string): RichTextInline[] {
   const nodes: RichTextInline[] = [];
   let i = 0;
   while (i < text.length) {
-    if (text[i] === "\\" && i + 1 < text.length && ["\\", "*"].includes(text[i + 1]!)) {
-      const escapedStars = text[i + 1] === "*" && text[i + 2] === "*" ? "**" : text[i + 1]!;
-      appendText(nodes, escapedStars);
-      i += escapedStars.length + 1;
+    if (text[i] === "\\" && i + 1 < text.length && ["\\", "*", "+"].includes(text[i + 1]!)) {
+      const escaped = text[i + 1]!;
+      const paired = (escaped === "*" || escaped === "+") && text[i + 2] === escaped;
+      appendText(nodes, paired ? escaped + escaped : escaped);
+      i += paired ? 3 : 2;
       continue;
+    }
+
+    if (text.startsWith("++", i)) {
+      const close = findUnescaped(text, "++", i + 2);
+      if (close > i + 2) {
+        nodes.push({ kind: "underline", children: parseRichTextInline(text.slice(i + 2, close)) });
+        i = close + 2;
+        continue;
+      }
     }
 
     if (text.startsWith("***", i) && text[i + 3] !== "*") {

@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Employee Overview notes now use the shared rich-text editor for adding and editing notes, with safe formatted rendering for saved entries.
+
+- Employee profile records now open their existing editors directly from the relevant tab. Performance inputs and meeting notes open in place, while training, leave, telework, travel, and awards link to the exact record in their owning workflow; recent performance and meeting cards on Overview are editable too.
+
+- Rich-text fields now support underlined text through a toolbar button, Ctrl+U, and the readable `++text++` backup syntax. Underline safely combines with bold and italic and remains plain text in search and exports.
+
 ### Fixed
 
 - Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.

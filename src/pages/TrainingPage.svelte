@@ -4,6 +4,7 @@
   // assignment is declarative (everyone, or a selected list), and the primary
   // working view is a per-requirement roster with one-click completion.
   import { app } from "../stores/app.svelte";
+  import { router } from "../app/router.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
@@ -243,6 +244,19 @@
     recVerified = rec?.lastVerifiedDate ?? "";
     recError = "";
   }
+
+  // Deep link: #/training/{employeeId}~{requirementId} opens the exact
+  // employee training record from an employee profile.
+  $effect(() => {
+    const target = router.current.param;
+    if (router.current.page !== "training" || !target) return;
+    const [employeeId, requirementId] = target.split("~");
+    const req = activeReqs.find((item) => item.id === requirementId);
+    if (!employeeId || !req) return;
+    selectedReqId = req.id;
+    openRecord(employeeId, req);
+    router.go("training");
+  });
 
   async function saveRecord() {
     if (!recordDialog) return;

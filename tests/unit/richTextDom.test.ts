@@ -44,6 +44,14 @@ describe("serializeRichTextDom", () => {
     expect(blocks[1]).toMatchObject({ kind: "paragraph", content: [{ kind: "strong" }] });
   });
 
+  it("serializes underline alone and combined with bold and italic", () => {
+    const out = serializeRichTextDom(
+      root(el("div", [el("u", [text("underlined")]), text(" and "), el("u", [el("strong", [el("em", [text("all")])])])]))
+    );
+    expect(out).toBe("++underlined++ and ++***all***++");
+    expect(richTextToPlainText(out)).toBe("underlined and all");
+  });
+
   it("does not wrap whitespace-only formatting elements", () => {
     const out = serializeRichTextDom(root(el("div", [text("a"), el("b", [text(" ")]), text("b")])));
     expect(out).toBe("a b");
@@ -91,10 +99,10 @@ describe("serializeRichTextDom", () => {
     expect(out).toBe("- [ ] Kept");
   });
 
-  it("escapes asterisks and backslashes so literal text round-trips", () => {
-    const out = serializeRichTextDom(root(el("div", [text("2*3=6 and C:\\dir")])));
-    expect(out).toBe("2\\*3=6 and C:\\\\dir");
-    expect(richTextToPlainText(out)).toBe("2*3=6 and C:\\dir");
+  it("escapes formatting markers and backslashes so literal text round-trips", () => {
+    const out = serializeRichTextDom(root(el("div", [text("2*3=6, C++ and C:\\dir")])));
+    expect(out).toBe("2\\*3=6, C\\+\\+ and C:\\\\dir");
+    expect(richTextToPlainText(out)).toBe("2*3=6, C++ and C:\\dir");
   });
 
   it("keeps br as a line break within a paragraph and trims trailing breaks", () => {
@@ -104,7 +112,7 @@ describe("serializeRichTextDom", () => {
 
   it("collapses unknown elements to their text content", () => {
     const out = serializeRichTextDom(
-      root(el("div", [el("span", [text("kept ")]), el("u", [text("also kept")])]))
+      root(el("div", [el("span", [text("kept ")]), el("mark", [text("also kept")])]))
     );
     expect(out).toBe("kept also kept");
   });
