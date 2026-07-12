@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Board column names can now be renamed in place: double-click a column name (or focus its header and press F2), then press Enter or click away to save. Escape cancels the edit.
+
 - Replaced the duplicate native Wails title bar with a frameless desktop window. RADAR's existing
   header is now the draggable title area with minimize, maximize/restore, and close controls, while
   the RADAR title remains available to the Windows taskbar. Replaced the default Wails taskbar icon

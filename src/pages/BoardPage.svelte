@@ -5,7 +5,7 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
-  import { TASK_PRIORITIES, statusLabel, type Task } from "../domain/models";
+  import { TASK_PRIORITIES, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
@@ -65,6 +65,10 @@
   let dropTarget = $state<{ columnId: string; index: number } | undefined>(undefined);
   let draggingColumnId = $state<string | undefined>(undefined);
   let columnDropTarget = $state<{ id: string; position: "before" | "after" } | undefined>(undefined);
+  let renamingColumnId = $state<string | undefined>(undefined);
+  let columnRenameDraft = $state("");
+  let columnRenameInput: HTMLInputElement | undefined = $state();
+  let columnRenameSaving = $state(false);
 
   function onDragStart(e: DragEvent, task: Task) {
     if (draggingColumnId) return;
@@ -150,13 +154,66 @@
     columnDropTarget = undefined;
   }
 
-  function onColumnKeydown(e: KeyboardEvent, columnId: string) {
+  function onColumnKeydown(e: KeyboardEvent, column: BoardColumnDefinition) {
     if (e.key === "ArrowLeft") {
       e.preventDefault();
-      void app.moveBoardColumn(columnId, -1);
+      void app.moveBoardColumn(column.id, -1);
     } else if (e.key === "ArrowRight") {
       e.preventDefault();
-      void app.moveBoardColumn(columnId, 1);
+      void app.moveBoardColumn(column.id, 1);
+    } else if (e.key === "F2") {
+      e.preventDefault();
+      beginColumnRename(column);
+    }
+  }
+
+  function beginColumnRename(column: BoardColumnDefinition) {
+    if (columnRenameSaving) return;
+    renamingColumnId = column.id;
+    columnRenameDraft = column.label;
+    requestAnimationFrame(() => {
+      columnRenameInput?.focus();
+      columnRenameInput?.select();
+    });
+  }
+
+  function beginColumnRenameFromDoubleClick(e: MouseEvent, column: BoardColumnDefinition) {
+    e.preventDefault();
+    e.stopPropagation();
+    beginColumnRename(column);
+  }
+
+  function cancelColumnRename() {
+    if (columnRenameSaving) return;
+    renamingColumnId = undefined;
+    columnRenameDraft = "";
+  }
+
+  async function saveColumnRename(column: BoardColumnDefinition) {
+    if (renamingColumnId !== column.id || columnRenameSaving) return;
+    const label = columnRenameDraft.trim();
+    columnRenameSaving = true;
+    try {
+      await app.renameBoardColumn(column.id, label);
+      renamingColumnId = undefined;
+      columnRenameDraft = "";
+      if (label !== column.label) app.toast(`Renamed column to "${label}"`, "success");
+    } catch (e) {
+      app.toast(e instanceof Error ? e.message : String(e), "error");
+      requestAnimationFrame(() => columnRenameInput?.focus());
+    } finally {
+      columnRenameSaving = false;
+    }
+  }
+
+  function onColumnRenameKeydown(e: KeyboardEvent, column: BoardColumnDefinition) {
+    e.stopPropagation();
+    if (e.key === "Enter") {
+      e.preventDefault();
+      void saveColumnRename(column);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelColumnRename();
     }
   }
 
@@ -178,6 +235,7 @@
 
   function cancelTransientState() {
     cancelDrag();
+    cancelColumnRename();
   }
 
   // --- keyboard movement (plan 13.4, 29.4) -----------------------------------
@@ -339,22 +397,42 @@
             if (e.currentTarget === e.target) dropTarget = undefined;
           }}
         >
+          <!-- During rename the header intentionally drops its button role and tab stop so the text input is the only interactive element. -->
+          <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
           <header
             class="bucket-header"
-            draggable="true"
-            role="button"
-            tabindex="0"
-            aria-label={`Drag ${col.column.label} column to reorder`}
-            title="Drag to reorder column"
+            draggable={renamingColumnId !== col.column.id}
+            role={renamingColumnId === col.column.id ? undefined : "button"}
+            tabindex={renamingColumnId === col.column.id ? undefined : 0}
+            aria-label={renamingColumnId === col.column.id ? undefined : `Drag ${col.column.label} column to reorder. Press F2 to rename.`}
+            title={renamingColumnId === col.column.id ? undefined : "Drag to reorder column. Double-click its name or press F2 to rename."}
             ondragstart={(e) => onColumnDragStart(e, col.column.id)}
             ondragover={(e) => onColumnDragOver(e, col.column.id)}
             ondrop={(e) => void onColumnDrop(e, col.column.id)}
             ondragend={onColumnDragEnd}
-            onkeydown={(e) => onColumnKeydown(e, col.column.id)}
+            onkeydown={(e) => onColumnKeydown(e, col.column)}
           >
-            <div class="bucket-title">
+            <!-- F2 on the keyboard-accessible header provides the equivalent action. -->
+            <!-- svelte-ignore a11y_no_static_element_interactions -->
+            <div class="bucket-title" ondblclick={(e) => beginColumnRenameFromDoubleClick(e, col.column)}>
               <span class="bucket-color" aria-hidden="true"></span>
-              <span>{col.column.label}</span>
+              {#if renamingColumnId === col.column.id}
+                <input
+                  class="column-name-input"
+                  bind:this={columnRenameInput}
+                  bind:value={columnRenameDraft}
+                  type="text"
+                  maxlength="80"
+                  aria-label={`Column name for ${col.column.label}`}
+                  onkeydown={(e) => onColumnRenameKeydown(e, col.column)}
+                  onblur={() => void saveColumnRename(col.column)}
+                  onpointerdown={(e) => e.stopPropagation()}
+                  ondragstart={(e) => e.preventDefault()}
+                  ondblclick={(e) => e.stopPropagation()}
+                />
+              {:else}
+                <span class="bucket-label">{col.column.label}</span>
+              {/if}
             </div>
             <span class="count">{col.tasks.length}</span>
           </header>
@@ -662,16 +740,32 @@
   .bucket-title {
     display: flex;
     align-items: center;
+    flex: 1;
     min-width: 0;
     gap: .45rem;
     font-weight: 700;
     font-size: .92rem;
     color: var(--text);
   }
-  .bucket-title span:last-child {
+  .bucket-label {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+  }
+  .column-name-input {
+    width: 100%;
+    min-width: 0;
+    min-height: 1.7rem;
+    margin: -.18rem 0;
+    padding: .12rem .35rem;
+    border-color: var(--accent);
+    border-radius: .35rem;
+    background: var(--surface);
+    color: var(--text);
+    font: inherit;
+    font-weight: 700;
+    line-height: 1.2;
+    cursor: text;
   }
   .bucket-color {
     width: .55rem;
