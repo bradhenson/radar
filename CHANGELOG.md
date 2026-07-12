@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Added safe, offline rich-text editing for task descriptions and notes plus meeting discussions and action items. The reusable editor supports bold, italic, headings, bulleted and numbered lists, checkboxes, keyboard shortcuts, and preview while preserving existing plain-text records and readable backups.
+
 - Board column names can now be renamed in place: double-click a column name (or focus its header and press F2), then press Enter or click away to save. Escape cancels the edit.
 
 - Replaced the duplicate native Wails title bar with a frameless desktop window. RADAR's existing

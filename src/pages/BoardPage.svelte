@@ -5,10 +5,12 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import RichTextView from "../components/common/RichTextView.svelte";
   import { TASK_PRIORITIES, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
+  import { richTextToPlainText } from "../utils/richText";
 
   let search = $state("");
   let filterEmployee = $state("");
@@ -35,7 +37,7 @@
       if (filterPriority && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
-        const hay = `${t.title} ${t.description ?? ""} ${t.tags.join(" ")} ${app.employeeName(t.employeeId)}`.toLowerCase();
+        const hay = `${t.title} ${richTextToPlainText(t.description)} ${t.tags.join(" ")} ${app.employeeName(t.employeeId)}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;
@@ -469,7 +471,7 @@
                     <span class="card-context">{app.projectName(task.projectId)}</span>
                   {/if}
                   {#if task.showOnCard === "description" && task.description}
-                    <span class="card-preview">{task.description}</span>
+                    <div class="card-preview"><RichTextView value={task.description} compact /></div>
                   {/if}
                   {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || task.status === "complete" || statusDiverges || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
                     <span class="card-meta">

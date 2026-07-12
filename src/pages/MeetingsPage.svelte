@@ -4,11 +4,13 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import RichTextView from "../components/common/RichTextView.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../domain/models";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
+  import { richTextToPlainText } from "../utils/richText";
 
   let search = $state("");
   let filterType = $state("");
@@ -35,8 +37,8 @@
         return (
           includesText(note.title, needle) ||
           includesText(note.meetingType, needle) ||
-          includesText(note.notes, needle) ||
-          includesText(note.actionItems, needle) ||
+          includesText(richTextToPlainText(note.notes), needle) ||
+          includesText(richTextToPlainText(note.actionItems), needle) ||
           note.attendeeEmployeeIds.some((id) => app.employeeName(id).toLowerCase().includes(needle)) ||
           includesText(app.projectName(note.projectId), needle)
         );
@@ -68,8 +70,8 @@
         note.title,
         app.projectName(note.projectId),
         employeeNames(note.attendeeEmployeeIds),
-        note.notes,
-        note.actionItems
+        richTextToPlainText(note.notes),
+        richTextToPlainText(note.actionItems)
       ])
     );
     try {
@@ -103,7 +105,7 @@
   function createFollowUpTask(note: MeetingNote) {
     ui.openNewTask({
       title: `Follow up: ${note.title}`,
-      description: note.actionItems || note.notes,
+      description: richTextToPlainText(note.actionItems || note.notes),
       projectId: note.projectId,
       employeeId: note.attendeeEmployeeIds[0]
     });
@@ -201,11 +203,11 @@
           <div class="meeting-sections">
             <section>
               <h3>Discussion</h3>
-              <div class:muted={!selectedNote.notes}>{selectedNote.notes || "No discussion notes recorded."}</div>
+              <RichTextView value={selectedNote.notes} emptyText="No discussion notes recorded." />
             </section>
             <section class="action-section">
               <h3>Action Items</h3>
-              <div class:muted={!selectedNote.actionItems}>{selectedNote.actionItems || "No action items recorded."}</div>
+              <RichTextView value={selectedNote.actionItems} emptyText="No action items recorded." />
             </section>
           </div>
           {#if selectedNote.actionItems}

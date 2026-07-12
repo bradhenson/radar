@@ -2,6 +2,7 @@
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
   import Icon from "../common/Icon.svelte";
+  import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../../domain/models";
   import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
@@ -213,10 +214,10 @@
     </div>
 
     <label for="mn-notes">Discussion notes</label>
-    <textarea id="mn-notes" class="discussion-notes" bind:value={notes} rows="8" maxlength="20000"></textarea>
+    <RichTextEditor id="mn-notes" bind:value={notes} rows={8} maxlength={20000} ariaLabel="Discussion notes" />
 
     <label for="mn-actions">Action items</label>
-    <textarea id="mn-actions" bind:value={actionItems} rows="3" maxlength="10000" style="width:100%"></textarea>
+    <RichTextEditor id="mn-actions" bind:value={actionItems} rows={4} maxlength={10000} ariaLabel="Action items" />
 
     <div class="form-actions">
       {#if isEditing}
@@ -310,10 +311,6 @@
   }
   .delete-action {
     margin-right: auto;
-  }
-  .discussion-notes {
-    width: 100%;
-    min-height: 12rem;
   }
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr; }

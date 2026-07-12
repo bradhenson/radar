@@ -3,6 +3,7 @@
 // "Import from task" action. Pure — no store or DOM imports.
 
 import type { ChecklistItem, IsoDate, PerformanceInput, Task, TaskNote } from "../models";
+import { richTextToPlainText } from "../../utils/richText";
 
 export interface TaskImportContext {
   today: IsoDate;
@@ -23,12 +24,12 @@ export function performanceInputPrefillFromTask(task: Task, ctx: TaskImportConte
   const completionNotes = (ctx.notes ?? [])
     .filter((n) => n.taskId === task.id && n.noteType === "completion")
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
-    .map((n) => n.body);
+    .map((n) => richTextToPlainText(n.body));
 
   return {
     employeeId: task.employeeId,
     inputDate: task.completedDate ?? ctx.today,
-    situationOrContext: task.description || undefined,
+    situationOrContext: richTextToPlainText(task.description) || undefined,
     actionOrAccomplishment: action,
     result: completionNotes.length ? completionNotes.join("\n") : undefined,
     projectId: task.projectId,

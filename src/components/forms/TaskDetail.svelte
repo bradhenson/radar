@@ -2,6 +2,8 @@
   // Full task editor with notes, checklist, and activity (plan 12.2, 14).
   import Dialog from "../common/Dialog.svelte";
   import Icon from "../common/Icon.svelte";
+  import RichTextEditor from "../common/RichTextEditor.svelte";
+  import RichTextView from "../common/RichTextView.svelte";
   import { app } from "../../stores/app.svelte";
   import { ui } from "../../stores/ui.svelte";
   import {
@@ -330,7 +332,7 @@
     {#if error}<div class="field-error">{error}</div>{/if}
 
     <label for="td-desc">Description</label>
-    <textarea id="td-desc" bind:value={draft.description} rows="3" maxlength="10000" style="width:100%"></textarea>
+    <RichTextEditor id="td-desc" bind:value={draft.description} rows={4} maxlength={10000} ariaLabel="Task description" />
     <label class="show-on-card">
       <input
         type="checkbox"
@@ -451,14 +453,14 @@
 
       <section>
         <h3>Notes</h3>
-        <div style="display:flex; gap:.4rem; margin-bottom:.5rem;">
-          <textarea placeholder="Add a note" bind:value={newNote} rows="2" maxlength="10000" style="flex:1"></textarea>
+        <div class="note-entry">
+          <RichTextEditor id="td-new-note" bind:value={newNote} rows={3} maxlength={10000} placeholder="Add a note" ariaLabel="New task note" />
           <button type="button" onclick={() => void addNote()}>Add</button>
         </div>
         {#each notes as note (note.id)}
           <div class="note">
             <div class="small muted">{formatTimestamp(note.createdAt)}</div>
-            <div style="white-space:pre-wrap">{note.body}</div>
+            <RichTextView value={note.body} compact />
           </div>
         {/each}
       </section>
@@ -487,6 +489,13 @@
     display: flex;
     flex-direction: column;
     gap: 1rem;
+  }
+  .note-entry {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: end;
+    gap: .4rem;
+    margin-bottom: .5rem;
   }
   @media (max-width: 800px) {
     .grid { grid-template-columns: 1fr 1fr; }

@@ -11,6 +11,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import RichTextView from "../components/common/RichTextView.svelte";
   import { CLEARANCE_OPTIONS, COMPUTER_ASSET_OPTIONS, INTERACTION_TYPES, statusLabel, type EmployeeNote, type MeetingNote } from "../domain/models";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
@@ -384,7 +385,7 @@
           <div class="card" style="margin-bottom:.5rem">
             <div class="small muted">{formatDate(note.meetingDate)} · {note.meetingType}{#if note.projectId} · {app.projectName(note.projectId)}{/if}</div>
             <div>{note.title}</div>
-            {#if note.actionItems}<div class="small muted">Actions: {note.actionItems}</div>{/if}
+            {#if note.actionItems}<div class="small muted"><strong>Actions:</strong><RichTextView value={note.actionItems} compact /></div>{/if}
           </div>
         {/each}
       {/if}
@@ -527,8 +528,8 @@
               <span class="spacer"></span>
               <button type="button" class="icon-btn" aria-label="Edit meeting note" title="Edit" onclick={() => (editingMeetingNote = note)}><Icon name="edit" size={16} /></button>
             </div>
-            {#if note.notes}<div><strong>Discussion:</strong> {note.notes}</div>{/if}
-            {#if note.actionItems}<div><strong>Action items:</strong> {note.actionItems}</div>{/if}
+            {#if note.notes}<div><strong>Discussion:</strong><RichTextView value={note.notes} compact /></div>{/if}
+            {#if note.actionItems}<div><strong>Action items:</strong><RichTextView value={note.actionItems} compact /></div>{/if}
           </div>
         {/each}
       {/if}

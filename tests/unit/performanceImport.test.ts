@@ -115,6 +115,18 @@ describe("performanceInputPrefillFromTask", () => {
     });
     expect(prefill.result).toBe("Cutover done.\nZero downtime.");
   });
+
+  it("converts rich task text to readable plain text", () => {
+    const prefill = performanceInputPrefillFromTask(
+      makeTask({ description: "## Background\n\nThe **legacy** stack failed." }),
+      {
+        today: TODAY,
+        notes: [makeNote({ noteType: "completion", body: "- [x] Cutover complete\n- [ ] Monitor" })]
+      }
+    );
+    expect(prefill.situationOrContext).toBe("Background\n\nThe legacy stack failed.");
+    expect(prefill.result).toBe("☑ Cutover complete\n☐ Monitor");
+  });
 });
 
 describe("mergeTaskImportIntoDraft", () => {
