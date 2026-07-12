@@ -22,8 +22,20 @@ describe("parseRichTextInline", () => {
   });
 
   it("supports escaped formatting markers", () => {
-    expect(parseRichTextInline("\\*not italic\\* and \\**not bold\\**")).toEqual([
-      { kind: "text", text: "*not italic* and **not bold**" }
+    expect(parseRichTextInline("\\*not italic\\* and \\**not bold\\** and \\++not underlined\\++")).toEqual([
+      { kind: "text", text: "*not italic* and **not bold** and ++not underlined++" }
+    ]);
+  });
+
+  it("parses underline alone and with nested formatting", () => {
+    expect(parseRichTextInline("Use ++underline++ and ++**bold underline**++")).toEqual([
+      { kind: "text", text: "Use " },
+      { kind: "underline", children: [{ kind: "text", text: "underline" }] },
+      { kind: "text", text: " and " },
+      {
+        kind: "underline",
+        children: [{ kind: "strong", children: [{ kind: "text", text: "bold underline" }] }]
+      }
     ]);
   });
 });

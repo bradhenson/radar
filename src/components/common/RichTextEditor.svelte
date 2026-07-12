@@ -51,7 +51,7 @@
       if (node.kind === "text") {
         parent.appendChild(document.createTextNode(node.text));
       } else {
-        const el = document.createElement(node.kind === "strong" ? "b" : "i");
+        const el = document.createElement(node.kind === "strong" ? "b" : node.kind === "emphasis" ? "i" : "u");
         inlineToDom(node.children, el);
         parent.appendChild(el);
       }
@@ -490,6 +490,11 @@
       exec("italic");
       return;
     }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "u") {
+      e.preventDefault();
+      exec("underline");
+      return;
+    }
     if (e.target instanceof HTMLElement && e.target.dataset.checked != null) {
       // Keyboard focus is on a checklist marker (it has tabindex): toggle on
       // Enter/Space, remove the item on Backspace/Delete. Without this the
@@ -552,6 +557,7 @@
   <div class="toolbar" role="toolbar" aria-label={`${ariaLabel} formatting`}>
     <button type="button" class="format strong" aria-label="Bold" title="Bold (Ctrl+B)" onmousedown={(e) => e.preventDefault()} onclick={() => exec("bold")}>B</button>
     <button type="button" class="format emphasis" aria-label="Italic" title="Italic (Ctrl+I)" onmousedown={(e) => e.preventDefault()} onclick={() => exec("italic")}>I</button>
+    <button type="button" class="format underline" aria-label="Underline" title="Underline (Ctrl+U)" onmousedown={(e) => e.preventDefault()} onclick={() => exec("underline")}>U</button>
     <span class="separator" aria-hidden="true"></span>
     <button type="button" class="format" aria-label="Heading" title="Heading" onmousedown={(e) => e.preventDefault()} onclick={toggleHeading}>H</button>
     <button type="button" class="format" aria-label="Bulleted list" title="Bulleted list" onmousedown={(e) => e.preventDefault()} onclick={() => execList("ul")}>•</button>
@@ -613,6 +619,7 @@
   .format { min-width: 1.75rem; font-size: .9rem; }
   .strong { font-weight: 800; }
   .emphasis { font-style: italic; }
+  .underline { text-decoration: underline; text-underline-offset: .12em; }
   .separator { width: 1px; height: 1.2rem; margin: 0 .18rem; background: var(--border); }
   .editor {
     position: relative;

@@ -20,8 +20,10 @@
       {node.text}
     {:else if node.kind === "strong"}
       <strong>{@render inline(node.children)}</strong>
-    {:else}
+    {:else if node.kind === "emphasis"}
       <em>{@render inline(node.children)}</em>
+    {:else}
+      <u>{@render inline(node.children)}</u>
     {/if}
   {/each}
 {/snippet}
