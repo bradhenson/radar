@@ -442,8 +442,8 @@
     overflow: hidden;
   }
   .rich-editor:focus-within {
-    border-color: var(--accent);
-    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 20%, transparent);
+    border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 9%, transparent);
   }
   .toolbar {
     display: flex;
@@ -478,6 +478,13 @@
     overflow-y: auto;
     resize: vertical;
     outline: 0;
+  }
+  /* The global [tabindex]:focus-visible ring would outline the inner editable
+     area, drawing a line under the toolbar. The container's :focus-within
+     border + shadow is the single focus indicator for the whole control. */
+  .editor:focus,
+  .editor:focus-visible {
+    outline: none;
   }
   .editor:empty::before {
     content: attr(data-placeholder);

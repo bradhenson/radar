@@ -6,6 +6,8 @@
 
 - Added safe, offline rich-text editing for task descriptions and notes plus meeting discussions and action items. The reusable editor supports bold, italic, headings, bulleted and numbered lists, checkboxes, keyboard shortcuts, and preview while preserving existing plain-text records and readable backups.
 
+- Softened the focus ring on form fields app-wide: focused inputs, selects, textareas, and the rich-text editor now show a subtle accent tint instead of a bright accent border, and the rich-text editor shows a single ring around the whole control instead of doubling one inside the toolbar. Keyboard focus outlines on buttons and cards remain full strength.
+
 - Rich-text fields now edit in a single live-formatted view: formatting appears as you type instead of behind a separate Write/Preview toggle. Typing shortcuts (`- `, `1. `, `## `, `[] ` at the start of a line) convert to lists, headings, and checklist items on the spot, checklist boxes toggle with a click or keyboard, and pasted content is inserted as plain text. Records are still stored in the same readable plain-text syntax, so existing notes and backups are unaffected.
 
 - Board column names can now be renamed in place: double-click a column name (or focus its header and press F2), then press Enter or click away to save. Escape cancels the edit.
