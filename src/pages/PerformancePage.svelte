@@ -2,8 +2,10 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import RichTextView from "../components/common/RichTextView.svelte";
   import { daysBetween, formatDate } from "../utils/dates";
   import { downloadText, backupFilename } from "../utils/download";
+  import { richTextToPlainText } from "../utils/richText";
 
   type ViewMode = "inputs" | "employees" | "coverage";
   type SortMode = "newest" | "oldest" | "employee";
@@ -24,6 +26,13 @@
     return value.replaceAll("_", " ");
   }
 
+  // List rows are single-line summaries, so flatten any rich-text formatting
+  // to plain text rather than showing raw markers. The detail panel renders
+  // the full formatting via RichTextView.
+  function summaryText(value: string | undefined): string {
+    return richTextToPlainText(value).replace(/\s*\n\s*/g, " ");
+  }
+
   let inputs = $derived.by(() => {
     const needle = search.trim().toLowerCase();
     return app.performanceInputs
@@ -36,9 +45,9 @@
         return (
           includes(app.employeeName(p.employeeId), needle) ||
           includes(app.projectName(p.projectId), needle) ||
-          includes(p.situationOrContext, needle) ||
-          includes(p.actionOrAccomplishment, needle) ||
-          includes(p.result, needle)
+          includes(richTextToPlainText(p.situationOrContext), needle) ||
+          includes(richTextToPlainText(p.actionOrAccomplishment), needle) ||
+          includes(richTextToPlainText(p.result), needle)
         );
       })
       .sort((a, b) => {
@@ -92,9 +101,9 @@
       for (const p of group.list) {
         lines.push(`Date: ${formatDate(p.inputDate)}`);
         if (p.projectId) lines.push(`Project: ${app.projectName(p.projectId)}`);
-        if (p.situationOrContext) lines.push(`Context: ${p.situationOrContext}`);
-        lines.push(`Action: ${p.actionOrAccomplishment}`);
-        if (p.result) lines.push(`Result / Impact: ${p.result}`);
+        if (p.situationOrContext) lines.push(`Context: ${richTextToPlainText(p.situationOrContext)}`);
+        lines.push(`Action: ${richTextToPlainText(p.actionOrAccomplishment)}`);
+        if (p.result) lines.push(`Result / Impact: ${richTextToPlainText(p.result)}`);
         lines.push(`Status: ${p.inputStatus}`, "");
       }
     }
@@ -208,7 +217,7 @@
               {#each group.list as input (input.id)}
                 <button type="button" class="input-list-item" class:active={selectedInput?.id === input.id} aria-pressed={selectedInput?.id === input.id} onclick={() => (selectedId = input.id)}>
                   <span class="input-row-meta"><span>{formatDate(input.inputDate)}</span><span class="badge">{statusText(input.inputStatus)}</span></span>
-                  <strong>{input.actionOrAccomplishment}</strong>
+                  <strong>{summaryText(input.actionOrAccomplishment)}</strong>
                   <span class="input-context">{app.projectName(input.projectId) || (input.result ? "Result recorded" : "Result / impact missing")}</span>
                 </button>
               {/each}
@@ -217,7 +226,7 @@
             {#each inputs as input (input.id)}
               <button type="button" class="input-list-item" class:active={selectedInput?.id === input.id} aria-pressed={selectedInput?.id === input.id} onclick={() => (selectedId = input.id)}>
                 <span class="input-row-meta"><span>{formatDate(input.inputDate)}</span><span>{app.employeeName(input.employeeId)}</span><span class="badge">{statusText(input.inputStatus)}</span></span>
-                <strong>{input.actionOrAccomplishment}</strong>
+                <strong>{summaryText(input.actionOrAccomplishment)}</strong>
                 <span class="input-context">{app.projectName(input.projectId) || (input.result ? "Result recorded" : "Result / impact missing")}</span>
               </button>
             {/each}
@@ -245,15 +254,15 @@
           <div class="input-sections">
             <section>
               <h3>Context</h3>
-              <div class:muted={!selectedInput.situationOrContext}>{selectedInput.situationOrContext || "No context recorded."}</div>
+              <RichTextView value={selectedInput.situationOrContext} emptyText="No context recorded." />
             </section>
             <section>
               <h3>Action / Accomplishment</h3>
-              <div>{selectedInput.actionOrAccomplishment}</div>
+              <RichTextView value={selectedInput.actionOrAccomplishment} />
             </section>
             <section class:missing={!selectedInput.result}>
               <h3>Result / Impact</h3>
-              <div class:muted={!selectedInput.result}>{selectedInput.result || "Result / impact not recorded."}</div>
+              <RichTextView value={selectedInput.result} emptyText="Result / impact not recorded." />
             </section>
           </div>
         </article>

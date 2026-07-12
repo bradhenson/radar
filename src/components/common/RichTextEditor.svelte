@@ -26,9 +26,11 @@
   $effect(() => {
     const next = value ?? "";
     if (!editor) return;
-    if (next === lastEmitted) return;
-    renderValue(next);
-    lastEmitted = next;
+    if (next !== lastEmitted) {
+      renderValue(next);
+      lastEmitted = next;
+    }
+    editor.classList.toggle("is-empty", next === "");
   });
 
   function makeMarker(checked: boolean): HTMLSpanElement {
@@ -101,14 +103,40 @@
     }
   }
 
+  /**
+   * A brand-new empty contenteditable holds typed characters in a bare text
+   * node with no block wrapper, so first-line autoformat ("- ", "## ", …)
+   * can't find a block to convert. Seed one empty block on focus so the very
+   * first line behaves like every later line. The is-empty class (not :empty)
+   * drives the placeholder, so the seeded block stays invisible until typed in.
+   */
+  function seedEmptyBlock() {
+    if (!editor) return;
+    const div = document.createElement("div");
+    div.appendChild(document.createElement("br"));
+    editor.replaceChildren(div);
+    const range = document.createRange();
+    range.setStart(div, 0);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  }
+
+  function onEditorFocus() {
+    // Only seed when the DOM is truly empty; a list/heading in progress can
+    // serialize to "" yet must not be replaced.
+    if (editor && !editor.firstChild) seedEmptyBlock();
+  }
+
   function emit() {
     if (!editor) return;
     normalizeChecklists();
     const next = serializeRichTextDom(editor);
-    if (next === "" && editor.childNodes.length > 0 && editor.textContent === "") {
-      // Clear leftover empty wrappers so the CSS :empty placeholder returns.
-      editor.textContent = "";
-    }
+    // Placeholder shows only when there is no text and no block structure
+    // (an empty list item the user is filling in is not "empty").
+    const structural = editor.querySelector("ul, ol, h3, h4, h5") !== null;
+    editor.classList.toggle("is-empty", next === "" && !structural);
     lastEmitted = next;
     value = next;
   }
@@ -266,9 +294,16 @@
     }
     if (!action) return;
     e.preventDefault();
+    // Delete the prefix directly rather than via execCommand: deleting the
+    // only content of a block with execCommand can merge/detach that block,
+    // which would leave the conversion operating on a node no longer in the
+    // tree. deleteContents keeps the block element intact.
+    range.deleteContents();
+    const caret = document.createRange();
+    caret.setStart(block, 0);
+    caret.collapse(true);
     sel.removeAllRanges();
-    sel.addRange(range);
-    document.execCommand("delete");
+    sel.addRange(caret);
     action();
     emit();
   }
@@ -427,6 +462,7 @@
     style:min-height={`calc(${rows} * 1.45em + 1.3rem)`}
     oninput={emit}
     onbeforeinput={onBeforeInput}
+    onfocus={onEditorFocus}
     onkeydown={onEditorKeydown}
     onclick={onEditorClick}
     onpaste={onPaste}
@@ -470,6 +506,7 @@
   .emphasis { font-style: italic; }
   .separator { width: 1px; height: 1.2rem; margin: 0 .18rem; background: var(--border); }
   .editor {
+    position: relative;
     padding: .65rem .7rem;
     background: var(--surface);
     line-height: 1.45;
@@ -486,8 +523,13 @@
   .editor:focus-visible {
     outline: none;
   }
-  .editor:empty::before {
+  /* Class-driven (not :empty) so the seeded empty block stays invisible.
+     :global because the class is toggled in JS, not present in markup, so
+     Svelte would otherwise prune this rule. Absolute so the seeded line
+     doesn't push the placeholder down. */
+  .editor:global(.is-empty)::before {
     content: attr(data-placeholder);
+    position: absolute;
     color: var(--text-muted);
     pointer-events: none;
   }

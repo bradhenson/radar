@@ -5,6 +5,7 @@
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
   import Dialog from "../common/Dialog.svelte";
   import Icon from "../common/Icon.svelte";
+  import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
   import type { PerformanceInput, Task } from "../../domain/models";
   import { statusLabel } from "../../domain/models";
@@ -253,17 +254,17 @@
     {/if}
 
     <label for="pi-context">Context <span class="field-hint">What was happening or what problem existed?</span></label>
-    <textarea id="pi-context" bind:value={situationOrContext} rows="2" maxlength="10000" style="width:100%"></textarea>
+    <RichTextEditor id="pi-context" bind:value={situationOrContext} rows={2} maxlength={10000} ariaLabel="Context" />
 
     <label for="pi-action">Action <span class="req">*</span> <span class="field-hint">What did the employee do?</span></label>
-    <textarea id="pi-action" bind:value={actionOrAccomplishment} rows="2" maxlength="10000" style="width:100%"></textarea>
+    <RichTextEditor id="pi-action" bind:value={actionOrAccomplishment} rows={2} maxlength={10000} ariaLabel="Action or accomplishment" />
     {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <label for="pi-result-impact">
       Result / Impact
       <span class="field-hint">What happened, and why did it matter (project, cost, schedule, quality, readiness, workforce)?</span>
     </label>
-    <textarea id="pi-result-impact" bind:value={result} rows="3" maxlength="10000" style="width:100%"></textarea>
+    <RichTextEditor id="pi-result-impact" bind:value={result} rows={3} maxlength={10000} ariaLabel="Result and impact" />
 
     <label class="check-inline">
       <input type="checkbox" bind:checked={recognitionPotential} />

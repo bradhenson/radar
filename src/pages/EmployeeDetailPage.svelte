@@ -362,8 +362,8 @@
         {#each inputs.slice(0, 3) as p (p.id)}
           <div class="card" style="margin-bottom:.5rem">
             <div class="small muted">{formatDate(p.inputDate)}</div>
-            <div>{p.actionOrAccomplishment}</div>
-            {#if p.result}<div class="small muted">Result / Impact: {p.result}</div>{/if}
+            <RichTextView value={p.actionOrAccomplishment} compact />
+            {#if p.result}<div class="small muted"><strong>Result / Impact:</strong><RichTextView value={p.result} compact /></div>{/if}
           </div>
         {/each}
       {/if}
@@ -507,9 +507,9 @@
               {#if p.projectId}· {app.projectName(p.projectId)}{/if}
               {#if p.recognitionPotential}· <span class="badge success">Recognition potential</span>{/if}
             </div>
-            {#if p.situationOrContext}<div><strong>Context:</strong> {p.situationOrContext}</div>{/if}
-            <div><strong>Action:</strong> {p.actionOrAccomplishment}</div>
-            {#if p.result}<div><strong>Result / Impact:</strong> {p.result}</div>{/if}
+            {#if p.situationOrContext}<div><strong>Context:</strong><RichTextView value={p.situationOrContext} compact /></div>{/if}
+            <div><strong>Action:</strong><RichTextView value={p.actionOrAccomplishment} compact /></div>
+            {#if p.result}<div><strong>Result / Impact:</strong><RichTextView value={p.result} compact /></div>{/if}
           </div>
         {/each}
       {/if}
