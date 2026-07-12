@@ -37,10 +37,11 @@ func main() {
 
 	app := NewApp(store)
 	err = wails.Run(&options.App{
-		Title:     "RADAR",
-		Width:     1280,
-		Height:    860,
-		Frameless: true,
+		Title:            "RADAR",
+		Width:            1280,
+		Height:           860,
+		Frameless:        true,
+		WindowStartState: options.Maximised,
 		AssetServer: &assetserver.Options{
 			Assets: assets,
 		},

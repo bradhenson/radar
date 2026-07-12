@@ -16,6 +16,8 @@
 
 ### Changed
 
+- The Wails desktop app now starts maximized by default while retaining the Windows taskbar and RADAR window controls. The maximize/restore button can return it to the configured 1280×860 window.
+
 - Extended rich-text editing to the performance input Context, Action, and Result / Impact fields, and rendered those fields as formatted text on the performance detail panel and employee accomplishments. Plain-text exports and search continue to read the flattened text, so formatting never leaks into reports or filters.
 
 - Added safe, offline rich-text editing for task descriptions and notes plus meeting discussions and action items. The reusable editor supports bold, italic, headings, bulleted and numbered lists, checkboxes, keyboard shortcuts, and preview while preserving existing plain-text records and readable backups.
