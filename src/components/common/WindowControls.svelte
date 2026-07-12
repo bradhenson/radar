@@ -34,6 +34,7 @@
     border: 0;
     border-radius: 0;
     background: transparent;
+    box-shadow: none;
     color: var(--text-muted);
   }
   button:hover { background: var(--surface-2); color: var(--text); }

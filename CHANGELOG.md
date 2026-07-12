@@ -14,6 +14,8 @@
 
 ### Fixed
 
+- Desktop title bar: the minimize/maximize/close buttons no longer cast the standard button drop shadow, which was blotting out the header separator line beneath them and drawing faint seams between the buttons.
+
 - Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.
 
 ### Changed
