@@ -4,6 +4,10 @@
 
 ### Added
 
+- Optional MCP server (`mcp/`, development-machine tool) that points an LLM client you already use — Claude Code, Codex, Claude Desktop — at your RADAR database. It can list and search people, tasks, and projects, run RADAR's attention engine, and record work: create and update tasks, add employee notes, and log check-ins. It uses your existing LLM subscription and holds no API key; the server itself makes no network calls. Writes follow the same contract as the app's own service layer — record, activity entry, and backup counter commit in one transaction, board column and status stay in sync, nothing is hard-deleted — and an ambiguous name is an error listing candidates rather than a guess. The shipped browser and desktop artifacts are unchanged and still make no network calls. See `mcp/README.md`.
+
+- The desktop app now notices when another process writes to the same `radar.db` and reloads automatically, showing a toast. This keeps RADAR usable while the MCP server records work in the background: without it, those records would stay invisible and editing the same record afterwards would silently overwrite them from stale memory.
+
 - Employee profiles are now configurable in Settings. Organizations can rename and reorder sections and fields, add text, date, yes/no, contact, and choice fields, and archive fields without deleting saved employee values. Each section in the editor starts collapsed and expands with its hamburger toggle to keep the card manageable. Profile editing, display, search, backups, and employee CSV exports all use the configured structure. In the employee CSV export dialog, all profile columns are off by default and must be selected per export.
 
 - Employee Overview notes now use the shared rich-text editor for adding and editing notes, with safe formatted rendering for saved entries.

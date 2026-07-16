@@ -52,8 +52,13 @@ interface WailsWindow {
     WindowMinimise?: () => void;
     WindowToggleMaximise?: () => void;
     Quit?: () => void;
+    EventsOn?: (event: string, handler: (...data: unknown[]) => void) => () => void;
   };
 }
+
+/** Emitted by desktop/dbwatch.go when an external writer (the MCP server)
+ *  commits to radar.db. Must match databaseChangedEvent in dbwatch.go. */
+const DATABASE_CHANGED_EVENT = "radar:database-changed";
 
 function wailsGlobals(): WailsWindow["go"] {
   if (typeof window === "undefined") return undefined;
@@ -90,4 +95,13 @@ export function toggleMaximiseDesktopWindow(): void {
 
 export function closeDesktopWindow(): void {
   wailsRuntime()?.Quit?.();
+}
+
+/**
+ * Subscribes to external-write notifications from the desktop shell. Returns
+ * an unsubscribe function, or undefined when not running under Wails (the
+ * browser build has no second writer).
+ */
+export function onDesktopDatabaseChanged(handler: () => void): (() => void) | undefined {
+  return wailsRuntime()?.EventsOn?.(DATABASE_CHANGED_EVENT, handler);
 }

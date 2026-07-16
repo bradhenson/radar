@@ -1,0 +1,15 @@
+{
+  // Separate from the root tsconfig on purpose: the browser app must never
+  // gain Node globals (the root config deliberately exposes only vite/client),
+  // while this dev-only server needs them. It still type-checks the src/
+  // modules it imports, so drift between the two is caught here.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "noEmit": true
+  },
+  "include": ["src/**/*.ts"]
+}

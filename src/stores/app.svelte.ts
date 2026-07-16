@@ -33,7 +33,7 @@ import { COLLECTION_NAMES, deleteOp, putOp } from "../data/DataStore";
 import { IndexedDbDataStore, StorageBlockedError, StorageLockedError, type ConnectionLossReason } from "../data/IndexedDbDataStore";
 import { InMemoryDataStore } from "../data/InMemoryDataStore";
 import { WailsDataStore } from "../data/WailsDataStore";
-import { wailsAppBindings, wailsStoreBindings } from "../data/wailsBridge";
+import { onDesktopDatabaseChanged, wailsAppBindings, wailsStoreBindings } from "../data/wailsBridge";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import { newId } from "../utils/ids";
@@ -287,6 +287,10 @@ export class AppStore {
         await desktop.initialize();
         this.store = desktop;
         this.storageKind = "sqlite";
+        // A second writer (the optional MCP server) commits directly to
+        // radar.db. Re-read when it does, so this window neither hides those
+        // records nor overwrites them from stale memory (working rule 18).
+        onDesktopDatabaseChanged(() => void this.refreshFromDisk());
       } else if (IndexedDbDataStore.isSupported()) {
         try {
           const idb = new IndexedDbDataStore({
@@ -324,6 +328,25 @@ export class AppStore {
       this.initError = e instanceof Error ? e.message : String(e);
     }
     this.startClock();
+  }
+
+  /**
+   * Re-read every collection after an external writer committed to the same
+   * database file (desktop/dbwatch.go emits the signal). Records already
+   * open in a form keep their draft state; only the persisted lists reload.
+   */
+  private refreshing = false;
+  async refreshFromDisk(): Promise<void> {
+    if (this.refreshing || !this.initialized) return;
+    this.refreshing = true;
+    try {
+      await this.loadAll();
+      this.toast("Reloaded — the database changed outside this window", "info");
+    } catch (e) {
+      this.toast(`Reload failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      this.refreshing = false;
+    }
   }
 
   private clockStarted = false;

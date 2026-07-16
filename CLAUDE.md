@@ -47,6 +47,11 @@ lockfile.
 - `src/pages/`, `src/components/` — Svelte 5 (runes) UI.
 - `environment-test/` — standalone Phase 0 capability probe; keep it dependency-free.
 - `desktop/` — optional Wails v2 shell and SQLite store; keep domain logic in TypeScript.
+- `mcp/` — optional dev-machine MCP server over `radar.db` (`mcp/README.md`). Never shipped in
+  either artifact and never imported by `src/`. It is a **second writer**: writes must go through
+  `RadarDb.putRecord` (record + activity entry + backup counter in one transaction, plus the
+  `app_meta.external_write_at` signal that `desktop/dbwatch.go` polls so an open window reloads).
+  Reuse types and domain rules from `src/` rather than redefining them.
 
 ## Verification tip
 A full end-to-end smoke test of the built file over `file://` can be run with Playwright against

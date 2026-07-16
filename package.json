@@ -12,7 +12,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check": "svelte-check --tsconfig ./tsconfig.json && tsc -p mcp/tsconfig.json",
+    "mcp": "tsx mcp/src/server.ts",
     "verify": "npm run check && npm test && npm run build",
     "smoke:file": "node scripts/smoke-file.mjs",
     "smoke:desktop": "node scripts/smoke-desktop.mjs"
@@ -21,12 +22,16 @@
     "node": "^20.19.0 || >=22.12.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "1.29.0",
     "@sveltejs/vite-plugin-svelte": "^6.0.0",
+    "@types/node": "26.1.1",
     "playwright": "^1.61.1",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
+    "tsx": "4.23.1",
     "typescript": "^5.6.0",
     "vite": "^7.0.0",
-    "vitest": "^3.0.0"
+    "vitest": "^3.0.0",
+    "zod": "4.4.3"
   }
 }

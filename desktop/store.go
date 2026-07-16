@@ -140,6 +140,21 @@ func (s *Store) closeDB() error {
 	return s.db.Close()
 }
 
+// externalWriteToken reads the cooperative change signal an external writer
+// (mcp/src/server.ts) stamps into app_meta after committing. RADAR's own
+// writes never touch this key, so a changed value always means someone else
+// wrote. Unexported on purpose: Store's exported methods become frontend
+// bindings, and only dbwatch.go needs this.
+func (s *Store) externalWriteToken() (string, error) {
+	var value string
+	err := s.db.QueryRow(
+		`SELECT value FROM app_meta WHERE key = ?`, externalWriteKey).Scan(&value)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
+	}
+	return value, err
+}
+
 // quoteIdent quotes a SQL identifier. Identifiers only ever come from the
 // compile-time collectionNames allowlist, never from the frontend.
 func quoteIdent(name string) string {

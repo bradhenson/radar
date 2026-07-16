@@ -22,7 +22,12 @@ type App struct {
 
 func NewApp(store *Store) *App { return &App{store: store} }
 
-func (a *App) startup(ctx context.Context) { a.ctx = ctx }
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	// Notice writes made by the optional MCP server while this window is open
+	// (dbwatch.go). Stops when ctx is cancelled at shutdown.
+	go watchExternalWrites(ctx, a.store)
+}
 
 // onSecondInstance surfaces the existing window when the user launches the
 // app again (single-instance lock in main.go).
