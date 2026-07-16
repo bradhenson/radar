@@ -14,14 +14,23 @@ or the desktop executable, and it does not change RADAR's offline guarantees:
 
 **Read:** `list_employees`, `get_employee`, `search_tasks`, `list_projects`,
 `get_attention` (runs RADAR's own attention engine — overdue, waiting too long,
-stale, missing check-ins, training and leave alerts).
+stale, missing check-ins, training and leave alerts), and `get_recent_activity`
+(the activity log — also your audit trail of what the assistant did).
 
-**Write:** `create_task`, `update_task`, `add_employee_note`, `record_check_in`.
+**Write:** `create_task`, `update_task` (including archive/restore),
+`update_employee`, `add_employee_note`, `record_check_in`.
+
+`update_employee` edits profile fields by the same labels the profile tab
+shows — Title, Building, Cube, phones, Clearance, Telework Agreement Valid
+Through, and any organization-defined fields from Settings. Yes/no fields
+accept "yes"/"no", dates are YYYY-MM-DD, choice fields accept the option label
+("Top Secret" stores the same value the profile form would).
 
 Writes go through the same contract as the app's own service layer: the record,
 its activity-history entry, and the backup-change counter commit in one
-transaction, board column and status stay in sync via the shared domain rules,
-and nothing is ever hard-deleted.
+transaction (reads included, so a concurrent edit in the app is never reverted
+from a stale read), board column and status stay in sync via the shared domain
+rules, and nothing is ever hard-deleted — archiving is the delete.
 
 ## Requirements
 
@@ -52,8 +61,31 @@ Or against a specific database:
 claude mcp add radar -- npx tsx mcp/src/server.ts "C:\path\to\radar.db"
 ```
 
-Codex and Claude Desktop take the same command in their own MCP config; the
-server is client-agnostic.
+### Using it with a ChatGPT subscription (Codex CLI)
+
+The server is a standard stdio MCP server, so OpenAI's **Codex CLI** — which
+signs in with a ChatGPT account — can drive it the same way Claude Code does:
+
+```sh
+codex mcp add radar -- npx tsx "C:\Users\henso\source\repos\RADAR\mcp\src\server.ts"
+```
+
+or in `~/.codex/config.toml`:
+
+```toml
+[mcp_servers.radar]
+command = "npx"
+args = ["tsx", "C:\\Users\\henso\\source\\repos\\RADAR\\mcp\\src\\server.ts"]
+```
+
+Use the **absolute** path: Codex may launch the server from a different working
+directory than this repo. If Codex on Windows fails to spawn `npx`, wrap it:
+`command = "cmd"`, `args = ["/c", "npx", "tsx", "..."]`.
+
+The ChatGPT desktop/web app itself is a different story: its connectors run
+from OpenAI's servers and need an internet-reachable MCP endpoint, so it cannot
+reach a server on your machine — and exposing radar.db to the internet is
+exactly what this design avoids. For ChatGPT, use Codex CLI.
 
 Run it directly (it will wait on stdio — that is normal):
 

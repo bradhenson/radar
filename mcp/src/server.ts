@@ -17,8 +17,10 @@ import {
   getEmployee,
   listEmployees,
   listProjects,
+  recentActivity,
   recordCheckIn,
   searchTasks,
+  updateEmployee,
   updateTask
 } from "./tools";
 
@@ -154,10 +156,41 @@ server.registerTool(
       column: z.string().optional().describe("Board column label, e.g. 'Waiting'"),
       status: z.enum(["open", "waiting", "complete"]).optional(),
       priority: z.enum(["low", "normal", "high", "critical"]).optional(),
-      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional()
+      dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
+      archived: z.boolean().optional().describe("true archives the task (RADAR never hard-deletes); false restores it")
     }
   },
   tool((args: Parameters<typeof updateTask>[1]) => updateTask(db, args))
+);
+
+server.registerTool(
+  "update_employee",
+  {
+    title: "Update employee profile fields",
+    description:
+      "Update a person's profile fields by their configured labels — the same fields the profile tab shows (Title, Building, Cube, phones, Clearance, Telework Agreement Valid Through, and any organization-defined fields). Pass a value of null or \"\" to clear a field. Yes/no fields accept yes/no, dates are YYYY-MM-DD, choice fields accept the option label. An unknown field name returns the list of available fields.",
+    inputSchema: {
+      employee: z.string().describe("Employee id, full name, or fragment"),
+      updates: z
+        .record(z.string(), z.string().nullable())
+        .describe('Field label -> new value, e.g. {"Cube": "C-204", "Government phone": "yes"}')
+    }
+  },
+  tool((args: { employee: string; updates: Record<string, string | null> }) => updateEmployee(db, args))
+);
+
+server.registerTool(
+  "get_recent_activity",
+  {
+    title: "Recent activity history",
+    description:
+      "RADAR's activity log, newest first — what was created, updated, completed, or archived, by the app and by this server. Useful for 'what changed this week' summaries and for auditing what the assistant did.",
+    inputSchema: {
+      limit: z.number().int().positive().max(200).optional(),
+      since: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().describe("Only entries on or after this date")
+    }
+  },
+  tool((args: { limit?: number; since?: string }) => recentActivity(db, args))
 );
 
 server.registerTool(

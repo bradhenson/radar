@@ -8,13 +8,27 @@
 
 import type { RadarDb } from "./db";
 import { resolveEmployee, resolveProject } from "./resolve";
-import type { BoardColumnDefinition, Employee, EmployeeNote, Task, TaskPriority, TaskStatus } from "../../src/domain/models";
+import type {
+  BoardColumnDefinition,
+  Employee,
+  EmployeeNote,
+  EmployeeProfileField,
+  EmployeeProfileValue,
+  Task,
+  TaskPriority,
+  TaskStatus
+} from "../../src/domain/models";
 import { normalizeTaskStatus, statusLabel } from "../../src/domain/models";
+import {
+  activeProfileFields,
+  applyEmployeeProfileValues,
+  formattedProfileValue
+} from "../../src/domain/employeeProfile";
 import { computeAttention } from "../../src/domain/rules/attention";
 import { orderForAppend } from "../../src/domain/rules/boardOrder";
 import { laneForStatus, statusChangeForLaneMove } from "../../src/domain/rules/laneStatus";
 import { richTextToPlainText } from "../../src/utils/richText";
-import { nowTimestamp, todayIso } from "../../src/utils/dates";
+import { isValidIsoDate, nowTimestamp, todayIso } from "../../src/utils/dates";
 import { newId } from "../../src/utils/ids";
 
 export const TASK_PRIORITIES: TaskPriority[] = ["low", "normal", "high", "critical"];
@@ -240,6 +254,12 @@ export function createTask(
     description?: string;
   }
 ) {
+  // One transaction around read + write: the boardOrder append reads sibling
+  // cards, and the desktop app may be writing concurrently.
+  return db.transaction(() => createTaskInTx(db, args));
+}
+
+function createTaskInTx(db: RadarDb, args: Parameters<typeof createTask>[1]) {
   const title = args.title.trim();
   if (!title) throw new Error("title is required");
 
@@ -297,8 +317,15 @@ export function updateTask(
     status?: TaskStatus;
     priority?: TaskPriority;
     dueDate?: string | null;
+    archived?: boolean;
   }
 ) {
+  // Read-modify-write under one transaction, so a concurrent edit in the
+  // desktop app cannot be silently reverted from a stale read.
+  return db.transaction(() => updateTaskInTx(db, args));
+}
+
+function updateTaskInTx(db: RadarDb, args: Parameters<typeof updateTask>[1]) {
   const existing = db.readOne("tasks", args.taskId);
   if (!existing) throw new Error(`No task with id ${args.taskId}. Use search_tasks to find it.`);
 
@@ -349,8 +376,15 @@ export function updateTask(
     }
   }
 
-  const actionType = args.status !== undefined || args.column !== undefined ? "status_changed" : "updated";
-  db.putRecord("tasks", next, { actionType, summary: `Updated task "${next.title}"` });
+  let actionType = args.status !== undefined || args.column !== undefined ? "status_changed" : "updated";
+  let summary = `Updated task "${next.title}"`;
+  // Archive instead of delete (working rule 7); restore is the inverse.
+  if (args.archived !== undefined && args.archived !== existing.isArchived) {
+    next.isArchived = args.archived;
+    actionType = args.archived ? "archived" : "restored";
+    summary = `${args.archived ? "Archived" : "Restored"} task "${next.title}"`;
+  }
+  db.putRecord("tasks", next, { actionType, summary });
   return taskView(next, employees, columns, projects.find((p) => p.id === next.projectId)?.name);
 }
 
@@ -375,7 +409,116 @@ export function addEmployeeNote(db: RadarDb, args: { employee: string; note: str
   return { id: note.id, employee: employee.displayName, createdAt: note.createdAt, text };
 }
 
+/**
+ * Update employee profile fields by their configured labels — the same
+ * sections and fields the Settings page defines and the profile tab shows,
+ * covering built-in fields (Title, Building, phones, Clearance, …) and any
+ * organization-defined ones. Value handling reuses the app's own
+ * applyEmployeeProfileValues, so storage and normalization cannot drift.
+ */
+export function updateEmployee(db: RadarDb, args: { employee: string; updates: Record<string, string | null> }) {
+  return db.transaction(() => {
+    const employees = db.readAll("employees");
+    const employee = resolveEmployee(employees, args.employee);
+    const fields = activeProfileFields(db.getSettings());
+
+    const entries = Object.entries(args.updates);
+    if (entries.length === 0) throw new Error("updates is empty — pass at least one field");
+
+    const resolved: EmployeeProfileField[] = [];
+    const values: Record<string, EmployeeProfileValue | ""> = {};
+    for (const [label, rawValue] of entries) {
+      const field = resolveField(fields, label);
+      resolved.push(field);
+      values[field.id] = coerceFieldValue(field, rawValue);
+    }
+
+    const next = applyEmployeeProfileValues(employee, resolved, values);
+    next.updatedAt = nowTimestamp();
+    const labels = resolved.map((f) => f.label).join(", ");
+    db.putRecord("employees", next, {
+      actionType: "updated",
+      summary: `Updated ${labels} for ${employee.displayName}`
+    });
+    return {
+      employee: employee.displayName,
+      changed: resolved.map((field) => ({
+        field: field.label,
+        value: formattedProfileValue(next, field) || "(cleared)"
+      }))
+    };
+  });
+}
+
+function resolveField(fields: EmployeeProfileField[], label: string): EmployeeProfileField {
+  const needle = label.trim().toLowerCase();
+  const exact = fields.filter((f) => f.label.toLowerCase() === needle);
+  if (exact.length === 1) return exact[0]!;
+  const partial = fields.filter((f) => f.label.toLowerCase().includes(needle));
+  if (partial.length === 1) return partial[0]!;
+  if (partial.length > 1) {
+    throw new Error(`"${label}" matches several fields: ${partial.map((f) => f.label).join(", ")}. Use the full label.`);
+  }
+  throw new Error(`No profile field matches "${label}". Available fields: ${fields.map((f) => f.label).join(", ")}`);
+}
+
+/** Coerces the string the model sent into the field's typed value. null or "" clears. */
+function coerceFieldValue(field: EmployeeProfileField, raw: string | null): EmployeeProfileValue | "" {
+  const text = (raw ?? "").trim();
+  if (!text) return ""; // applyEmployeeProfileValues clears empty values
+  switch (field.type) {
+    case "boolean": {
+      if (/^(yes|y|true)$/i.test(text)) return true;
+      if (/^(no|n|false)$/i.test(text)) return false;
+      throw new Error(`"${field.label}" is a yes/no field; got "${raw}"`);
+    }
+    case "date": {
+      if (!isValidIsoDate(text)) throw new Error(`"${field.label}" needs a YYYY-MM-DD date; got "${raw}"`);
+      return text;
+    }
+    case "choice":
+      return resolveChoice(field, text);
+    case "multi_choice":
+      return text.split(/[,;]/).map((part) => resolveChoice(field, part.trim()));
+    default:
+      return text;
+  }
+}
+
+function resolveChoice(field: EmployeeProfileField, text: string): string {
+  const needle = text.toLowerCase();
+  const option = field.options?.find((o) => o.value.toLowerCase() === needle || o.label.toLowerCase() === needle);
+  if (!option) {
+    const available = field.options?.map((o) => o.label).join(", ") || "(none configured)";
+    throw new Error(`"${text}" is not an option for "${field.label}". Options: ${available}`);
+  }
+  return option.value;
+}
+
+export function recentActivity(db: RadarDb, args: { limit?: number; since?: string }) {
+  let entries = db.readAll("activityEntries");
+  if (args.since) {
+    if (!isValidIsoDate(args.since)) throw new Error(`since must be a YYYY-MM-DD date; got "${args.since}"`);
+    entries = entries.filter((entry) => entry.timestamp >= args.since!);
+  }
+  return entries
+    .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
+    .slice(0, args.limit ?? 30)
+    .map((entry) => ({
+      timestamp: entry.timestamp,
+      action: entry.actionType,
+      entityType: entry.entityType,
+      summary: entry.summary
+    }));
+}
+
 export function recordCheckIn(db: RadarDb, args: { employee: string; summary?: string; type?: string; followUpRequired?: boolean }) {
+  // Two records change together (interaction + employee check-in date); one
+  // transaction keeps them atomic and the read fresh.
+  return db.transaction(() => recordCheckInInTx(db, args));
+}
+
+function recordCheckInInTx(db: RadarDb, args: Parameters<typeof recordCheckIn>[1]) {
   const employees = db.readAll("employees");
   const employee = resolveEmployee(employees, args.employee);
   const now = nowTimestamp();

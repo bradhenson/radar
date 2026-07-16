@@ -13,8 +13,10 @@ import {
   createTask,
   getEmployee,
   listEmployees,
+  recentActivity,
   recordCheckIn,
   searchTasks,
+  updateEmployee,
   updateTask
 } from "../../mcp/src/tools";
 import { COLLECTION_NAMES } from "../../src/data/DataStore";
@@ -235,6 +237,91 @@ describe("update_task", () => {
 
   it("reports an unknown task id", () => {
     expect(() => updateTask(db, { taskId: "missing", priority: "high" })).toThrow(/No task with id/);
+  });
+});
+
+describe("update_task archive flag", () => {
+  it("archives and restores with matching activity entries", () => {
+    updateTask(db, { taskId: "task-1", archived: true });
+    expect(db.readOne("tasks", "task-1")!.isArchived).toBe(true);
+    updateTask(db, { taskId: "task-1", archived: false });
+    expect(db.readOne("tasks", "task-1")!.isArchived).toBe(false);
+    const actions = db.readAll("activityEntries").map((e) => e.actionType);
+    expect(actions).toContain("archived");
+    expect(actions).toContain("restored");
+  });
+
+  it("archived tasks drop out of default searches", () => {
+    updateTask(db, { taskId: "task-1", archived: true });
+    expect(searchTasks(db, { employee: "Dana" })).toHaveLength(0);
+    expect(searchTasks(db, { employee: "Dana", includeArchived: true })).toHaveLength(1);
+  });
+});
+
+describe("update_employee", () => {
+  it("updates built-in fields via their configured labels", () => {
+    const result = updateEmployee(db, {
+      employee: "dana",
+      updates: { Cube: "C-204", Title: "IT Specialist II" }
+    });
+    expect(result.employee).toBe("Dana Whitfield");
+    const stored = db.readOne("employees", "emp-1")!;
+    expect(stored.locationCube).toBe("C-204");
+    expect(stored.positionTitle).toBe("IT Specialist II");
+    expect(result.changed).toContainEqual({ field: "Cube", value: "C-204" });
+  });
+
+  it("coerces yes/no fields and validates dates", () => {
+    updateEmployee(db, {
+      employee: "dana",
+      updates: { "Government phone": "yes", "Telework Agreement Valid Through": "2026-12-31" }
+    });
+    const stored = db.readOne("employees", "emp-1")!;
+    expect(stored.govPhone).toBe(true);
+    expect(stored.teleworkAgreementValidThrough).toBe("2026-12-31");
+    expect(() =>
+      updateEmployee(db, { employee: "dana", updates: { "Telework Agreement Valid Through": "New Year" } })
+    ).toThrow(/YYYY-MM-DD/);
+    expect(() => updateEmployee(db, { employee: "dana", updates: { "Government phone": "maybe" } })).toThrow(/yes\/no/);
+  });
+
+  it("maps choice options by label and rejects unknown options", () => {
+    updateEmployee(db, { employee: "dana", updates: { Clearance: "Top Secret" } });
+    // Stored as the option value, exactly as the profile form would store it.
+    expect(db.readOne("employees", "emp-1")!.clearance).toBe("ts");
+    expect(() => updateEmployee(db, { employee: "dana", updates: { Clearance: "Cosmic" } })).toThrow(/Options: Secret/);
+  });
+
+  it("clears a field with null", () => {
+    updateEmployee(db, { employee: "dana", updates: { Cube: "C-204" } });
+    const result = updateEmployee(db, { employee: "dana", updates: { Cube: null } });
+    expect(db.readOne("employees", "emp-1")!.locationCube).toBeUndefined();
+    expect(result.changed).toContainEqual({ field: "Cube", value: "(cleared)" });
+  });
+
+  it("lists available fields when the label is unknown", () => {
+    expect(() => updateEmployee(db, { employee: "dana", updates: { Shoe: "12" } })).toThrow(/Available fields: .*Cube/);
+  });
+
+  it("records one activity entry naming the changed fields", () => {
+    updateEmployee(db, { employee: "dana", updates: { Cube: "C-204", Building: "B-7" } });
+    const entries = db.readAll("activityEntries");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.summary).toContain("Dana Whitfield");
+    expect(entries[0]!.summary).toMatch(/Building/);
+    expect(entries[0]!.summary).toMatch(/Cube/);
+  });
+});
+
+describe("get_recent_activity", () => {
+  it("returns newest first and honors since", () => {
+    createTask(db, { title: "First" });
+    updateTask(db, { taskId: "task-1", priority: "high" });
+    const entries = recentActivity(db, {});
+    expect(entries.length).toBe(2);
+    expect(entries[0]!.timestamp >= entries[1]!.timestamp).toBe(true);
+    expect(recentActivity(db, { since: "2099-01-01" })).toHaveLength(0);
+    expect(() => recentActivity(db, { since: "yesterday" })).toThrow(/YYYY-MM-DD/);
   });
 });
 

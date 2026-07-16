@@ -42,6 +42,7 @@ export class RadarDb {
   private db: DatabaseSync;
   /** One id per server process, matching the app's per-session id. */
   private readonly sessionId = newId();
+  private inTransaction = false;
 
   constructor(dbPath: string) {
     this.db = new DatabaseSync(dbPath);
@@ -78,6 +79,30 @@ export class RadarDb {
 
   close(): void {
     this.db.close();
+  }
+
+  /**
+   * Runs fn inside one BEGIN IMMEDIATE transaction. Read-modify-write tools
+   * must wrap their *read* in this too: the desktop app is a concurrent
+   * writer, so a record read outside the transaction can be stale by the
+   * time the write commits, silently reverting the app's change (the same
+   * lost-update problem working rule 18 exists to prevent). Reentrant, so
+   * putRecord composes with an outer transaction.
+   */
+  transaction<T>(fn: () => T): T {
+    if (this.inTransaction) return fn();
+    this.db.exec("BEGIN IMMEDIATE");
+    this.inTransaction = true;
+    try {
+      const result = fn();
+      this.db.exec("COMMIT");
+      return result;
+    } catch (e) {
+      this.db.exec("ROLLBACK");
+      throw e;
+    } finally {
+      this.inTransaction = false;
+    }
   }
 
   readAll<K extends CollectionName>(collection: K): CollectionTypes[K][] {
@@ -133,8 +158,7 @@ export class RadarDb {
       sessionId: this.sessionId
     };
 
-    this.db.exec("BEGIN IMMEDIATE");
-    try {
+    return this.transaction(() => {
       this.upsert(collection, id, JSON.stringify(record));
       this.upsert("activityEntries", entry.id, JSON.stringify(entry));
       if (MUTATING_ACTIVITY.has(activity.actionType)) {
@@ -145,12 +169,8 @@ export class RadarDb {
       // Includes a random suffix: two writes inside the same millisecond must
       // still produce a different value for the watcher to notice.
       this.putMetaKey(EXTERNAL_WRITE_KEY, `${nowTimestamp()}#${newId()}`);
-      this.db.exec("COMMIT");
-    } catch (e) {
-      this.db.exec("ROLLBACK");
-      throw e;
-    }
-    return entry;
+      return entry;
+    });
   }
 
   private upsert(collection: string, id: string, data: string): void {
