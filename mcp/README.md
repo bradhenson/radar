@@ -61,6 +61,13 @@ Or against a specific database:
 claude mcp add radar -- npx tsx mcp/src/server.ts "C:\path\to\radar.db"
 ```
 
+Verify it connected (then start a **new** session — tools load at session start):
+
+```sh
+claude mcp list
+# radar: npx tsx mcp/src/server.ts - ✓ Connected
+```
+
 ### Using it with a ChatGPT subscription (Codex CLI)
 
 The server is a standard stdio MCP server, so OpenAI's **Codex CLI** — which
@@ -107,6 +114,38 @@ records, so picking the wrong person silently is not an acceptable outcome.
 
 Your MCP client asks permission before it runs a tool; that is the confirm step
 for writes, so RADAR does not add a second one.
+
+## Tool reference
+
+You normally never call these directly — the client picks them from your plain-language
+request — but this is what it has to work with. Optional arguments in *italics*.
+
+### Read
+
+| Tool | Arguments | Example ask |
+| --- | --- | --- |
+| `list_employees` | *search*, *includeArchived* | "Who's on Team Delta?" |
+| `get_employee` | employee (id, name, or fragment) | "Give me the full picture on Dana." |
+| `search_tasks` | *employee*, *status* (open/waiting/complete), *project*, *priority*, *text*, *overdueOnly*, *includeArchived*, *limit* | "What's overdue?" · "Show Dana's waiting items." |
+| `list_projects` | *includeArchived* | "How many open tasks per project?" |
+| `get_attention` | *limit* | "What needs my attention today?" |
+| `get_recent_activity` | *limit*, *since* (YYYY-MM-DD) | "What changed this week?" · "What did you do just now?" |
+
+### Write
+
+| Tool | Arguments | Example ask |
+| --- | --- | --- |
+| `create_task` | title, *employee*, *project*, *column*, *priority*, *dueDate*, *startDate*, *description* | "Task for Dana: audit evidence by Friday, high priority." |
+| `update_task` | taskId, *title*, *description*, *employee*, *project*, *column*, *status*, *priority*, *dueDate* (null clears), *archived* | "Move the cutover checklist to Waiting." · "Archive that old report task." |
+| `update_employee` | employee, updates (field label → value; null clears) | "Update Dana's cube to C-204 and set Government phone to yes." |
+| `add_employee_note` | employee, note | "Note on Dana: prefers written summaries." |
+| `record_check_in` | employee, *summary*, *type*, *followUpRequired* | "Log that I checked in with Dana about the cutover." |
+
+Defaults match the app's own behavior: a bare `create_task` lands in Inbox at
+normal priority; moving a task's column updates its status and vice versa
+(dropping into Waiting starts the waiting clock; Complete stamps the completion
+date); `update_employee` field names are the labels from Settings → Employee
+profile fields, and an unknown label errors with the full list.
 
 ## Running RADAR at the same time
 

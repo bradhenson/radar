@@ -65,6 +65,17 @@ that the frontend crossed the Wails bridge and initialized SQLite, then relaunch
 same database lineage remains. UI workflows should also be checked in the real executable for
 release changes.
 
+## Optional MCP server (LLM assistant over your data)
+
+`mcp/` contains a development-machine [MCP](https://modelcontextprotocol.io) server that points an
+LLM client you already use — Claude Code, Codex CLI (ChatGPT subscription), Claude Desktop — at
+your `radar.db`, so you can ask in plain language for summaries ("what needs my attention?") and
+record work ("create a task for … by Friday", "update their cube number"). It uses your existing
+LLM subscription, holds no API key, and makes no network calls of its own; the shipped browser and
+desktop artifacts are unchanged. Writes are transactional, recorded in activity history, and an
+open desktop window reloads automatically when the server commits. Setup, the full tool reference,
+and the privacy caveat (tool results do go to your LLM provider) are in **`mcp/README.md`**.
+
 ## Phase 0 — environment test (run this in a managed environment first)
 
 `environment-test/index.html` is a standalone page (no build step) that verifies what the managed
