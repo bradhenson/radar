@@ -37,6 +37,9 @@ rules, and nothing is ever hard-deleted — archiving is the delete.
 - **Node 22.5+** (uses the built-in `node:sqlite`; Node 24 recommended). SQLite
   is still flagged experimental in Node, so it prints a warning on stderr —
   harmless, and invisible to the MCP client.
+- **A clone of this repository with dependencies installed** — run `npm ci`
+  once in the repo root. The server runs from source via `tsx`; there is no
+  separate install or build step.
 - The desktop build, or any `radar.db`. The browser (IndexedDB) build stores
   data inside the browser profile, which this server cannot reach.
 
@@ -74,7 +77,7 @@ The server is a standard stdio MCP server, so OpenAI's **Codex CLI** — which
 signs in with a ChatGPT account — can drive it the same way Claude Code does:
 
 ```sh
-codex mcp add radar -- npx tsx "C:\Users\henso\source\repos\RADAR\mcp\src\server.ts"
+codex mcp add radar -- npx tsx "C:\path\to\RADAR\mcp\src\server.ts"
 ```
 
 or in `~/.codex/config.toml`:
@@ -82,10 +85,11 @@ or in `~/.codex/config.toml`:
 ```toml
 [mcp_servers.radar]
 command = "npx"
-args = ["tsx", "C:\\Users\\henso\\source\\repos\\RADAR\\mcp\\src\\server.ts"]
+args = ["tsx", "C:\\path\\to\\RADAR\\mcp\\src\\server.ts"]
 ```
 
-Use the **absolute** path: Codex may launch the server from a different working
+Replace `C:\path\to\RADAR` with wherever you cloned this repository. Use the
+**absolute** path: Codex may launch the server from a different working
 directory than this repo. If Codex on Windows fails to spawn `npx`, wrap it:
 `command = "cmd"`, `args = ["/c", "npx", "tsx", "..."]`.
 
