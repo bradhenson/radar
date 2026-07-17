@@ -7,7 +7,7 @@
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
   import EmployeeProfileForm from "../components/forms/EmployeeProfileForm.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
-  import Dialog from "../components/common/Dialog.svelte";
+  import Pane from "../components/common/Pane.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
@@ -588,7 +588,7 @@
     <EmployeeProfileForm {employee} onclose={() => (profileOpen = false)} />
   {/if}
   {#if checkInOpen}
-    <Dialog title="Record check-in" onclose={() => (checkInOpen = false)}>
+    <Pane title="Record check-in" onclose={() => (checkInOpen = false)}>
       <label for="ci-type">Interaction type</label>
       <select id="ci-type" bind:value={checkInType} style="width:100%">
         {#each INTERACTION_TYPES as t (t)}<option value={t}>{t}</option>{/each}
@@ -602,7 +602,7 @@
         <button type="button" onclick={() => (checkInOpen = false)}>Cancel</button>
         <button type="button" class="primary" onclick={() => void saveCheckIn()}>Save</button>
       </div>
-    </Dialog>
+    </Pane>
   {/if}
   {#if meetingNoteOpen}
     <MeetingNoteForm prefill={{ attendeeEmployeeIds: [employeeId], meetingType: "Product team" }} onclose={() => (meetingNoteOpen = false)} />

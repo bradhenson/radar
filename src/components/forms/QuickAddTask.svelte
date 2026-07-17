@@ -2,7 +2,7 @@
   // Title-first rapid task capture: title plus optional employee and due date.
   // Create keeps the dialog open (and keeps the employee/date) so several
   // tasks can be entered in a row; "Create & open" jumps into the full editor.
-  import Dialog from "../common/Dialog.svelte";
+  import Pane from "../common/Pane.svelte";
   import { app } from "../../stores/app.svelte";
   import { ui } from "../../stores/ui.svelte";
   import { isValidIsoDate } from "../../utils/dates";
@@ -45,7 +45,7 @@
   }
 </script>
 
-<Dialog title="Quick add task" {onclose} unsavedGuard={() => title.trim().length > 0}>
+<Pane title="Quick add task" {onclose} unsavedGuard={() => title.trim().length > 0}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -86,7 +86,7 @@
       <button type="submit" class="primary">Create</button>
     </div>
   </form>
-</Dialog>
+</Pane>
 
 <style>
   .qa-grid {

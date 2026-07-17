@@ -1,6 +1,6 @@
 <script lang="ts">
   // Full task editor with notes, checklist, and activity (plan 12.2, 14).
-  import Dialog from "../common/Dialog.svelte";
+  import Pane from "../common/Pane.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import RichTextView from "../common/RichTextView.svelte";
@@ -320,7 +320,7 @@
   }
 </script>
 
-<Dialog title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
+<Pane title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -477,7 +477,7 @@
       </section>
     {/if}
   {/if}
-</Dialog>
+</Pane>
 
 <style>
   .grid {

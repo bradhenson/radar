@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Dialog from "../common/Dialog.svelte";
+  import Pane from "../common/Pane.svelte";
   import { app } from "../../stores/app.svelte";
   import type { Employee } from "../../domain/models";
   import { nowTimestamp } from "../../utils/dates";
@@ -60,7 +60,7 @@
   }
 </script>
 
-<Dialog
+<Pane
   title={employee ? "Edit Employee" : "Add Employee"}
   {onclose}
   unsavedGuard={() => initialized && formSnapshot() !== openedSnapshot}
@@ -101,4 +101,4 @@
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
-</Dialog>
+</Pane>

@@ -3,7 +3,7 @@
   // Creates a new input (optionally prefilled) or edits an existing one; either
   // way, task details can be imported into the empty fields (plan 17.5).
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
-  import Dialog from "../common/Dialog.svelte";
+  import Pane from "../common/Pane.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
@@ -189,7 +189,7 @@
   }
 </script>
 
-<Dialog
+<Pane
   title={input ? "Edit Performance Input" : "Performance Input"}
   wide
   {onclose}
@@ -279,7 +279,7 @@
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
-</Dialog>
+</Pane>
 
 {#if confirmDelete && input}
   <ConfirmDialog

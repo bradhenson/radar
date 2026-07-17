@@ -1,6 +1,6 @@
 <script lang="ts">
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
-  import Dialog from "../common/Dialog.svelte";
+  import Pane from "../common/Pane.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
@@ -150,7 +150,7 @@
   }
 </script>
 
-<Dialog title={isEditing ? "Meeting Note" : "New Meeting Note"} wide onclose={requestClose}>
+<Pane title={isEditing ? "Meeting Note" : "New Meeting Note"} wide onclose={requestClose}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -227,7 +227,7 @@
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
     </div>
   </form>
-</Dialog>
+</Pane>
 
 {#if confirmDelete && note}
   <ConfirmDialog

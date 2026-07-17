@@ -4,7 +4,7 @@
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
-  import Dialog from "../components/common/Dialog.svelte";
+  import Pane from "../components/common/Pane.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import type { AwardRecord } from "../domain/models";
@@ -166,7 +166,7 @@
 </div>
 
 {#if formOpen}
-  <Dialog
+  <Pane
     title={editing ? "Edit Award" : "Add Award"}
     onclose={() => (formOpen = false)}
     unsavedGuard={() => formSnapshot() !== openedSnapshot}
@@ -211,7 +211,7 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Dialog>
+  </Pane>
 {/if}
 
 {#if pendingDelete}

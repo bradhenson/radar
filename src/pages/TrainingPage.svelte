@@ -5,7 +5,7 @@
   // working view is a per-requirement roster with one-click completion.
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
-  import Dialog from "../components/common/Dialog.svelte";
+  import Pane from "../components/common/Pane.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
   import type { TrainingStatusRow } from "../stores/app.svelte";
@@ -453,7 +453,7 @@
 </div>
 
 {#if reqFormOpen}
-  <Dialog title={editingReq ? "Edit Requirement" : "Add Training Requirement"} onclose={() => (reqFormOpen = false)}>
+  <Pane title={editingReq ? "Edit Requirement" : "Add Training Requirement"} onclose={() => (reqFormOpen = false)}>
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -531,11 +531,11 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Dialog>
+  </Pane>
 {/if}
 
 {#if recordDialog}
-  <Dialog title={`${recordDialog.req.name} — ${app.employeeName(recordDialog.employeeId)}`} onclose={() => (recordDialog = undefined)}>
+  <Pane title={`${recordDialog.req.name} — ${app.employeeName(recordDialog.employeeId)}`} onclose={() => (recordDialog = undefined)}>
     <form
       onsubmit={(e) => {
         e.preventDefault();
@@ -570,7 +570,7 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Dialog>
+  </Pane>
 {/if}
 
 <style>
