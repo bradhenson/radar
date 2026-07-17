@@ -1,6 +1,6 @@
 <script lang="ts">
   // Full task editor with notes, checklist, and activity (plan 12.2, 14).
-  import Pane from "../common/Pane.svelte";
+  import DockedPane from "../common/DockedPane.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import RichTextView from "../common/RichTextView.svelte";
@@ -60,10 +60,26 @@
   type EditableTaskFields = ReturnType<typeof editableFieldsFromDraft>;
   type EditableTaskField = keyof EditableTaskFields;
 
+  let closedExplicitly = false;
+
   function close() {
+    closedExplicitly = true;
     if (onclose) onclose();
     else ui.detailTaskId = undefined;
   }
+
+  // The docked pane leaves the page interactive, so this editor can unmount
+  // without an explicit close — clicking another card swaps the keyed
+  // instance. Persist edits on the way out; a blank title falls back to the
+  // existing one so validation can't discard the other changes.
+  $effect(() => {
+    return () => {
+      if (closedExplicitly || isNewTask) return;
+      if (!draft.title.trim()) draft.title = initialTask.title;
+      if (!hasUnsavedChanges) return;
+      void save(false);
+    };
+  });
 
   function normalizedTags(): string[] {
     return tagsText
@@ -320,7 +336,7 @@
   }
 </script>
 
-<Pane title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
+<DockedPane title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -477,7 +493,7 @@
       </section>
     {/if}
   {/if}
-</Pane>
+</DockedPane>
 
 <style>
   .grid {

@@ -434,20 +434,19 @@
           <TodayPage />
         {/if}
       </main>
+      {#if ui.newTaskOpen}
+        <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
+      {:else if detailTask}
+        {#key detailTask.id}
+          <TaskDetail task={detailTask} />
+        {/key}
+      {/if}
     </div>
 
   </div>
 
   {#if ui.quickAddOpen}
     <QuickAddTask onclose={() => (ui.quickAddOpen = false)} />
-  {/if}
-  {#if ui.newTaskOpen}
-    <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
-  {/if}
-  {#if detailTask}
-    {#key detailTask.id}
-      <TaskDetail task={detailTask} />
-    {/key}
   {/if}
   {#if ui.performancePromptTask}
     {@const t = ui.performancePromptTask}

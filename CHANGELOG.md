@@ -24,7 +24,9 @@
 
 ### Changed
 
-- Data-entry forms now open in a slide-over pane anchored to the right edge instead of a centered dialog, keeping the page behind visible for reference while typing. This covers task editing and quick add, employee add/edit and profile details, meeting notes, performance inputs, check-ins, and the awards, leave, travel, telework, training, and project forms. Keyboard behavior is unchanged: focus moves into the pane and returns to the opening control on close, Tab stays trapped, Escape closes, and unsaved changes still prompt before discarding. Confirmations, destructive prompts, the CSV export dialog, and the import-backup summary remain centered dialogs.
+- The task editor (open task and new task) now docks as a persistent right-hand panel instead of opening a dialog: the page beside it stays fully visible and interactive, clicking another card switches the panel to that task (saving any edits first), and the panel stays open while navigating between pages. Escape or ✕ closes it, saving changes. On narrow windows it floats over the page instead of docking.
+
+- Other data-entry forms open in a slide-over pane anchored to the right edge instead of a centered dialog, keeping the page behind visible for reference while typing. This covers quick add, employee add/edit and profile details, meeting notes, performance inputs, check-ins, and the awards, leave, travel, telework, training, and project forms. Keyboard behavior is unchanged: focus moves into the pane and returns to the opening control on close, Tab stays trapped, Escape closes, and unsaved changes still prompt before discarding. Confirmations, destructive prompts, the CSV export dialog, and the import-backup summary remain centered dialogs.
 
 - Reorganized the sidebar navigation: the Work section (Board, Calendar, Today, Projects, Meetings) now sits above the People section, and Board, Calendar, and Today — previously ungrouped at the top — are part of Work.
 
