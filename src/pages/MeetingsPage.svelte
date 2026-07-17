@@ -112,6 +112,11 @@
   }
 </script>
 
+{#if createOpen}
+  <MeetingNoteForm onclose={() => (createOpen = false)} />
+{:else if editing}
+  <MeetingNoteForm note={editing} onclose={() => (editing = undefined)} />
+{:else}
 <div class="page">
   <div class="page-header">
     <h1>Meeting Notes</h1>
@@ -221,13 +226,6 @@
     </div>
   {/if}
 </div>
-
-{#if createOpen}
-  <MeetingNoteForm onclose={() => (createOpen = false)} />
-{/if}
-
-{#if editing}
-  <MeetingNoteForm note={editing} onclose={() => (editing = undefined)} />
 {/if}
 
 {#if pendingDelete}
