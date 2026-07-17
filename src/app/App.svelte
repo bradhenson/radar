@@ -144,6 +144,19 @@
 
   let detailTask = $derived(ui.detailTaskId ? app.tasks.find((t) => t.id === ui.detailTaskId) : undefined);
 
+  // The task editor renders in place of the routed page, so navigating while
+  // it is open must dismiss it — otherwise the destination page would stay
+  // hidden behind the form. TaskDetail autosaves on unmount, so no edits are
+  // lost by the dismissal.
+  let lastRoute = router.current.page + "/" + (router.current.param ?? "");
+  $effect(() => {
+    const route = router.current.page + "/" + (router.current.param ?? "");
+    if (route === lastRoute) return;
+    lastRoute = route;
+    if (ui.detailTaskId) ui.detailTaskId = undefined;
+    if (ui.newTaskOpen) ui.closeNewTask();
+  });
+
   // Current record for the post-input "archive this task?" prompt; resolved by
   // id so the archive acts on the latest task state, never a stale snapshot.
   let archivePromptTask = $derived(
@@ -400,7 +413,13 @@
             <button type="button" class="primary" onclick={() => router.go("settings")}>Restore backup</button>
           </section>
         {/if}
-        {#if router.current.page === "today"}
+        {#if ui.newTaskOpen}
+          <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
+        {:else if detailTask}
+          {#key detailTask.id}
+            <TaskDetail task={detailTask} />
+          {/key}
+        {:else if router.current.page === "today"}
           <TodayPage />
         {:else if router.current.page === "board"}
           <BoardPage />
@@ -434,13 +453,6 @@
           <TodayPage />
         {/if}
       </main>
-      {#if ui.newTaskOpen}
-        <TaskDetail defaults={ui.newTaskDefaults} onclose={() => ui.closeNewTask()} />
-      {:else if detailTask}
-        {#key detailTask.id}
-          <TaskDetail task={detailTask} />
-        {/key}
-      {/if}
     </div>
 
   </div>

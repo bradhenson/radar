@@ -1,6 +1,6 @@
 <script lang="ts">
   // Full task editor with notes, checklist, and activity (plan 12.2, 14).
-  import DockedPane from "../common/DockedPane.svelte";
+  import FormPage from "../common/FormPage.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import RichTextView from "../common/RichTextView.svelte";
@@ -68,10 +68,10 @@
     else ui.detailTaskId = undefined;
   }
 
-  // The docked pane leaves the page interactive, so this editor can unmount
-  // without an explicit close — clicking another card swaps the keyed
-  // instance. Persist edits on the way out; a blank title falls back to the
-  // existing one so validation can't discard the other changes.
+  // The editor replaces the routed page rather than blocking it, so it can
+  // unmount without an explicit close — e.g. sidebar navigation dismisses it.
+  // Persist edits on the way out; a blank title falls back to the existing
+  // one so validation can't discard the other changes.
   $effect(() => {
     return () => {
       if (closedExplicitly || isNewTask) return;
@@ -336,7 +336,7 @@
   }
 </script>
 
-<DockedPane title={isNewTask ? "New Task" : "Task"} wide onclose={() => void autosaveAndClose()}>
+<FormPage title={isNewTask ? "New Task" : "Task"} onclose={() => void autosaveAndClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -493,7 +493,7 @@
       </section>
     {/if}
   {/if}
-</DockedPane>
+</FormPage>
 
 <style>
   .grid {

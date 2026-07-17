@@ -24,7 +24,7 @@
 
 ### Changed
 
-- The task editor (open task and new task) now docks as a persistent right-hand panel instead of opening a dialog: the page beside it stays fully visible and interactive, clicking another card switches the panel to that task (saving any edits first), and the panel stays open while navigating between pages. Escape or ✕ closes it, saving changes. On narrow windows it floats over the page instead of docking.
+- The task editor (open task and new task) now opens as a full page in the main content area instead of a dialog: clicking a card or New task swaps the page to the editor, and closing it (✕, Escape, Save, or Cancel) returns to the page you were on. Sidebar navigation while editing saves your changes and goes to the chosen page.
 
 - Other data-entry forms open in a slide-over pane anchored to the right edge instead of a centered dialog, keeping the page behind visible for reference while typing. This covers quick add, employee add/edit and profile details, meeting notes, performance inputs, check-ins, and the awards, leave, travel, telework, training, and project forms. Keyboard behavior is unchanged: focus moves into the pane and returns to the opening control on close, Tab stays trapped, Escape closes, and unsaved changes still prompt before discarding. Confirmations, destructive prompts, the CSV export dialog, and the import-backup summary remain centered dialogs.
 
