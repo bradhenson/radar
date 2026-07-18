@@ -397,6 +397,8 @@ export interface AppSettings {
   completedVisibleDays: number;
   backupReminderDays: number;
   backupChangeThreshold: number;
+  /** Activity entries older than this are pruned at startup; 0 keeps forever. */
+  activityRetentionDays: number;
   trainingWarningDays: number;
   leaveLookaheadDays: number;
   theme: "light" | "dark" | "system";
@@ -464,6 +466,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   completedVisibleDays: 7,
   backupReminderDays: 1,
   backupChangeThreshold: 10,
+  activityRetentionDays: 365,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
   theme: "dark",

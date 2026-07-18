@@ -43,16 +43,23 @@
   let voucherManual = $state(false);
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<TravelRecord | undefined>(undefined);
+  let expanded = $state<Record<string, boolean>>({});
 
-  // Deep link: #/travel/{recordId} opens the trip's edit dialog (Today page
-  // attention items and calendar chips land on the actual record).
+  // Deep link: #/travel/{recordId} expands the trip in the list (Today page
+  // attention items and search results land on the actual record). One-shot.
   $effect(() => {
     const id = router.current.param;
     if (router.current.page !== "travel" || !id) return;
     const record = app.travelRecords.find((t) => t.id === id);
     if (!record) return;
-    openForm(record);
+    view = "list";
+    if (isPast(record)) showPast = true;
+    if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
+    expanded[id] = true;
     router.go("travel");
+    requestAnimationFrame(() => {
+      document.getElementById(`travel-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
   });
 
   // Auto-fill the voucher due date (return + 5 days) until the user overrides it.
@@ -231,10 +238,14 @@
     }
   }
 
-  function editFromRow(t: TravelRecord) {
+  function toggleRow(id: string) {
+    expanded[id] = !expanded[id];
+  }
+
+  function toggleFromRow(id: string) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
-    openForm(t);
+    toggleRow(id);
   }
 
   function requestDelete(t: TravelRecord) {
@@ -286,36 +297,34 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th><th></th>
+            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th>
           </tr>
         </thead>
         <tbody>
           {#each rows as t (t.id)}
-            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            {@const open = Boolean(expanded[t.id])}
+            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" onclick={() => editFromRow(t)}>
+            <tr class="row-clickable" class:row-open={open} id={"travel-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
               <td>
                 <button
                   type="button"
-                  class="link cell-link"
+                  class="disclosure"
+                  class:open
+                  aria-expanded={open}
+                  aria-label={open ? `Hide travel details for ${app.employeeName(t.employeeId)}` : `Show travel details for ${app.employeeName(t.employeeId)}`}
                   onclick={(ev) => {
                     ev.stopPropagation();
-                    openForm(t);
-                  }}>{app.employeeName(t.employeeId)}</button
-                >
+                    toggleRow(t.id);
+                  }}><Icon name="chevron" size={13} /></button>
+                {app.employeeName(t.employeeId)}
               </td>
-              <td>
-                {t.destination}
-                {#if t.notes}<div class="notes-line">{t.notes}</div>{/if}
-              </td>
+              <td>{t.destination}</td>
               <td class="date-col">{formatDate(t.startDate)}</td>
               <td class="date-col">{formatDate(t.endDate)}</td>
               <td><span class="badge {iptBadgeClass(t.iptConcurrence)}">{iptLabel(t.iptConcurrence)}</span></td>
-              <td>
-                <span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span>
-                {#if t.dtsAuthorizationId}<div class="auth-id">{t.dtsAuthorizationId}</div>{/if}
-              </td>
+              <td><span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span></td>
               <td>
                 {#if voucherState(t) === "overdue"}
                   <span class="badge overdue" title="Voucher past due">{formatDate(t.voucherDueDate)}</span>
@@ -325,21 +334,32 @@
                   {formatDate(t.voucherDueDate)}
                 {/if}
               </td>
-              <td>
-                <div class="row-actions">
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete travel"
-                    title="Delete"
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      requestDelete(t);
-                    }}><Icon name="trash" size={16} /></button
-                  >
-                </div>
-              </td>
             </tr>
+            {#if open}
+              <tr class="detail-row">
+                <td colspan="7">
+                  <div class="detail" aria-label={`Travel details for ${app.employeeName(t.employeeId)}`}>
+                    <dl class="detail-grid">
+                      {#if t.dtsAuthorizationId}
+                        <div><dt>DTS authorization ID</dt><dd>{t.dtsAuthorizationId}</dd></div>
+                      {/if}
+                      <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
+                    </dl>
+                    <div class="detail-footer">
+                      <button type="button" onclick={() => openForm(t)}>Edit</button>
+                      <button
+                        type="button"
+                        class="icon-btn danger"
+                        aria-label="Delete travel"
+                        title="Delete"
+                        onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
+                      <span class="spacer"></span>
+                      <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -526,16 +546,8 @@
   .date-col {
     white-space: nowrap;
   }
-  .notes-line {
-    color: var(--text-muted);
-    font-size: .8rem;
-    max-width: 22rem;
+  .prewrap {
     white-space: pre-wrap;
-  }
-  .auth-id {
-    color: var(--text-muted);
-    font-size: .78rem;
-    margin-top: .1rem;
   }
   .field-hint {
     color: var(--text-muted);
@@ -553,15 +565,6 @@
     gap: .5rem;
     justify-content: flex-end;
     margin-top: 1rem;
-  }
-  .row-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: .5rem;
-    flex-wrap: wrap;
-  }
-  .row-clickable {
-    cursor: pointer;
   }
   .calendar-view {
     min-width: 0;

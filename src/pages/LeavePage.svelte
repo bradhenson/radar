@@ -30,15 +30,21 @@
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<LeaveRecord | undefined>(undefined);
+  let expanded = $state<Record<string, boolean>>({});
 
-  // Deep link: #/leave/{recordId} opens the record's edit dialog.
+  // Deep link: #/leave/{recordId} expands the record in the list. One-shot.
   $effect(() => {
     const id = router.current.param;
     if (router.current.page !== "leave" || !id) return;
     const record = app.leaveRecords.find((l) => l.id === id);
     if (!record) return;
-    openForm(record);
+    view = "list";
+    if (compareDates(record.endDate, app.today) < 0) showPast = true;
+    expanded[id] = true;
     router.go("leave");
+    requestAnimationFrame(() => {
+      document.getElementById(`leave-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
   });
 
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
@@ -151,10 +157,14 @@
     return l.leaveType ?? "Leave";
   }
 
-  function editFromRow(l: LeaveRecord) {
+  function toggleRow(id: string) {
+    expanded[id] = !expanded[id];
+  }
+
+  function toggleFromRow(id: string) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
-    openForm(l);
+    toggleRow(id);
   }
 
   function requestDelete(l: LeaveRecord) {
@@ -197,43 +207,64 @@
     {#if rows.length === 0}
       <EmptyState message="No leave records." hint="Track upcoming absences for workload awareness. Details stay broad — no reasons required." />
     {:else}
-      <table class="data">
-        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th><th></th></tr></thead>
+      <table class="data leave-table">
+        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
-            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            {@const open = Boolean(expanded[l.id])}
+            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" onclick={() => editFromRow(l)}>
+            <tr class="row-clickable" class:row-open={open} id={"leave-row-" + l.id} onclick={() => toggleFromRow(l.id)}>
               <td>
                 <button
                   type="button"
-                  class="link cell-link"
+                  class="disclosure"
+                  class:open
+                  aria-expanded={open}
+                  aria-label={open ? `Hide leave details for ${app.employeeName(l.employeeId)}` : `Show leave details for ${app.employeeName(l.employeeId)}`}
                   onclick={(ev) => {
                     ev.stopPropagation();
-                    openForm(l);
-                  }}>{app.employeeName(l.employeeId)}</button
-                >
+                    toggleRow(l.id);
+                  }}><Icon name="chevron" size={13} /></button>
+                {app.employeeName(l.employeeId)}
               </td>
-              <td>{formatDate(l.startDate)}</td>
-              <td>{formatDate(l.endDate)}</td>
+              <td class="date-cell">{formatDate(l.startDate)}</td>
+              <td class="date-cell">{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
-              <td>{l.status}</td>
-              <td>
-                <div class="row-actions">
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete leave"
-                    title="Delete"
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      requestDelete(l);
-                    }}><Icon name="trash" size={16} /></button
-                  >
-                </div>
-              </td>
+              <td><span class="badge">{l.status}</span></td>
             </tr>
+            {#if open}
+              <tr class="detail-row">
+                <td colspan="5">
+                  <div class="detail" aria-label={`Leave details for ${app.employeeName(l.employeeId)}`}>
+                    <dl class="detail-grid">
+                      {#if l.partialDay}
+                        <div><dt>Partial day</dt><dd>{l.partialDay}</dd></div>
+                      {/if}
+                      <div><dt>Workload impact</dt><dd>{l.workloadImpactNote || "None noted"}</dd></div>
+                      {#if l.sourceSystem || l.sourceReference}
+                        <div><dt>Source</dt><dd>{[l.sourceSystem, l.sourceReference].filter(Boolean).join(" · ")}</dd></div>
+                      {/if}
+                      {#if l.lastVerifiedDate}
+                        <div><dt>Last verified</dt><dd>{formatDate(l.lastVerifiedDate)}</dd></div>
+                      {/if}
+                    </dl>
+                    <div class="detail-footer">
+                      <button type="button" onclick={() => openForm(l)}>Edit</button>
+                      <button
+                        type="button"
+                        class="icon-btn danger"
+                        aria-label="Delete leave"
+                        title="Delete"
+                        onclick={() => requestDelete(l)}><Icon name="trash" size={16} /></button>
+                      <span class="spacer"></span>
+                      <button type="button" onclick={() => router.go("employees", l.employeeId)}>Open employee</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -398,20 +429,10 @@
     background: var(--accent-soft);
     color: var(--accent);
   }
-  .row-actions,
   .dialog-actions {
     display: flex;
     align-items: center;
     gap: .5rem;
-  }
-  .row-actions {
-    justify-content: flex-end;
-    flex-wrap: wrap;
-  }
-  .row-clickable {
-    cursor: pointer;
-  }
-  .dialog-actions {
     justify-content: flex-end;
     margin-top: 1rem;
   }

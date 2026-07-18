@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import { router } from "../app/router.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
@@ -100,6 +101,23 @@
     expanded[id] = !expanded[id];
   }
 
+  // Deep link (global search): #/performance/<id> switches to All Inputs,
+  // clears the filters, expands that input, and scrolls to it. One-shot.
+  $effect(() => {
+    const id = router.current.param;
+    if (!id || !app.performanceInputs.some((p) => p.id === id && !p.isArchived)) return;
+    viewMode = "inputs";
+    search = "";
+    filterEmployee = "";
+    filterStatus = "";
+    filterMissing = "";
+    expanded[id] = true;
+    router.go("performance");
+    requestAnimationFrame(() => {
+      document.getElementById(`input-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
+  });
+
   function toggleFromRow(id: string) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
@@ -142,7 +160,7 @@
   <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <tr class="row-clickable" class:row-open={open} onclick={() => toggleFromRow(input.id)}>
+  <tr class="row-clickable" class:row-open={open} id={"input-row-" + input.id} onclick={() => toggleFromRow(input.id)}>
     <td class="date-cell">
       <button
         type="button"
@@ -319,9 +337,6 @@
   .view-tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
   .filter-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: var(--bg); }
   .filter-toolbar input[type="search"] { min-width: 15rem; flex: 1; }
-  .table-wrap { overflow-x: auto; }
-  .row-clickable { cursor: pointer; }
-  .date-cell { white-space: nowrap; }
   .employee-cell { white-space: nowrap; }
   .summary-cell { min-width: 16rem; }
   .summary-cell .clamp2 {
@@ -332,22 +347,6 @@
     line-clamp: 2;
     line-height: 1.35;
   }
-  .disclosure {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: .3rem;
-    padding: .1rem;
-    min-height: 0;
-    border: none;
-    background: none;
-    box-shadow: none;
-    color: var(--text-muted);
-    vertical-align: -.1rem;
-    transition: transform .16s var(--ease-out), color .14s ease;
-  }
-  .disclosure:hover { background: none; color: var(--accent); }
-  .disclosure.open { transform: rotate(90deg); color: var(--accent); }
   .group-row td {
     background: var(--surface-2);
     color: var(--text-muted);
@@ -360,14 +359,6 @@
   }
   .group-row td span { font-weight: 500; }
   .input-table tbody .group-row:hover td:first-child { box-shadow: none; }
-  /* Keep the accent tick pinned while a row is open and merge it visually with
-     its detail row by hiding the border between them. */
-  .input-table tbody tr.row-open td { border-bottom-color: transparent; }
-  .input-table tbody tr.row-open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
-  .input-table tbody .detail-row > td { padding: .95rem 1.1rem 1.05rem; background: var(--surface-2); }
-  .input-table tbody .detail-row { cursor: default; }
-  .input-table tbody .detail-row:hover td:first-child { box-shadow: none; }
-  .detail { display: grid; gap: .8rem; }
   .input-sections {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
@@ -376,8 +367,6 @@
   .input-sections section { padding: .9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); white-space: pre-wrap; }
   .input-sections section.missing { border-left: 3px solid var(--warning); }
   .input-sections h3 { margin: 0 0 .25rem; color: var(--text-muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
-  .detail-footer { display: flex; align-items: center; gap: .6rem; }
-  .detail-footer button { font-size: .78rem; }
   .status-control { display: flex; align-items: center; gap: .6rem; margin: 0; color: var(--text-muted); }
   .status-control select { min-width: 10rem; }
   .coverage-table td:last-child { text-align: right; }

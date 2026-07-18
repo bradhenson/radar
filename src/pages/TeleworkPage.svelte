@@ -63,17 +63,35 @@
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<TeleworkRecord | undefined>(undefined);
 
-  // Deep link: #/telework/{recordId} opens the record's edit dialog, so
+  let expanded = $state<Record<string, boolean>>({});
+
+  // Deep link: #/telework/{recordId} expands the record in the list, so
   // attention items land on the actual agreement instead of a generic list.
   $effect(() => {
     const id = router.current.param;
     if (router.current.page !== "telework" || !id) return;
     const record = app.teleworkRecords.find((t) => t.id === id);
     if (!record) return;
-    if (isSituationalRequest(record)) openForm(record);
-    else openAgreementForm(record);
+    view = "list";
+    if (isHistorical(record)) showHistorical = true;
+    if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
+    if (filterStatus && filterStatus !== record.status) filterStatus = "";
+    expanded[id] = true;
     router.go("telework");
+    requestAnimationFrame(() => {
+      document.getElementById(`telework-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
   });
+
+  function toggleRow(id: string) {
+    expanded[id] = !expanded[id];
+  }
+
+  function toggleFromRow(id: string) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    toggleRow(id);
+  }
 
   function statusLabel(status: TeleworkStatus): string {
     return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
@@ -328,12 +346,6 @@
     }
   }
 
-  function editFromRow(t: TeleworkRecord) {
-    // Don't hijack a click the user made to select and copy text.
-    if (window.getSelection()?.toString()) return;
-    openForm(t);
-  }
-
   function requestDelete(t: TeleworkRecord) {
     pendingDelete = t;
   }
@@ -393,45 +405,56 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Notes</th><th></th>
+            <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th>
           </tr>
         </thead>
         <tbody>
           {#each rows as t (t.id)}
-            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            {@const open = Boolean(expanded[t.id])}
+            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" onclick={() => editFromRow(t)}>
+            <tr class="row-clickable" class:row-open={open} id={"telework-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
               <td>
                 <button
                   type="button"
-                  class="link cell-link"
+                  class="disclosure"
+                  class:open
+                  aria-expanded={open}
+                  aria-label={open ? `Hide request details for ${app.employeeName(t.employeeId)}` : `Show request details for ${app.employeeName(t.employeeId)}`}
                   onclick={(ev) => {
                     ev.stopPropagation();
-                    openForm(t);
-                  }}>{app.employeeName(t.employeeId)}</button
-                >
+                    toggleRow(t.id);
+                  }}><Icon name="chevron" size={13} /></button>
+                {app.employeeName(t.employeeId)}
               </td>
               <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
-              <td>{formatDate(t.requestDate)}</td>
-              <td>{formatDate(t.effectiveDate)}</td>
-              <td>{formatDate(requestEndDate(t))}</td>
-              <td class="notes-cell">{t.notes ?? ""}</td>
-              <td>
-                <div class="row-actions">
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete telework request"
-                    title="Delete"
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      requestDelete(t);
-                    }}><Icon name="trash" size={16} /></button
-                  >
-                </div>
-              </td>
+              <td class="date-cell">{formatDate(t.requestDate)}</td>
+              <td class="date-cell">{formatDate(t.effectiveDate)}</td>
+              <td class="date-cell">{formatDate(requestEndDate(t))}</td>
             </tr>
+            {#if open}
+              <tr class="detail-row">
+                <td colspan="5">
+                  <div class="detail" aria-label={`Request details for ${app.employeeName(t.employeeId)}`}>
+                    <dl class="detail-grid">
+                      <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
+                    </dl>
+                    <div class="detail-footer">
+                      <button type="button" onclick={() => openForm(t)}>Edit</button>
+                      <button
+                        type="button"
+                        class="icon-btn danger"
+                        aria-label="Delete telework request"
+                        title="Delete"
+                        onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
+                      <span class="spacer"></span>
+                      <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -447,29 +470,33 @@
       <table class="data">
         <thead>
           <tr>
-            <th>Employee</th><th>Type</th><th>Status</th><th>Effective</th><th>Expires</th><th>Schedule</th><th></th>
+            <th>Employee</th><th>Type</th><th>Status</th><th>Effective</th><th>Expires</th><th>Schedule</th>
           </tr>
         </thead>
         <tbody>
           {#each agreementRows as t (t.id)}
-            <!-- Row click is a mouse convenience; the name button is the keyboard path. -->
+            {@const open = Boolean(expanded[t.id])}
+            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" onclick={() => { if (!window.getSelection()?.toString()) openAgreementForm(t); }}>
+            <tr class="row-clickable" class:row-open={open} id={"telework-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
               <td>
                 <button
                   type="button"
-                  class="link cell-link"
+                  class="disclosure"
+                  class:open
+                  aria-expanded={open}
+                  aria-label={open ? `Hide agreement details for ${app.employeeName(t.employeeId)}` : `Show agreement details for ${app.employeeName(t.employeeId)}`}
                   onclick={(ev) => {
                     ev.stopPropagation();
-                    openAgreementForm(t);
-                  }}>{app.employeeName(t.employeeId)}</button
-                >
+                    toggleRow(t.id);
+                  }}><Icon name="chevron" size={13} /></button>
+                {app.employeeName(t.employeeId)}
               </td>
               <td>{t.recordType}</td>
               <td><span class="badge status-{t.status}">{t.status.replace(/_/g, " ")}</span></td>
-              <td>{formatDate(t.effectiveDate)}</td>
-              <td>
+              <td class="date-cell">{formatDate(t.effectiveDate)}</td>
+              <td class="date-cell">
                 {#if expirationState(t) === "overdue"}
                   <span class="badge overdue" title="Agreement expired">{formatDate(t.expirationDate)}</span>
                 {:else if expirationState(t) === "soon"}
@@ -479,21 +506,35 @@
                 {/if}
               </td>
               <td class="notes-cell">{t.scheduleSummary ?? ""}</td>
-              <td>
-                <div class="row-actions">
-                  <button
-                    type="button"
-                    class="icon-btn danger"
-                    aria-label="Delete telework agreement"
-                    title="Delete"
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      requestDelete(t);
-                    }}><Icon name="trash" size={16} /></button
-                  >
-                </div>
-              </td>
             </tr>
+            {#if open}
+              <tr class="detail-row">
+                <td colspan="6">
+                  <div class="detail" aria-label={`Agreement details for ${app.employeeName(t.employeeId)}`}>
+                    <dl class="detail-grid">
+                      {#if t.requestDate}
+                        <div><dt>Request date</dt><dd>{formatDate(t.requestDate)}</dd></div>
+                      {/if}
+                      {#if t.scheduleSummary}
+                        <div><dt>Schedule</dt><dd class="prewrap">{t.scheduleSummary}</dd></div>
+                      {/if}
+                      <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
+                    </dl>
+                    <div class="detail-footer">
+                      <button type="button" onclick={() => openAgreementForm(t)}>Edit</button>
+                      <button
+                        type="button"
+                        class="icon-btn danger"
+                        aria-label="Delete telework agreement"
+                        title="Delete"
+                        onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
+                      <span class="spacer"></span>
+                      <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
+                    </div>
+                  </div>
+                </td>
+              </tr>
+            {/if}
           {/each}
         </tbody>
       </table>
@@ -731,14 +772,8 @@
     justify-content: flex-end;
     margin-top: 1rem;
   }
-  .row-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: .5rem;
-    flex-wrap: wrap;
-  }
-  .row-clickable {
-    cursor: pointer;
+  .prewrap {
+    white-space: pre-wrap;
   }
   .calendar-view {
     min-width: 0;

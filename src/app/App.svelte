@@ -23,8 +23,11 @@
   import TeleworkPage from "../pages/TeleworkPage.svelte";
   import TravelPage from "../pages/TravelPage.svelte";
   import AwardsPage from "../pages/AwardsPage.svelte";
+  import ReportsPage from "../pages/ReportsPage.svelte";
+  import ActivityPage from "../pages/ActivityPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
+  import CommandPalette from "../components/common/CommandPalette.svelte";
   import { daysSinceTimestamp, formatTimestamp } from "../utils/dates";
   import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
@@ -65,7 +68,9 @@
     { page: "telework", label: "Telework", icon: "telework" },
     { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "archive", label: "Archive", icon: "archive", section: "System" },
+    { page: "reports", label: "Reports", icon: "reports", section: "System" },
+    { page: "activity", label: "Activity", icon: "activity" },
+    { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
 
@@ -175,11 +180,18 @@
   }
 
   function globalKeydown(e: KeyboardEvent) {
+    // Ctrl+K works everywhere, including while typing, independent of the
+    // single-key shortcut setting (it is modifier-based).
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+      e.preventDefault();
+      ui.searchOpen = !ui.searchOpen;
+      return;
+    }
     if (!app.settings.enableSingleKeyShortcuts) return;
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.newTaskOpen || ui.quickAddOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performanceFormInput || ui.performancePromptTask || ui.archivePromptTaskId)
+    if (ui.newTaskOpen || ui.quickAddOpen || ui.searchOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performanceFormInput || ui.performancePromptTask || ui.archivePromptTaskId)
       return;
     switch (e.key.toLowerCase()) {
       case "n":
@@ -335,6 +347,9 @@
           Memory-only storage
         </span>
       {/if}
+      <button type="button" class="icon-btn" onclick={() => (ui.searchOpen = true)} title="Search everything (Ctrl+K)" aria-label="Search">
+        <Icon name="search" size={17} />
+      </button>
       <button type="button" class="icon-btn" onclick={toggleTheme} title="Toggle light/dark theme" aria-label="Toggle theme">
         <Icon name={isDark ? "sun" : "moon"} size={17} />
       </button>
@@ -451,6 +466,10 @@
           <TravelPage />
         {:else if router.current.page === "awards"}
           <AwardsPage />
+        {:else if router.current.page === "reports"}
+          <ReportsPage />
+        {:else if router.current.page === "activity"}
+          <ActivityPage />
         {:else if router.current.page === "archive"}
           <ArchivePage />
         {:else if router.current.page === "settings"}
@@ -465,6 +484,9 @@
 
   {#if ui.quickAddOpen}
     <QuickAddTask onclose={() => (ui.quickAddOpen = false)} />
+  {/if}
+  {#if ui.searchOpen}
+    <CommandPalette onclose={() => (ui.searchOpen = false)} />
   {/if}
   {#if ui.performancePromptTask}
     {@const t = ui.performancePromptTask}

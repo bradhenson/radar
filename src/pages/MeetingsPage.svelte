@@ -1,6 +1,7 @@
 <script lang="ts">
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
@@ -55,6 +56,22 @@
   function toggleRow(id: string) {
     expanded[id] = !expanded[id];
   }
+
+  // Deep link (global search, Today page): #/meetings/<id> clears the filters,
+  // expands that note, and scrolls to it. One-shot — the param is consumed.
+  $effect(() => {
+    const id = router.current.param;
+    if (!id || !app.meetingNotes.some((note) => note.id === id && !note.isArchived)) return;
+    search = "";
+    filterType = "";
+    filterProject = "";
+    filterEmployee = "";
+    expanded[id] = true;
+    router.go("meetings");
+    requestAnimationFrame(() => {
+      document.getElementById(`meeting-row-${id}`)?.scrollIntoView({ block: "center" });
+    });
+  });
 
   function toggleFromRow(id: string) {
     // Don't hijack a click the user made to select and copy text.
@@ -176,7 +193,7 @@
             <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
             <!-- svelte-ignore a11y_click_events_have_key_events -->
             <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" class:row-open={open} onclick={() => toggleFromRow(note.id)}>
+            <tr class="row-clickable" class:row-open={open} id={"meeting-row-" + note.id} onclick={() => toggleFromRow(note.id)}>
               <td class="date-cell">
                 <button
                   type="button"
@@ -250,9 +267,6 @@
 
 <style>
   .meeting-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: var(--bg); }
-  .table-wrap { overflow-x: auto; }
-  .row-clickable { cursor: pointer; }
-  .date-cell { white-space: nowrap; }
   .title-cell { min-width: 14rem; }
   .attendees-cell {
     max-width: 16rem;
@@ -261,30 +275,6 @@
     white-space: nowrap;
   }
   .action-mark { color: var(--accent); font-size: .7rem; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
-  .disclosure {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    margin-right: .3rem;
-    padding: .1rem;
-    min-height: 0;
-    border: none;
-    background: none;
-    box-shadow: none;
-    color: var(--text-muted);
-    vertical-align: -.1rem;
-    transition: transform .16s var(--ease-out), color .14s ease;
-  }
-  .disclosure:hover { background: none; color: var(--accent); }
-  .disclosure.open { transform: rotate(90deg); color: var(--accent); }
-  /* Keep the accent tick pinned while a row is open and merge it visually with
-     its detail row by hiding the border between them. */
-  .meeting-table tbody tr.row-open td { border-bottom-color: transparent; }
-  .meeting-table tbody tr.row-open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
-  .meeting-table tbody .detail-row > td { padding: .95rem 1.1rem 1.05rem; background: var(--surface-2); }
-  .meeting-table tbody .detail-row { cursor: default; }
-  .meeting-table tbody .detail-row:hover td:first-child { box-shadow: none; }
-  .detail { display: grid; gap: .85rem; }
   .detail-attendees { display: grid; gap: .2rem; }
   .detail-label { color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
   .meeting-sections {
@@ -302,6 +292,4 @@
     text-transform: uppercase;
     letter-spacing: .04em;
   }
-  .detail-footer { display: flex; align-items: center; gap: .45rem; }
-  .detail-footer button { font-size: .78rem; }
 </style>

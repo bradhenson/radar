@@ -41,6 +41,7 @@ import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
 import { laneForStatus, statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
+import { expiredActivityEntryIds } from "../domain/rules/activityRetention";
 import { requirementAppliesTo, rollingExpiration, trainingStatus, type TrainingStatus } from "../domain/rules/training";
 
 export type SaveStatus = "saved" | "saving" | "error";
@@ -321,6 +322,7 @@ export class AppStore {
         this.storageKind = "memory";
       }
       await this.loadAll();
+      await this.pruneActivityEntries();
       await this.refreshStoragePersistence();
       await this.refreshDesktopInfo();
       this.initialized = true;
@@ -717,6 +719,33 @@ export class AppStore {
       summary,
       sessionId: this.sessionId
     };
+  }
+
+  /**
+   * Delete activity entries older than the retention window (startup
+   * maintenance). One summary entry records the prune. Never blocks startup:
+   * a failed prune is a warning, not an initialization error.
+   */
+  async pruneActivityEntries(): Promise<void> {
+    try {
+      const retentionDays = this.settings.activityRetentionDays;
+      const ids = expiredActivityEntryIds(this.activityEntries, this.today, retentionDays);
+      if (ids.length === 0) return;
+      const entry = this.buildActivityEntry(
+        "system",
+        "activity",
+        "maintenance",
+        `Pruned ${ids.length} activity entr${ids.length === 1 ? "y" : "ies"} older than ${retentionDays} days`
+      );
+      const ops: MutationOp[] = ids.map((id) => deleteOp("activityEntries", id));
+      ops.push(putOp("activityEntries", entry));
+      await this.store.mutate(ops);
+      const removed = new Set(ids);
+      this.activityEntries = this.activityEntries.filter((e) => !removed.has(e.id));
+      this.activityEntries.push(entry);
+    } catch (e) {
+      console.warn("Activity prune failed", e);
+    }
   }
 
   /** Standalone activity write for non-cascading events (imports, backups). */

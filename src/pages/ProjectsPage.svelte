@@ -2,6 +2,7 @@
   // Project directory (plan 12.5, 16) with inline add/edit dialog.
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
+  import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -102,15 +103,27 @@
       .sort((a, b) => ((a.dueDate ?? "9999") < (b.dueDate ?? "9999") ? -1 : 1));
   }
 
-  function editFromRow(p: Project) {
+  function toggleFromRow(id: string) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
-    openForm(p);
+    toggleExpanded(id);
   }
 
   function toggleExpanded(id: string) {
     expandedId = expandedId === id ? undefined : id;
   }
+
+  // Deep link (global search): #/projects/<id> expands that project's tasks,
+  // including closed projects hidden by the default filter. One-shot.
+  $effect(() => {
+    const id = router.current.param;
+    if (!id) return;
+    const project = app.projects.find((p) => p.id === id && !p.isArchived);
+    if (!project) return;
+    if (!["proposed", "active", "on_hold"].includes(project.status)) showClosed = true;
+    expandedId = id;
+    router.go("projects");
+  });
 
   function requestDelete(p: Project) {
     pendingDelete = p;
@@ -162,10 +175,10 @@
       </thead>
       <tbody>
         {#each rows as r (r.p.id)}
-          <!-- Row click and the name open edit; the list icon expands related tasks. -->
+          <!-- Row click toggles the detail (grammar: click = read); the name button opens edit. -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <tr class="row-clickable" onclick={() => editFromRow(r.p)}>
+          <tr class="row-clickable" class:row-open={expandedId === r.p.id} onclick={() => toggleFromRow(r.p.id)}>
             <td>
               <span class="project-name">
                 <button
@@ -173,11 +186,11 @@
                   class="disclosure"
                   class:open={expandedId === r.p.id}
                   aria-expanded={expandedId === r.p.id}
-                  aria-label={expandedId === r.p.id ? `Hide tasks for ${r.p.name}` : `Show tasks for ${r.p.name}`}
+                  aria-label={expandedId === r.p.id ? `Hide details for ${r.p.name}` : `Show details for ${r.p.name}`}
                   onclick={(ev) => {
                     ev.stopPropagation();
                     toggleExpanded(r.p.id);
-                  }}>☰</button
+                  }}><Icon name="chevron" size={13} /></button
                 >
                 <button
                   type="button"
@@ -218,8 +231,8 @@
             </td>
           </tr>
           {#if expandedId === r.p.id}
-            <tr>
-              <td colspan="8" style="background:var(--surface-2)">
+            <tr class="detail-row">
+              <td colspan="8">
                 {#if r.p.description}<p>{r.p.description}</p>{/if}
                 {#if projectTasks(r.p.id).length === 0}
                   <p class="muted">No tasks in this project.</p>
@@ -245,9 +258,6 @@
 </div>
 
 <style>
-  .row-clickable {
-    cursor: pointer;
-  }
   .row-actions {
     display: flex;
     align-items: center;
@@ -259,22 +269,6 @@
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
-  }
-  .disclosure {
-    border: none;
-    background: none;
-    box-shadow: none;
-    color: var(--text-muted);
-    padding: 0.1rem 0.25rem;
-    min-height: 0;
-    min-width: 1.2rem;
-    font-size: 0.85rem;
-    line-height: 1;
-  }
-  .disclosure:hover,
-  .disclosure.open {
-    background: none;
-    color: var(--accent);
   }
 </style>
 

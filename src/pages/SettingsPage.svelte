@@ -449,6 +449,9 @@
         <input type="number" min="1" value={app.settings.backupReminderDays} onchange={numberInput("backupReminderDays")} /></label>
       <label>Backup change threshold
         <input type="number" min="1" value={app.settings.backupChangeThreshold} onchange={numberInput("backupChangeThreshold")} /></label>
+      <label>Activity log retention (days)
+        <input type="number" min="0" value={app.settings.activityRetentionDays} onchange={numberInput("activityRetentionDays")} />
+        <span class="field-hint">Older entries are pruned at startup. 0 keeps everything.</span></label>
     </div>
   </section>
 

@@ -7,6 +7,7 @@
   import { router } from "../app/router.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
   import type { TrainingStatusRow } from "../stores/app.svelte";
   import { TRAINING_STATE_LABELS, TRAINING_STATE_ORDER, rollingExpiration, type TrainingState, type TrainingStatus } from "../domain/rules/training";
@@ -121,10 +122,10 @@
     }
   }
 
-  function editReqFromRow(req: TrainingRequirement) {
+  function toggleRosterFromRow(reqId: string) {
     // Don't hijack a click the user made to select and copy text.
     if (window.getSelection()?.toString()) return;
-    openReqForm(req);
+    openRoster(reqId);
   }
 
   function openReqForm(req?: TrainingRequirement) {
@@ -312,22 +313,26 @@
   {:else}
     <h2>Requirements</h2>
     <table class="data" style="margin-bottom:1.2rem">
-      <thead><tr><th>Name</th><th>Due</th><th>Applies to</th><th>Progress</th><th></th></tr></thead>
+      <thead><tr><th>Name</th><th>Due</th><th>Applies to</th><th>Progress</th></tr></thead>
       <tbody>
         {#each summaries as s (s.req.id)}
-          <!-- Row click edits the requirement; the name button is the keyboard path. Track stays explicit. -->
+          {@const open = s.req.id === selectedReqId}
+          <!-- Row click toggles the tracking roster; the chevron is the keyboard control. -->
           <!-- svelte-ignore a11y_click_events_have_key_events -->
           <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <tr class="row-clickable" class:selected-req={s.req.id === selectedReqId} onclick={() => editReqFromRow(s.req)}>
+          <tr class="row-clickable" class:row-open={open} onclick={() => toggleRosterFromRow(s.req.id)}>
             <td>
               <button
                 type="button"
-                class="link cell-link"
+                class="disclosure"
+                class:open
+                aria-expanded={open}
+                aria-label={open ? `Close roster for ${s.req.name}` : `Track roster for ${s.req.name}`}
                 onclick={(ev) => {
                   ev.stopPropagation();
-                  openReqForm(s.req);
-                }}>{s.req.name}</button
-              >
+                  openRoster(s.req.id);
+                }}><Icon name="chevron" size={13} /></button>
+              <strong>{s.req.name}</strong>
             </td>
             <td>{scheduleText(s.req)}</td>
             <td>{scopeText(s.req)}</td>
@@ -335,78 +340,69 @@
               {s.done}/{s.total} complete
               {#if s.overdue > 0}<span class="badge overdue" style="margin-left:.4rem">{s.overdue} overdue</span>{/if}
             </td>
-            <td style="white-space:nowrap">
-              <button
-                type="button"
-                onclick={(ev) => {
-                  ev.stopPropagation();
-                  openRoster(s.req.id);
-                }}>{s.req.id === selectedReqId ? "Close" : "Track"}</button
-              >
-            </td>
           </tr>
+          {#if open && selectedReq}
+            <tr class="detail-row">
+              <td colspan="4">
+                <section class="roster" aria-label={`Roster for ${selectedReq.name}`}>
+                  <div class="toolbar roster-toolbar">
+                    <label for="complete-date" class="muted small">Completion date</label>
+                    <input id="complete-date" type="date" bind:value={completeDate} />
+                    <button type="button" class="primary" disabled={checkedIds.length === 0} onclick={() => void markComplete(checkedIds)}>
+                      Mark {checkedIds.length || "selected"} complete
+                    </button>
+                    <span class="spacer"></span>
+                    <button type="button" onclick={() => openReqForm(selectedReq)}>Edit requirement</button>
+                  </div>
+                  <table class="data">
+                    <thead>
+                      <tr>
+                        <th style="width:2rem">
+                          <input
+                            type="checkbox"
+                            aria-label="Select all employees who have not completed this training"
+                            checked={incompleteIds.length > 0 && checkedIds.length === incompleteIds.length}
+                            disabled={incompleteIds.length === 0}
+                            onchange={toggleCheckAll}
+                          />
+                        </th>
+                        <th>Employee</th>
+                        <th>Status</th>
+                        <th>Verified</th>
+                        <th></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {#each roster as row (row.employee.id)}
+                        <tr>
+                          <td>
+                            <input
+                              type="checkbox"
+                              aria-label={`Select ${row.employee.displayName}`}
+                              checked={checkedIds.includes(row.employee.id)}
+                              onchange={() => toggleChecked(row.employee.id)}
+                            />
+                          </td>
+                          <td>{row.employee.displayName}</td>
+                          <td><span class="badge {CELL[row.status.state].cls}">{statusText(row.status)}</span></td>
+                          <td>{formatDate(row.record?.lastVerifiedDate)}</td>
+                          <td style="white-space:nowrap">
+                            {#if !["complete", "waived", "not_applicable"].includes(row.status.state)}
+                              <button type="button" onclick={() => void markComplete([row.employee.id])}>Complete</button>
+                            {/if}
+                            <button type="button" onclick={() => openRecord(row.employee.id, selectedReq!)}>Details</button>
+                          </td>
+                        </tr>
+                      {/each}
+                    </tbody>
+                  </table>
+                </section>
+              </td>
+            </tr>
+          {/if}
         {/each}
       </tbody>
     </table>
-
-    {#if selectedReq}
-      {@const summary = summaries.find((s) => s.req.id === selectedReq!.id)}
-      <section class="card roster">
-        <div class="roster-head">
-          <h2>{selectedReq.name}</h2>
-          <span class="muted">{scheduleText(selectedReq)} · {summary?.done ?? 0}/{summary?.total ?? 0} complete</span>
-        </div>
-        <div class="toolbar">
-          <label for="complete-date" class="muted small">Completion date</label>
-          <input id="complete-date" type="date" bind:value={completeDate} />
-          <button type="button" class="primary" disabled={checkedIds.length === 0} onclick={() => void markComplete(checkedIds)}>
-            Mark {checkedIds.length || "selected"} complete
-          </button>
-        </div>
-        <table class="data">
-          <thead>
-            <tr>
-              <th style="width:2rem">
-                <input
-                  type="checkbox"
-                  aria-label="Select all employees who have not completed this training"
-                  checked={incompleteIds.length > 0 && checkedIds.length === incompleteIds.length}
-                  disabled={incompleteIds.length === 0}
-                  onchange={toggleCheckAll}
-                />
-              </th>
-              <th>Employee</th>
-              <th>Status</th>
-              <th>Verified</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {#each roster as row (row.employee.id)}
-              <tr>
-                <td>
-                  <input
-                    type="checkbox"
-                    aria-label={`Select ${row.employee.displayName}`}
-                    checked={checkedIds.includes(row.employee.id)}
-                    onchange={() => toggleChecked(row.employee.id)}
-                  />
-                </td>
-                <td>{row.employee.displayName}</td>
-                <td><span class="badge {CELL[row.status.state].cls}">{statusText(row.status)}</span></td>
-                <td>{formatDate(row.record?.lastVerifiedDate)}</td>
-                <td style="white-space:nowrap">
-                  {#if !["complete", "waived", "not_applicable"].includes(row.status.state)}
-                    <button type="button" onclick={() => void markComplete([row.employee.id])}>Complete</button>
-                  {/if}
-                  <button type="button" onclick={() => openRecord(row.employee.id, selectedReq!)}>Details</button>
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      </section>
-    {/if}
 
     {#if showMatrix}
       <section class="matrix-section">
@@ -647,11 +643,8 @@
   .matrix-cell .mark.success { color: var(--success-fg); }
   .matrix-cell .mark.warning { color: var(--duesoon-fg); }
   .matrix-cell .mark.overdue { color: var(--overdue-fg); }
-  .roster { margin-bottom: 1.2rem; }
-  .roster-head { display: flex; align-items: baseline; gap: 0.8rem; flex-wrap: wrap; }
-  .roster-head h2 { margin: 0; }
-  .selected-req td { background: color-mix(in srgb, var(--accent-soft) 45%, transparent); }
-  .row-clickable { cursor: pointer; }
+  .roster { display: grid; gap: .6rem; }
+  .roster-toolbar { margin-bottom: 0; }
   .employee-picker { max-height: 220px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px; padding: 0.4rem 0.6rem; display: grid; grid-template-columns: 1fr 1fr; gap: 0.1rem 0.8rem; }
   .employee-picker label { display: flex; align-items: center; gap: 0.35rem; font-weight: normal; }
 </style>

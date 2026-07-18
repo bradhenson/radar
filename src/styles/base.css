@@ -481,3 +481,60 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
     scroll-behavior: auto !important;
   }
 }
+
+/* ---------- print ----------
+   Reports (and any page) print as content only: navigation, toolbars, and
+   on-screen controls disappear; tables flatten to plain bordered rows. */
+@media print {
+  .topbar, .sidenav, .compactnav, .toolbar, .no-print { display: none !important; }
+  body { background: #fff; }
+  main { overflow: visible; }
+  table.data { box-shadow: none; border-radius: 0; }
+  table.data tbody tr:hover { background: transparent; }
+  a { text-decoration: none; color: inherit; }
+}
+
+/* ---------- expanding rows (disclosure grammar) ----------
+   Shared by every list page: clicking a row (or its chevron, the keyboard
+   control) inserts an inline detail row. Open rows pin the accent tick and
+   merge visually with their detail row. */
+table.data tr.row-clickable { cursor: pointer; }
+table.data .disclosure {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: .3rem;
+  padding: .1rem;
+  min-height: 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  color: var(--text-muted);
+  vertical-align: -.1rem;
+  transition: transform .16s var(--ease-out), color .14s ease;
+}
+table.data .disclosure:hover { background: none; color: var(--accent); }
+table.data .disclosure.open { transform: rotate(90deg); color: var(--accent); }
+table.data tr.row-open td { border-bottom-color: transparent; }
+table.data tr.row-open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+table.data tr.detail-row > td { padding: .95rem 1.1rem 1.05rem; background: var(--surface-2); }
+table.data tr.detail-row:hover td:first-child { box-shadow: none; }
+.detail { display: grid; gap: .8rem; }
+.detail-footer { display: flex; align-items: center; gap: .5rem; }
+.detail-footer button { font-size: .78rem; }
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  gap: .6rem .9rem;
+  margin: 0;
+}
+.detail-grid dt {
+  color: var(--text-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+.detail-grid dd { margin: .1rem 0 0; }
+.date-cell { white-space: nowrap; }
+.table-wrap { overflow-x: auto; }

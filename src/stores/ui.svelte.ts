@@ -8,6 +8,8 @@ class UiState {
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */
   quickAddOpen = $state(false);
+  /** Global search palette (Ctrl+K). */
+  searchOpen = $state(false);
   /** Task id currently open in the full-page editor. */
   detailTaskId = $state<string | undefined>(undefined);
   /** Completed task for the "create performance input?" prompt. */
