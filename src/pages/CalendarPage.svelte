@@ -14,12 +14,10 @@
 
   let anchor = $state<IsoDate>(app.today);
   let filterEmployee = $state("");
-  // Leave and travel default on: "who is out?" is the calendar's main
-  // supervisory question, not just task due dates.
   let showTasks = $state(true);
-  let showLeave = $state(true);
+  let showLeave = $state(false);
   let showTelework = $state(false);
-  let showTravel = $state(true);
+  let showTravel = $state(false);
   let showAwards = $state(false);
   let hideComplete = $state(false);
 
