@@ -24,6 +24,14 @@
 
 ### Changed
 
+- The task editor (open task and new task) now opens as a full page in the main content area instead of a dialog: clicking a card or New task swaps the page to the editor, and closing it (✕, Escape, Save, or Cancel) returns to the page you were on. Sidebar navigation while editing saves your changes and goes to the chosen page.
+
+- Meeting notes open the same way: creating or editing a note from the Meetings page or an employee's profile swaps the page for the note editor, and closing or navigating away returns to where you were. Dismissing with in-progress changes still saves them (Cancel remains the explicit discard), including when you navigate away mid-edit.
+
+- Performance inputs now open as a full page in the main content area, matching the task and meeting-note editors for both new and existing inputs.
+
+- Other data-entry forms use centered modal dialogs instead of right-edge slide-over panes. This covers quick add, employee add/edit and profile details, check-ins, and the awards, leave, travel, telework, training, and project forms. Focus trapping, Escape handling, focus restoration, and unsaved-change prompts are preserved.
+
 - Reorganized the sidebar navigation: the Work section (Board, Calendar, Today, Projects, Meetings) now sits above the People section, and Board, Calendar, and Today — previously ungrouped at the top — are part of Work.
 
 - The Wails desktop app now starts maximized by default while retaining the Windows taskbar and RADAR window controls. The maximize/restore button can return it to the configured 1280×860 window.

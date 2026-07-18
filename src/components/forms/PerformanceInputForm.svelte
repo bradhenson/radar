@@ -3,7 +3,7 @@
   // Creates a new input (optionally prefilled) or edits an existing one; either
   // way, task details can be imported into the empty fields (plan 17.5).
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
-  import Dialog from "../common/Dialog.svelte";
+  import FormPage from "../common/FormPage.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
@@ -24,7 +24,7 @@
     onclose
   }: { input?: PerformanceInput; prefill?: Partial<PerformanceInput>; onclose: () => void } = $props();
 
-  // This dialog is mounted for one record at a time. Put the initial-prop
+  // This page is mounted for one record at a time. Put the initial-prop
   // lookup behind a function so Svelte understands that we intentionally take
   // a one-time draft rather than accidentally retaining a stale prop.
   function initialBase(): Partial<PerformanceInput> {
@@ -48,6 +48,8 @@
   let importNote = $state("");
   let error = $state("");
   let confirmDelete = $state(false);
+  let saving = $state(false);
+  let closedExplicitly = false;
 
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   function formSnapshot(): string {
@@ -125,7 +127,13 @@
       : `Imported from “${task.title}”.`;
   }
 
+  function close() {
+    closedExplicitly = true;
+    onclose();
+  }
+
   async function save() {
+    if (saving) return;
     if (!employeeId) {
       error = "Employee is required.";
       return;
@@ -162,37 +170,53 @@
           createdAt: now,
           isArchived: false
         };
-    await app.putRecord("performanceInputs", record, {
-      actionType: input ? "updated" : "created",
-      summary: `${input ? "Updated" : "Recorded"} performance input for ${app.employeeName(employeeId)}`
-    });
-    // Mark the source task so we do not prompt again (plan 17.5).
-    if (relatedTaskId) {
-      const task = app.tasks.find((t) => t.id === relatedTaskId);
-      if (task && !task.performanceInputCreated) {
-        await app.putRecord("tasks", { ...task, performanceInputCreated: true });
+    saving = true;
+    try {
+      await app.putRecord("performanceInputs", record, {
+        actionType: input ? "updated" : "created",
+        summary: `${input ? "Updated" : "Recorded"} performance input for ${app.employeeName(employeeId)}`
+      });
+      // Mark the source task so we do not prompt again (plan 17.5).
+      if (relatedTaskId) {
+        const task = app.tasks.find((t) => t.id === relatedTaskId);
+        if (task && !task.performanceInputCreated) {
+          await app.putRecord("tasks", { ...task, performanceInputCreated: true });
+        }
+        // The task's work is captured; offer to move it off the board.
+        if (!input && task && shouldOfferTaskArchive(task)) {
+          ui.archivePromptTaskId = task.id;
+        }
       }
-      // The task's work is captured; offer to move it off the board.
-      if (!input && task && shouldOfferTaskArchive(task)) {
-        ui.archivePromptTaskId = task.id;
-      }
+      app.toast("Performance input saved", "success");
+      close();
+    } catch (e) {
+      error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      saving = false;
     }
-    app.toast("Performance input saved", "success");
-    onclose();
   }
 
   async function deleteInput() {
-    if (!input) return;
+    if (!input || saving) return;
     await app.deletePerformanceInput(input);
     confirmDelete = false;
-    onclose();
+    close();
   }
+
+  // Sidebar navigation unmounts full-page editors. Preserve a valid dirty
+  // draft on that path, while explicit Cancel/discard continues to discard.
+  $effect(() => {
+    return () => {
+      if (closedExplicitly || saving || formSnapshot() === openedSnapshot) return;
+      if (!employeeId || !actionOrAccomplishment.trim() || !isValidIsoDate(inputDate)) return;
+      void save();
+    };
+  });
 </script>
 
-<Dialog
+<FormPage
   title={input ? "Edit Performance Input" : "Performance Input"}
-  wide
-  {onclose}
+  onclose={close}
   unsavedGuard={() => formSnapshot() !== openedSnapshot}
 >
   <form
@@ -275,11 +299,11 @@
       {#if input}
         <button type="button" class="icon-btn danger delete-action" aria-label="Delete performance input" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
       {/if}
-      <button type="button" onclick={onclose}>Cancel</button>
-      <button type="submit" class="primary">Save</button>
+      <button type="button" onclick={close}>Cancel</button>
+      <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
     </div>
   </form>
-</Dialog>
+</FormPage>
 
 {#if confirmDelete && input}
   <ConfirmDialog

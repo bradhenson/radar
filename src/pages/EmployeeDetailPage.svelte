@@ -246,6 +246,10 @@
     <EmptyState message="Employee not found." />
     <button type="button" onclick={() => router.go("employees")}>Back to directory</button>
   </div>
+{:else if meetingNoteOpen}
+  <MeetingNoteForm prefill={{ attendeeEmployeeIds: [employeeId], meetingType: "Product team" }} onclose={() => (meetingNoteOpen = false)} />
+{:else if editingMeetingNote}
+  <MeetingNoteForm note={editingMeetingNote} onclose={() => (editingMeetingNote = undefined)} />
 {:else}
   <div class="page">
     <div class="page-header">
@@ -603,12 +607,6 @@
         <button type="button" class="primary" onclick={() => void saveCheckIn()}>Save</button>
       </div>
     </Dialog>
-  {/if}
-  {#if meetingNoteOpen}
-    <MeetingNoteForm prefill={{ attendeeEmployeeIds: [employeeId], meetingType: "Product team" }} onclose={() => (meetingNoteOpen = false)} />
-  {/if}
-  {#if editingMeetingNote}
-    <MeetingNoteForm note={editingMeetingNote} onclose={() => (editingMeetingNote = undefined)} />
   {/if}
   {#if confirmDeleteOpen}
     <ConfirmDialog

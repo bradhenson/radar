@@ -1,5 +1,5 @@
-// Cross-page UI state: global dialogs opened from anywhere (task create,
-// task detail, performance-input creation prompt).
+// Cross-page UI state for full-page editors and global dialogs opened from
+// anywhere in the application.
 
 import type { PerformanceInput, Task } from "../domain/models";
 
@@ -8,13 +8,13 @@ class UiState {
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */
   quickAddOpen = $state(false);
-  /** Task id currently open in the detail dialog. */
+  /** Task id currently open in the full-page editor. */
   detailTaskId = $state<string | undefined>(undefined);
   /** Completed task for the "create performance input?" prompt. */
   performancePromptTask = $state<Task | undefined>(undefined);
-  /** Prefill for the performance input form; undefined = closed. */
+  /** Prefill for the full-page performance input form; undefined = closed. */
   performanceFormPrefill = $state<Partial<PerformanceInput> | undefined>(undefined);
-  /** Existing performance input open for editing; undefined = closed. */
+  /** Existing performance input open in the full-page editor; undefined = closed. */
   performanceFormInput = $state<PerformanceInput | undefined>(undefined);
   /**
    * Task id for the "archive this task?" prompt shown after a performance

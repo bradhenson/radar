@@ -1,6 +1,6 @@
 <script lang="ts">
   import ConfirmDialog from "../common/ConfirmDialog.svelte";
-  import Dialog from "../common/Dialog.svelte";
+  import FormPage from "../common/FormPage.svelte";
   import Icon from "../common/Icon.svelte";
   import RichTextEditor from "../common/RichTextEditor.svelte";
   import { app } from "../../stores/app.svelte";
@@ -113,7 +113,7 @@
         summary: `${isEditing ? "Updated" : "Recorded"} meeting note "${record.title}"`
       });
       app.toast(isEditing ? "Meeting note updated" : "Meeting note saved", "success");
-      onclose();
+      close();
     } catch (e) {
       error = `Save failed: ${e instanceof Error ? e.message : String(e)}`;
     } finally {
@@ -121,18 +121,40 @@
     }
   }
 
-  // Dismissing the dialog (backdrop click, Escape, or the ✕) saves in-progress
-  // work instead of throwing it away. Cancel stays the explicit discard path.
+  let closedExplicitly = false;
+
+  function close() {
+    closedExplicitly = true;
+    onclose();
+  }
+
+  // Dismissing the form (Escape or the ✕) saves in-progress work instead of
+  // throwing it away. Cancel stays the explicit discard path.
   async function requestClose() {
     if (saving) return;
     if (!isDirty) {
-      onclose();
+      close();
       return;
     }
     // save() closes on success. If a required field is missing it surfaces the
-    // error and keeps the dialog open, so the notes aren't silently lost.
+    // error and keeps the form open, so the notes aren't silently lost.
     await save();
   }
+
+  // The form renders as a full page, so navigation can unmount it without an
+  // explicit close. Persist in-progress work on the way out; a blank title on
+  // an existing note falls back to the original so validation can't discard
+  // the other fields. A new note with no title has nothing to fall back to.
+  $effect(() => {
+    return () => {
+      if (closedExplicitly || saving || !isDirty) return;
+      if (!title.trim()) {
+        if (!isEditing) return;
+        title = initial.title;
+      }
+      void save();
+    };
+  });
 
   async function deleteNote() {
     if (!note || saving) return;
@@ -141,7 +163,7 @@
       await app.deleteRecord("meetingNotes", note.id, `Deleted meeting note "${note.title}"`);
       app.toast("Meeting note deleted", "success");
       confirmDelete = false;
-      onclose();
+      close();
     } catch (e) {
       error = `Delete failed: ${e instanceof Error ? e.message : String(e)}`;
     } finally {
@@ -150,7 +172,7 @@
   }
 </script>
 
-<Dialog title={isEditing ? "Meeting Note" : "New Meeting Note"} wide onclose={requestClose}>
+<FormPage title={isEditing ? "Meeting Note" : "New Meeting Note"} onclose={() => void requestClose()}>
   <form
     onsubmit={(e) => {
       e.preventDefault();
@@ -223,11 +245,11 @@
       {#if isEditing}
         <button type="button" class="icon-btn danger delete-action" disabled={saving} aria-label="Delete meeting note" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
       {/if}
-      <button type="button" onclick={onclose} title="Close without saving changes">Cancel</button>
+      <button type="button" onclick={() => close()} title="Close without saving changes">Cancel</button>
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
     </div>
   </form>
-</Dialog>
+</FormPage>
 
 {#if confirmDelete && note}
   <ConfirmDialog
