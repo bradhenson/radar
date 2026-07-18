@@ -7,7 +7,7 @@
   import EmployeeForm from "../components/forms/EmployeeForm.svelte";
   import EmployeeProfileForm from "../components/forms/EmployeeProfileForm.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
-  import Pane from "../components/common/Pane.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
@@ -592,7 +592,7 @@
     <EmployeeProfileForm {employee} onclose={() => (profileOpen = false)} />
   {/if}
   {#if checkInOpen}
-    <Pane title="Record check-in" onclose={() => (checkInOpen = false)}>
+    <Dialog title="Record check-in" onclose={() => (checkInOpen = false)}>
       <label for="ci-type">Interaction type</label>
       <select id="ci-type" bind:value={checkInType} style="width:100%">
         {#each INTERACTION_TYPES as t (t)}<option value={t}>{t}</option>{/each}
@@ -606,7 +606,7 @@
         <button type="button" onclick={() => (checkInOpen = false)}>Cancel</button>
         <button type="button" class="primary" onclick={() => void saveCheckIn()}>Save</button>
       </div>
-    </Pane>
+    </Dialog>
   {/if}
   {#if confirmDeleteOpen}
     <ConfirmDialog

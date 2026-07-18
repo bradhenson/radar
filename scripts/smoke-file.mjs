@@ -63,11 +63,42 @@ try {
   await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
   await page.getByText(title, { exact: true }).waitFor();
 
+  // Performance inputs use the same full-page editing surface as tasks and
+  // meeting notes. Exercise create, persistence, and edit on that real page.
+  await page.getByRole("link", { name: "Performance", exact: true }).first().click();
+  await page.getByRole("heading", { name: "Performance", exact: true }).waitFor();
+  await page.getByRole("button", { name: "New Performance Input" }).click();
+  await page.locator('.form-page[aria-label="Performance Input"]').waitFor();
+  if (await page.getByRole("dialog", { name: "Performance Input" }).count()) {
+    throw new Error("Performance input opened as a modal instead of a full page.");
+  }
+
+  const performanceAction = `Improved offline workflow ${Date.now()}`;
+  await page.locator("#pi-emp").selectOption({ index: 1 });
+  await page.locator("#pi-action").fill(performanceAction);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await page.getByRole("heading", { name: "Performance", exact: true }).waitFor();
+  await page.getByRole("searchbox", { name: "Search performance" }).fill(performanceAction);
+  await page.getByText(performanceAction, { exact: true }).first().waitFor();
+  await page.getByRole("button", { name: "Edit input" }).click();
+  await page.locator('.form-page[aria-label="Edit Performance Input"]').waitFor();
+  await page.getByRole("button", { name: "Close" }).click();
+
+  // Compact data-entry forms have returned to the centered modal component;
+  // Quick Add is a representative global entry point.
+  await page.getByRole("link", { name: "Today", exact: true }).first().click();
+  await page.getByRole("button", { name: "Quick Add", exact: true }).click();
+  await page.getByRole("dialog", { name: "Quick add task" }).waitFor();
+  if (await page.locator(".pane").count()) {
+    throw new Error("A right-edge slide-over pane is still present.");
+  }
+  await page.getByRole("dialog", { name: "Quick add task" }).getByRole("button", { name: "Close" }).click();
+
   const nonFileRequests = requests.filter((url) => !url.startsWith("file:"));
   if (errors.length) throw new Error(`Console/page errors: ${errors.join(" | ")}`);
   if (nonFileRequests.length) throw new Error(`Unexpected non-file requests: ${nonFileRequests.join(", ")}`);
 
-  console.log(`smoke-file: OK (${navCount} nav links, task creation persisted across reload, no network requests).`);
+  console.log(`smoke-file: OK (${navCount} nav links, task and performance input flows passed, centered modal passed, no network requests).`);
 } finally {
   await context?.close();
   rmSync(profileDir, { recursive: true, force: true });

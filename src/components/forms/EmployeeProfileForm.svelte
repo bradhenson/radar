@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Pane from "../common/Pane.svelte";
+  import Dialog from "../common/Dialog.svelte";
   import { app } from "../../stores/app.svelte";
   import { router } from "../../app/router.svelte";
   import type { Employee, EmployeeProfileValue } from "../../domain/models";
@@ -50,7 +50,7 @@
   }
 </script>
 
-<Pane title="Edit Profile Details" wide {onclose}>
+<Dialog title="Edit Profile Details" wide {onclose}>
   <form onsubmit={(event) => { event.preventDefault(); void save(); }}>
     {#each sections as section (section.id)}
       {@const sectionFields = fieldsFor(section.id)}
@@ -101,7 +101,7 @@
       <button type="submit" class="primary">Save</button>
     </div>
   </form>
-</Pane>
+</Dialog>
 
 <style>
   .form-section { margin-top: 1.5rem; }

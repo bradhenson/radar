@@ -3,7 +3,7 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
-  import Pane from "../components/common/Pane.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -279,7 +279,7 @@
 </style>
 
 {#if formOpen}
-  <Pane
+  <Dialog
     title={editing ? "Edit Project" : "Add Project"}
     onclose={() => (formOpen = false)}
     unsavedGuard={() => formSnapshot() !== openedSnapshot}
@@ -331,7 +331,7 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Pane>
+  </Dialog>
 {/if}
 
 {#if pendingDelete}

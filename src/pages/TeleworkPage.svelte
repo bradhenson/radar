@@ -3,7 +3,7 @@
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
-  import Pane from "../components/common/Pane.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import { TELEWORK_RECORD_TYPES, type TeleworkRecord, type TeleworkStatus } from "../domain/models";
@@ -558,7 +558,7 @@
 </div>
 
 {#if formOpen}
-  <Pane
+  <Dialog
     title={editing ? "Edit Situational Telework" : "Add Situational Telework"}
     onclose={() => (formOpen = false)}
     unsavedGuard={() => formSnapshot() !== openedSnapshot}
@@ -606,11 +606,11 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Pane>
+  </Dialog>
 {/if}
 
 {#if agreementFormOpen}
-  <Pane
+  <Dialog
     title={editingAgreement ? "Edit Telework Agreement" : "Add Telework Agreement"}
     onclose={() => (agreementFormOpen = false)}
     unsavedGuard={() => agreementSnapshot() !== openedAgreementSnapshot}
@@ -668,7 +668,7 @@
         <button type="submit" class="primary">Save</button>
       </div>
     </form>
-  </Pane>
+  </Dialog>
 {/if}
 
 {#if pendingDelete}

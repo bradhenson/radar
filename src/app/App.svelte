@@ -144,10 +144,9 @@
 
   let detailTask = $derived(ui.detailTaskId ? app.tasks.find((t) => t.id === ui.detailTaskId) : undefined);
 
-  // The task editor renders in place of the routed page, so navigating while
-  // it is open must dismiss it — otherwise the destination page would stay
-  // hidden behind the form. TaskDetail autosaves on unmount, so no edits are
-  // lost by the dismissal.
+  // Full-page editors render in place of the routed page, so navigating while
+  // one is open must dismiss it — otherwise the destination page would stay
+  // hidden behind the form.
   let lastRoute = router.current.page + "/" + (router.current.param ?? "");
   $effect(() => {
     const route = router.current.page + "/" + (router.current.param ?? "");
@@ -155,6 +154,7 @@
     lastRoute = route;
     if (ui.detailTaskId) ui.detailTaskId = undefined;
     if (ui.newTaskOpen) ui.closeNewTask();
+    if (ui.performanceFormPrefill || ui.performanceFormInput) ui.closePerformanceForm();
   });
 
   // Current record for the post-input "archive this task?" prompt; resolved by
@@ -179,7 +179,7 @@
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.newTaskOpen || ui.quickAddOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performancePromptTask || ui.archivePromptTaskId)
+    if (ui.newTaskOpen || ui.quickAddOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performanceFormInput || ui.performancePromptTask || ui.archivePromptTaskId)
       return;
     switch (e.key.toLowerCase()) {
       case "n":
@@ -419,6 +419,12 @@
           {#key detailTask.id}
             <TaskDetail task={detailTask} />
           {/key}
+        {:else if ui.performanceFormPrefill || ui.performanceFormInput}
+          <PerformanceInputForm
+            input={ui.performanceFormInput}
+            prefill={ui.performanceFormPrefill ?? {}}
+            onclose={() => ui.closePerformanceForm()}
+          />
         {:else if router.current.page === "today"}
           <TodayPage />
         {:else if router.current.page === "board"}
@@ -483,13 +489,6 @@
         >
       </div>
     </Dialog>
-  {/if}
-  {#if ui.performanceFormPrefill || ui.performanceFormInput}
-    <PerformanceInputForm
-      input={ui.performanceFormInput}
-      prefill={ui.performanceFormPrefill ?? {}}
-      onclose={() => ui.closePerformanceForm()}
-    />
   {/if}
   {#if archivePromptTask}
     <ConfirmDialog
