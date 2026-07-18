@@ -2,7 +2,9 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
+  import type { PerformanceInput } from "../domain/models";
   import { daysBetween, formatDate } from "../utils/dates";
   import { downloadText, backupFilename } from "../utils/download";
   import { richTextToPlainText } from "../utils/richText";
@@ -10,13 +12,15 @@
   type ViewMode = "inputs" | "employees" | "coverage";
   type SortMode = "newest" | "oldest" | "employee";
 
+  const INPUT_STATUSES = ["draft", "ready", "used_midyear", "used_annual", "archived"];
+
   let viewMode = $state<ViewMode>("inputs");
   let search = $state("");
   let filterEmployee = $state("");
   let filterStatus = $state("");
   let filterMissing = $state("");
   let sortMode = $state<SortMode>("newest");
-  let selectedId = $state("");
+  let expanded = $state<Record<string, boolean>>({});
 
   function includes(value: string | undefined, needle: string): boolean {
     return Boolean(value?.toLowerCase().includes(needle));
@@ -26,8 +30,8 @@
     return value.replaceAll("_", " ");
   }
 
-  // List rows are single-line summaries, so flatten any rich-text formatting
-  // to plain text rather than showing raw markers. The detail panel renders
+  // Table rows are short summaries, so flatten any rich-text formatting to
+  // plain text rather than showing raw markers. The expanded detail renders
   // the full formatting via RichTextView.
   function summaryText(value: string | undefined): string {
     return richTextToPlainText(value).replace(/\s*\n\s*/g, " ");
@@ -72,8 +76,6 @@
       .sort((a, b) => a.name.localeCompare(b.name));
   });
 
-  let selectedInput = $derived(inputs.find((input) => input.id === selectedId) ?? inputs[0]);
-
   // Coverage is informational and never an employee ranking.
   let coverage = $derived.by(() => {
     const needle = search.trim().toLowerCase();
@@ -93,6 +95,16 @@
       })
       .sort((a, b) => a.employee.displayName.localeCompare(b.employee.displayName));
   });
+
+  function toggleRow(id: string) {
+    expanded[id] = !expanded[id];
+  }
+
+  function toggleFromRow(id: string) {
+    // Don't hijack a click the user made to select and copy text.
+    if (window.getSelection()?.toString()) return;
+    toggleRow(id);
+  }
 
   async function exportText() {
     const lines: string[] = ["RADAR - PERFORMANCE INPUT EXPORT", `Generated: ${formatDate(app.today)}`, ""];
@@ -125,6 +137,72 @@
   }
 </script>
 
+{#snippet inputRow(input: PerformanceInput, showEmployee: boolean)}
+  {@const open = Boolean(expanded[input.id])}
+  <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <tr class="row-clickable" class:row-open={open} onclick={() => toggleFromRow(input.id)}>
+    <td class="date-cell">
+      <button
+        type="button"
+        class="disclosure"
+        class:open
+        aria-expanded={open}
+        aria-label={open ? `Hide performance input details` : `Show performance input details`}
+        onclick={(ev) => {
+          ev.stopPropagation();
+          toggleRow(input.id);
+        }}><Icon name="chevron" size={13} /></button>
+      {formatDate(input.inputDate)}
+    </td>
+    {#if showEmployee}
+      <td class="employee-cell">{app.employeeName(input.employeeId)}</td>
+    {/if}
+    <td class="summary-cell"><span class="clamp2">{summaryText(input.actionOrAccomplishment)}</span></td>
+    <td>{#if input.projectId}{app.projectName(input.projectId)}{:else}<span class="muted">—</span>{/if}</td>
+    <td>{#if input.result}<span class="muted">Yes</span>{:else}<span class="badge warning">Missing</span>{/if}</td>
+    <td><span class="badge">{statusText(input.inputStatus)}</span></td>
+  </tr>
+  {#if open}
+    <tr class="detail-row">
+      <td colspan={showEmployee ? 6 : 5}>
+        <div class="detail" aria-label={`Performance input for ${app.employeeName(input.employeeId)}`}>
+          {#if input.recognitionPotential}
+            <div><span class="badge success">Recognition potential</span></div>
+          {/if}
+          <div class="input-sections">
+            <section>
+              <h3>Context</h3>
+              <RichTextView value={input.situationOrContext} emptyText="No context recorded." />
+            </section>
+            <section>
+              <h3>Action / Accomplishment</h3>
+              <RichTextView value={input.actionOrAccomplishment} />
+            </section>
+            <section class:missing={!input.result}>
+              <h3>Result / Impact</h3>
+              <RichTextView value={input.result} emptyText="Result / impact not recorded." />
+            </section>
+          </div>
+          <div class="detail-footer">
+            <label class="status-control">
+              Status
+              <select value={input.inputStatus} onchange={(event) => void setStatus(input.id, (event.currentTarget as HTMLSelectElement).value)}>
+                {#each INPUT_STATUSES as status (status)}
+                  <option value={status}>{statusText(status)}</option>
+                {/each}
+              </select>
+            </label>
+            <span class="spacer"></span>
+            <button type="button" onclick={() => (ui.performanceFormInput = input)}>Edit input</button>
+          </div>
+        </div>
+      </td>
+    </tr>
+  {/if}
+{/snippet}
+
 <div class="page">
   <div class="page-header">
     <h1>Performance</h1>
@@ -151,7 +229,7 @@
     {#if viewMode !== "coverage"}
       <select bind:value={filterStatus} aria-label="Filter by status">
         <option value="">All statuses</option>
-        {#each ["draft", "ready", "used_midyear", "used_annual", "archived"] as status (status)}
+        {#each INPUT_STATUSES as status (status)}
           <option value={status}>{statusText(status)}</option>
         {/each}
       </select>
@@ -171,7 +249,7 @@
     {#if coverage.length === 0}
       <EmptyState message="No employees match." hint="Clear the employee filter or search to review coverage." />
     {:else}
-      <div class="coverage-wrap">
+      <div class="table-wrap">
         <table class="data coverage-table">
           <thead><tr><th>Employee</th><th>Inputs</th><th>Most recent</th><th>Missing result / impact</th><th></th></tr></thead>
           <tbody>
@@ -204,69 +282,33 @@
   {:else if inputs.length === 0}
     <EmptyState message="No performance inputs match." hint="Capture accomplishments with New Performance Input, or adjust the filters." />
   {:else}
-    <div class="performance-workspace">
-      <section class="card input-list-panel" aria-label="Performance input list">
-        <div class="panel-heading">
-          <h2>{viewMode === "employees" ? "Inputs by employee" : "Inputs"}</h2>
-          <span class="small muted">{inputs.length} total</span>
-        </div>
-        <div class="input-list">
+    <div class="table-wrap">
+      <table class="data input-table">
+        <thead>
+          <tr>
+            <th>Date</th>
+            {#if viewMode === "inputs"}<th>Employee</th>{/if}
+            <th>Action / Accomplishment</th>
+            <th>Project</th>
+            <th>Result</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
           {#if viewMode === "employees"}
             {#each byEmployee as group (group.employeeId)}
-              <div class="employee-group-label">{group.name} <span>({group.list.length})</span></div>
+              <tr class="group-row"><td colspan="5">{group.name} <span>({group.list.length})</span></td></tr>
               {#each group.list as input (input.id)}
-                <button type="button" class="input-list-item" class:active={selectedInput?.id === input.id} aria-pressed={selectedInput?.id === input.id} onclick={() => (selectedId = input.id)}>
-                  <span class="input-row-meta"><span>{formatDate(input.inputDate)}</span><span class="badge">{statusText(input.inputStatus)}</span></span>
-                  <strong>{summaryText(input.actionOrAccomplishment)}</strong>
-                  <span class="input-context">{app.projectName(input.projectId) || (input.result ? "Result recorded" : "Result / impact missing")}</span>
-                </button>
+                {@render inputRow(input, false)}
               {/each}
             {/each}
           {:else}
             {#each inputs as input (input.id)}
-              <button type="button" class="input-list-item" class:active={selectedInput?.id === input.id} aria-pressed={selectedInput?.id === input.id} onclick={() => (selectedId = input.id)}>
-                <span class="input-row-meta"><span>{formatDate(input.inputDate)}</span><span>{app.employeeName(input.employeeId)}</span><span class="badge">{statusText(input.inputStatus)}</span></span>
-                <strong>{summaryText(input.actionOrAccomplishment)}</strong>
-                <span class="input-context">{app.projectName(input.projectId) || (input.result ? "Result recorded" : "Result / impact missing")}</span>
-              </button>
+              {@render inputRow(input, true)}
             {/each}
           {/if}
-        </div>
-      </section>
-
-      {#if selectedInput}
-        <article class="card input-detail" aria-label={`Performance input for ${app.employeeName(selectedInput.employeeId)}`}>
-          <div class="detail-actions"><button type="button" onclick={() => (ui.performanceFormInput = selectedInput)}>Edit input</button></div>
-          <div class="detail-kicker">
-            <span>{formatDate(selectedInput.inputDate)}</span>
-            {#if selectedInput.projectId}<span>· {app.projectName(selectedInput.projectId)}</span>{/if}
-            {#if selectedInput.recognitionPotential}<span class="badge success">Recognition potential</span>{/if}
-          </div>
-          <h2 class="detail-title">{app.employeeName(selectedInput.employeeId)}</h2>
-          <label class="status-control">
-            Status
-            <select value={selectedInput.inputStatus} onchange={(event) => void setStatus(selectedInput.id, (event.currentTarget as HTMLSelectElement).value)}>
-              {#each ["draft", "ready", "used_midyear", "used_annual", "archived"] as status (status)}
-                <option value={status}>{statusText(status)}</option>
-              {/each}
-            </select>
-          </label>
-          <div class="input-sections">
-            <section>
-              <h3>Context</h3>
-              <RichTextView value={selectedInput.situationOrContext} emptyText="No context recorded." />
-            </section>
-            <section>
-              <h3>Action / Accomplishment</h3>
-              <RichTextView value={selectedInput.actionOrAccomplishment} />
-            </section>
-            <section class:missing={!selectedInput.result}>
-              <h3>Result / Impact</h3>
-              <RichTextView value={selectedInput.result} emptyText="Result / impact not recorded." />
-            </section>
-          </div>
-        </article>
-      {/if}
+        </tbody>
+      </table>
     </div>
   {/if}
 </div>
@@ -277,37 +319,67 @@
   .view-tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
   .filter-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: var(--bg); }
   .filter-toolbar input[type="search"] { min-width: 15rem; flex: 1; }
-  .performance-workspace { display: grid; grid-template-columns: minmax(21rem, 29rem) minmax(0, 1fr); gap: 1rem; align-items: start; }
-  .input-list-panel { padding: 0; overflow: hidden; }
-  .panel-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .85rem 1rem; border-bottom: 1px solid var(--border); }
-  .panel-heading h2 { margin: 0; }
-  .input-list { display: grid; max-height: calc(100vh - 15rem); min-height: 28rem; overflow: auto; }
-  .employee-group-label { position: sticky; top: 0; z-index: 1; padding: .45rem 1rem; border-bottom: 1px solid var(--border); background: var(--surface-2); color: var(--text-muted); font-size: .75rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-  .employee-group-label span { font-weight: 500; }
-  .input-list-item { display: grid; gap: .25rem; width: 100%; min-height: 0; padding: .7rem 1rem; text-align: left; border: 0; border-bottom: 1px solid var(--border); border-radius: 0; background: transparent; }
-  .input-list-item:hover { background: color-mix(in srgb, var(--accent-soft) 38%, transparent); }
-  .input-list-item.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-  .input-list-item strong { display: -webkit-box; overflow: hidden; -webkit-box-orient: vertical; -webkit-line-clamp: 2; line-clamp: 2; line-height: 1.35; }
-  .input-row-meta { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); font-size: .75rem; }
-  .input-row-meta .badge { margin-left: auto; }
-  .input-context { overflow: hidden; color: var(--text-muted); font-size: .77rem; text-overflow: ellipsis; white-space: nowrap; }
-  .input-detail { position: sticky; top: 4rem; display: grid; gap: .8rem; min-height: 30rem; }
-  .detail-actions { display: flex; justify-content: flex-end; }
-  .detail-actions button { font-size: .78rem; }
-  .detail-kicker { display: flex; align-items: center; flex-wrap: wrap; gap: .45rem; color: var(--text-muted); font-size: .82rem; }
-  .detail-title { margin: -.15rem 0 0; font-size: 1.35rem; }
-  .status-control { display: flex; align-items: center; gap: .6rem; margin: 0; padding-bottom: .8rem; border-bottom: 1px solid var(--border); color: var(--text-muted); }
-  .status-control select { min-width: 10rem; }
-  .input-sections { display: grid; gap: .8rem; }
-  .input-sections section { padding: .9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-2); white-space: pre-wrap; }
+  .table-wrap { overflow-x: auto; }
+  .row-clickable { cursor: pointer; }
+  .date-cell { white-space: nowrap; }
+  .employee-cell { white-space: nowrap; }
+  .summary-cell { min-width: 16rem; }
+  .summary-cell .clamp2 {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    line-height: 1.35;
+  }
+  .disclosure {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    margin-right: .3rem;
+    padding: .1rem;
+    min-height: 0;
+    border: none;
+    background: none;
+    box-shadow: none;
+    color: var(--text-muted);
+    vertical-align: -.1rem;
+    transition: transform .16s var(--ease-out), color .14s ease;
+  }
+  .disclosure:hover { background: none; color: var(--accent); }
+  .disclosure.open { transform: rotate(90deg); color: var(--accent); }
+  .group-row td {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding-top: .45rem;
+    padding-bottom: .45rem;
+  }
+  .group-row td span { font-weight: 500; }
+  .input-table tbody .group-row:hover td:first-child { box-shadow: none; }
+  /* Keep the accent tick pinned while a row is open and merge it visually with
+     its detail row by hiding the border between them. */
+  .input-table tbody tr.row-open td { border-bottom-color: transparent; }
+  .input-table tbody tr.row-open td:first-child { box-shadow: inset 3px 0 0 var(--accent); }
+  .input-table tbody .detail-row > td { padding: .95rem 1.1rem 1.05rem; background: var(--surface-2); }
+  .input-table tbody .detail-row { cursor: default; }
+  .input-table tbody .detail-row:hover td:first-child { box-shadow: none; }
+  .detail { display: grid; gap: .8rem; }
+  .input-sections {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: .8rem;
+  }
+  .input-sections section { padding: .9rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); white-space: pre-wrap; }
   .input-sections section.missing { border-left: 3px solid var(--warning); }
   .input-sections h3 { margin: 0 0 .25rem; color: var(--text-muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .05em; }
-  .coverage-wrap { overflow-x: auto; }
+  .detail-footer { display: flex; align-items: center; gap: .6rem; }
+  .detail-footer button { font-size: .78rem; }
+  .status-control { display: flex; align-items: center; gap: .6rem; margin: 0; color: var(--text-muted); }
+  .status-control select { min-width: 10rem; }
   .coverage-table td:last-child { text-align: right; }
   .coverage-table td:last-child button { white-space: nowrap; }
-  @media (max-width: 950px) {
-    .performance-workspace { grid-template-columns: 1fr; }
-    .input-list { max-height: 22rem; min-height: 0; }
-    .input-detail { position: static; min-height: 0; }
-  }
 </style>

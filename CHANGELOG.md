@@ -24,6 +24,8 @@
 
 ### Changed
 
+- The Meetings and Performance pages replace their two-column list-and-preview layout with full-width tables whose rows expand in place. Clicking a row (or its chevron, which is keyboard-focusable) opens an inline detail area directly beneath it showing the full formatted content — Discussion and Action Items for meetings; Context, Action, and Result / Impact for performance inputs — along with the record's actions (edit, archive/delete, follow-up task, status change). Multiple rows can be open at once, and the Performance "By Employee" view keeps its grouped headings. The Coverage table is unchanged.
+
 - The task editor (open task and new task) now opens as a full page in the main content area instead of a dialog: clicking a card or New task swaps the page to the editor, and closing it (✕, Escape, Save, or Cancel) returns to the page you were on. Sidebar navigation while editing saves your changes and goes to the chosen page.
 
 - Meeting notes open the same way: creating or editing a note from the Meetings page or an employee's profile swaps the page for the note editor, and closing or navigating away returns to where you were. Dismissing with in-progress changes still saves them (Cancel remains the explicit discard), including when you navigate away mid-edit.
