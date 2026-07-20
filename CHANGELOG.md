@@ -4,6 +4,8 @@
 
 ### Added
 
+- Board summary pills are now quick filters. Click Due soon, Overdue, Waiting, or High priority to show only matching cards while retaining the current search and dropdown scope; click the active pill again, the Tasks pill, or Clear filters to return to the full board. Selected pills have a visible checkmark and accessible pressed state.
+
 - Global search (Ctrl+K, or the magnifier in the top bar): one palette that searches tasks, employees, projects, meeting notes, and performance inputs — including inside rich-text bodies — and doubles as page navigation. Results are ranked (title matches above body matches, capped per type), fully keyboard-driven (arrows, Enter, Escape), and open the actual record: tasks open the editor, employees open their profile, and meetings, performance inputs, and projects expand in place on their page. Archived records are excluded; the Archive page remains the place to search those.
 
 - Activity page (System section): the full audit trail is now inspectable — filter by record type, action, or summary text, page through history, and jump back to records that still exist. Alongside it, an activity retention policy: entries older than a configurable window (default 365 days; 0 keeps everything) are pruned automatically at startup so years of daily use never slow the app down. The prune itself is recorded as a maintenance entry, and the setting lives under Attention rule thresholds in Settings.

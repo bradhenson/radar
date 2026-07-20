@@ -7,6 +7,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import { TASK_PRIORITIES, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
+  import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
@@ -18,8 +19,11 @@
   let filterProject = $state("");
   let filterPriority = $state("");
   let hideComplete = $state(false);
+  let summaryFilter = $state<BoardSummaryFilter>("");
 
-  let visibleTasks = $derived(
+  // Dropdown/search filters establish the board's working set. Summary pills
+  // then narrow that set without changing their counts underneath the user.
+  let baseFilteredTasks = $derived(
     app.tasks.filter((t) => {
       if (t.isArchived) return false;
       if (t.status === "cancelled") return false;
@@ -44,6 +48,12 @@
     })
   );
 
+  let visibleTasks = $derived(
+    baseFilteredTasks.filter((task) =>
+      matchesBoardSummaryFilter(task, summaryFilter, app.today, app.settings.dueSoonDays)
+    )
+  );
+
   let columns = $derived(
     app.activeBoardColumns.map((column) => ({
       column,
@@ -52,15 +62,24 @@
   );
 
   let boardStats = $derived({
-    total: visibleTasks.length,
-    overdue: visibleTasks.filter((t) => dueState(t, app.today, app.settings.dueSoonDays) === "overdue").length,
-    dueSoon: visibleTasks.filter((t) => {
-      const state = dueState(t, app.today, app.settings.dueSoonDays);
-      return state === "due_today" || state === "due_soon";
-    }).length,
-    waiting: visibleTasks.filter((t) => t.status === "waiting").length,
-    priority: visibleTasks.filter((t) => t.priority === "high" || t.priority === "critical").length
+    total: baseFilteredTasks.length,
+    overdue: baseFilteredTasks.filter((task) =>
+      matchesBoardSummaryFilter(task, "overdue", app.today, app.settings.dueSoonDays)
+    ).length,
+    dueSoon: baseFilteredTasks.filter((task) =>
+      matchesBoardSummaryFilter(task, "due_soon", app.today, app.settings.dueSoonDays)
+    ).length,
+    waiting: baseFilteredTasks.filter((task) =>
+      matchesBoardSummaryFilter(task, "waiting", app.today, app.settings.dueSoonDays)
+    ).length,
+    priority: baseFilteredTasks.filter((task) =>
+      matchesBoardSummaryFilter(task, "priority", app.today, app.settings.dueSoonDays)
+    ).length
   });
+
+  function toggleSummaryFilter(filter: Exclude<BoardSummaryFilter, "">) {
+    summaryFilter = summaryFilter === filter ? "" : filter;
+  }
 
   // --- drag and drop --------------------------------------------------------
   let draggingId = $state<string | undefined>(undefined);
@@ -233,6 +252,7 @@
     filterProject = "";
     filterPriority = "";
     hideComplete = false;
+    summaryFilter = "";
   }
 
   function cancelTransientState() {
@@ -329,7 +349,7 @@
   }
 
   let anyFilter = $derived(
-    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || hideComplete)
+    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || hideComplete || summaryFilter)
   );
 </script>
 
@@ -341,12 +361,40 @@
       <span class="eyebrow">Tasks</span>
       <h1>Kanban Board</h1>
     </div>
-    <div class="board-stats" aria-label="Board summary">
-      <span><strong>{boardStats.total}</strong> visible</span>
-      <span class:warn={boardStats.dueSoon > 0}><strong>{boardStats.dueSoon}</strong> due soon</span>
-      <span class:alert={boardStats.overdue > 0}><strong>{boardStats.overdue}</strong> overdue</span>
-      <span><strong>{boardStats.waiting}</strong> waiting</span>
-      <span class:alert={boardStats.priority > 0}><strong>{boardStats.priority}</strong> high priority</span>
+    <div class="board-stats" aria-label="Quick board filters">
+      <button
+        type="button"
+        class:active={!summaryFilter}
+        aria-pressed={!summaryFilter}
+        onclick={() => (summaryFilter = "")}><strong>{boardStats.total}</strong> tasks</button
+      >
+      <button
+        type="button"
+        class:warn={boardStats.dueSoon > 0}
+        class:active={summaryFilter === "due_soon"}
+        aria-pressed={summaryFilter === "due_soon"}
+        onclick={() => toggleSummaryFilter("due_soon")}><strong>{boardStats.dueSoon}</strong> due soon</button
+      >
+      <button
+        type="button"
+        class:alert={boardStats.overdue > 0}
+        class:active={summaryFilter === "overdue"}
+        aria-pressed={summaryFilter === "overdue"}
+        onclick={() => toggleSummaryFilter("overdue")}><strong>{boardStats.overdue}</strong> overdue</button
+      >
+      <button
+        type="button"
+        class:active={summaryFilter === "waiting"}
+        aria-pressed={summaryFilter === "waiting"}
+        onclick={() => toggleSummaryFilter("waiting")}><strong>{boardStats.waiting}</strong> waiting</button
+      >
+      <button
+        type="button"
+        class:alert={boardStats.priority > 0}
+        class:active={summaryFilter === "priority"}
+        aria-pressed={summaryFilter === "priority"}
+        onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button
+      >
     </div>
     <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New task</button>
   </div>
@@ -621,7 +669,7 @@
     gap: .45rem;
     flex-wrap: wrap;
   }
-  .board-stats span {
+  .board-stats button {
     display: inline-flex;
     align-items: baseline;
     gap: .3rem;
@@ -633,24 +681,36 @@
     color: var(--text-muted);
     box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
     white-space: nowrap;
+    font-weight: 500;
   }
+  .board-stats button:hover { border-color: currentColor; }
+  .board-stats button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
   .board-stats strong {
     color: var(--text);
     font-size: .98rem;
   }
-  .board-stats span.warn {
+  .board-stats button.warn {
     background: var(--duesoon-bg);
     border-color: transparent;
     color: var(--duesoon-fg);
   }
-  .board-stats span.alert {
+  .board-stats button.alert {
     background: var(--overdue-bg);
     border-color: transparent;
     color: var(--overdue-fg);
   }
-  .board-stats span.warn strong,
-  .board-stats span.alert strong {
+  .board-stats button.warn strong,
+  .board-stats button.alert strong {
     color: inherit;
+  }
+  .board-stats button.active {
+    border-color: currentColor;
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+  .board-stats button.active::after {
+    content: "✓";
+    font-size: .7rem;
+    font-weight: 800;
   }
   .board-new-task {
     white-space: nowrap;
