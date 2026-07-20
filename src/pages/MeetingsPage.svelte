@@ -279,7 +279,7 @@
   .detail-label { color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
   .meeting-sections {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(19rem, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: .8rem;
     white-space: pre-wrap;
   }

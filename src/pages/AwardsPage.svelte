@@ -23,30 +23,16 @@
   let fNotes = $state("");
   let fError = $state("");
   let pendingDelete = $state<AwardRecord | undefined>(undefined);
-  let expanded = $state<Record<string, boolean>>({});
 
-  // Deep link: #/awards/{recordId} expands the award in the list. One-shot.
+  // Deep link: #/awards/{recordId} opens the exact award for editing. One-shot.
   $effect(() => {
     const id = router.current.param;
     if (router.current.page !== "awards" || !id) return;
     const record = app.awardRecords.find((a) => a.id === id);
     if (!record) return;
-    expanded[id] = true;
     router.go("awards");
-    requestAnimationFrame(() => {
-      document.getElementById(`award-row-${id}`)?.scrollIntoView({ block: "center" });
-    });
+    openForm(record);
   });
-
-  function toggleRow(id: string) {
-    expanded[id] = !expanded[id];
-  }
-
-  function toggleFromRow(id: string) {
-    // Don't hijack a click the user made to select and copy text.
-    if (window.getSelection()?.toString()) return;
-    toggleRow(id);
-  }
 
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   let openedSnapshot = $state("");
@@ -134,69 +120,24 @@
       <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th></tr></thead>
       <tbody>
         {#each rows as a (a.id)}
-          {@const open = Boolean(expanded[a.id])}
-          <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
-          <!-- svelte-ignore a11y_click_events_have_key_events -->
-          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-          <tr class="row-clickable" class:row-open={open} id={"award-row-" + a.id} onclick={() => toggleFromRow(a.id)}>
+          <!-- Row click is a mouse convenience; the title button is the keyboard path. -->
+          <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+          <tr class="row-clickable" id={"award-row-" + a.id} onclick={() => openForm(a)}>
             <td>
               <button
                 type="button"
-                class="disclosure"
-                class:open
-                aria-expanded={open}
-                aria-label={open ? `Hide details for ${a.title}` : `Show details for ${a.title}`}
+                class="link cell-link"
                 onclick={(ev) => {
                   ev.stopPropagation();
-                  toggleRow(a.id);
-                }}><Icon name="chevron" size={13} /></button>
-              <strong>{a.title}</strong>
+                  openForm(a);
+                }}>{a.title}</button
+              >
             </td>
             <td>{app.employeeName(a.employeeId)}</td>
             <td>{a.awardType ?? ""}</td>
             <td><span class="badge">{a.status}</span></td>
             <td class="date-cell">{formatDate(a.nominationDueDate)}</td>
           </tr>
-          {#if open}
-            <tr class="detail-row">
-              <td colspan="5">
-                <div class="detail" aria-label={`Award details for ${a.title}`}>
-                  <dl class="detail-grid">
-                    {#if a.accomplishmentPeriodStart || a.accomplishmentPeriodEnd}
-                      <div><dt>Accomplishment period</dt><dd>{formatDate(a.accomplishmentPeriodStart)} – {formatDate(a.accomplishmentPeriodEnd)}</dd></div>
-                    {/if}
-                    {#if a.submittedDate}
-                      <div><dt>Submitted</dt><dd>{formatDate(a.submittedDate)}</dd></div>
-                    {/if}
-                    {#if a.decisionDate}
-                      <div><dt>Decision</dt><dd>{formatDate(a.decisionDate)}</dd></div>
-                    {/if}
-                    {#if a.projectId}
-                      <div><dt>Project</dt><dd>{app.projectName(a.projectId)}</dd></div>
-                    {/if}
-                    {#if a.relatedPerformanceInputIds.length}
-                      <div><dt>Linked performance inputs</dt><dd>{a.relatedPerformanceInputIds.length}</dd></div>
-                    {/if}
-                    <div><dt>Supporting notes</dt><dd class="prewrap">{a.supportingNotes || "None"}</dd></div>
-                    {#if a.citationDraft}
-                      <div class="span-all"><dt>Citation draft</dt><dd class="prewrap">{a.citationDraft}</dd></div>
-                    {/if}
-                  </dl>
-                  <div class="detail-footer">
-                    <button type="button" onclick={() => openForm(a)}>Edit</button>
-                    <button
-                      type="button"
-                      class="icon-btn danger"
-                      aria-label="Delete award"
-                      title="Delete"
-                      onclick={() => requestDelete(a)}><Icon name="trash" size={16} /></button>
-                    <span class="spacer"></span>
-                    <button type="button" onclick={() => router.go("employees", a.employeeId)}>Open employee</button>
-                  </div>
-                </div>
-              </td>
-            </tr>
-          {/if}
         {/each}
       </tbody>
     </table>
@@ -273,11 +214,5 @@
   }
   .delete-action {
     margin-right: auto;
-  }
-  .prewrap {
-    white-space: pre-wrap;
-  }
-  .span-all {
-    grid-column: 1 / -1;
   }
 </style>

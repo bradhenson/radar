@@ -494,10 +494,11 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   a { text-decoration: none; color: inherit; }
 }
 
-/* ---------- expanding rows (disclosure grammar) ----------
-   Shared by every list page: clicking a row (or its chevron, the keyboard
-   control) inserts an inline detail row. Open rows pin the accent tick and
-   merge visually with their detail row. */
+/* ---------- interactive and expanding rows ----------
+   row-clickable marks a whole-row mouse target. Read-oriented lists can pair
+   it with a keyboard-accessible disclosure; direct-edit lists pair it with a
+   keyboard-accessible name/title button instead. Open disclosure rows pin the
+   accent tick and merge visually with their detail row. */
 table.data tr.row-clickable { cursor: pointer; }
 table.data .disclosure {
   display: inline-flex;
