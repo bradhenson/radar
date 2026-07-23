@@ -30,9 +30,8 @@
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<LeaveRecord | undefined>(undefined);
-  let expanded = $state<Record<string, boolean>>({});
 
-  // Deep link: #/leave/{recordId} expands the record in the list. One-shot.
+  // Deep link: #/leave/{recordId} opens the exact record for editing. One-shot.
   $effect(() => {
     const id = router.current.param;
     if (router.current.page !== "leave" || !id) return;
@@ -40,11 +39,8 @@
     if (!record) return;
     view = "list";
     if (compareDates(record.endDate, app.today) < 0) showPast = true;
-    expanded[id] = true;
     router.go("leave");
-    requestAnimationFrame(() => {
-      document.getElementById(`leave-row-${id}`)?.scrollIntoView({ block: "center" });
-    });
+    openForm(record);
   });
 
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
@@ -157,16 +153,6 @@
     return l.leaveType ?? "Leave";
   }
 
-  function toggleRow(id: string) {
-    expanded[id] = !expanded[id];
-  }
-
-  function toggleFromRow(id: string) {
-    // Don't hijack a click the user made to select and copy text.
-    if (window.getSelection()?.toString()) return;
-    toggleRow(id);
-  }
-
   function requestDelete(l: LeaveRecord) {
     pendingDelete = l;
   }
@@ -211,60 +197,24 @@
         <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
-            {@const open = Boolean(expanded[l.id])}
-            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" class:row-open={open} id={"leave-row-" + l.id} onclick={() => toggleFromRow(l.id)}>
+            <!-- Row click is a mouse convenience; the employee button is the keyboard path. -->
+            <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
+            <tr class="row-clickable" id={"leave-row-" + l.id} onclick={() => openForm(l)}>
               <td>
                 <button
                   type="button"
-                  class="disclosure"
-                  class:open
-                  aria-expanded={open}
-                  aria-label={open ? `Hide leave details for ${app.employeeName(l.employeeId)}` : `Show leave details for ${app.employeeName(l.employeeId)}`}
+                  class="link cell-link"
                   onclick={(ev) => {
                     ev.stopPropagation();
-                    toggleRow(l.id);
-                  }}><Icon name="chevron" size={13} /></button>
-                {app.employeeName(l.employeeId)}
+                    openForm(l);
+                  }}>{app.employeeName(l.employeeId)}</button
+                >
               </td>
               <td class="date-cell">{formatDate(l.startDate)}</td>
               <td class="date-cell">{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
               <td><span class="badge">{l.status}</span></td>
             </tr>
-            {#if open}
-              <tr class="detail-row">
-                <td colspan="5">
-                  <div class="detail" aria-label={`Leave details for ${app.employeeName(l.employeeId)}`}>
-                    <dl class="detail-grid">
-                      {#if l.partialDay}
-                        <div><dt>Partial day</dt><dd>{l.partialDay}</dd></div>
-                      {/if}
-                      <div><dt>Workload impact</dt><dd>{l.workloadImpactNote || "None noted"}</dd></div>
-                      {#if l.sourceSystem || l.sourceReference}
-                        <div><dt>Source</dt><dd>{[l.sourceSystem, l.sourceReference].filter(Boolean).join(" · ")}</dd></div>
-                      {/if}
-                      {#if l.lastVerifiedDate}
-                        <div><dt>Last verified</dt><dd>{formatDate(l.lastVerifiedDate)}</dd></div>
-                      {/if}
-                    </dl>
-                    <div class="detail-footer">
-                      <button type="button" onclick={() => openForm(l)}>Edit</button>
-                      <button
-                        type="button"
-                        class="icon-btn danger"
-                        aria-label="Delete leave"
-                        title="Delete"
-                        onclick={() => requestDelete(l)}><Icon name="trash" size={16} /></button>
-                      <span class="spacer"></span>
-                      <button type="button" onclick={() => router.go("employees", l.employeeId)}>Open employee</button>
-                    </div>
-                  </div>
-                </td>
-              </tr>
-            {/if}
           {/each}
         </tbody>
       </table>

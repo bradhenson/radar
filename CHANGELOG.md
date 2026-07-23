@@ -32,6 +32,10 @@
 
 ### Fixed
 
+- Leave, telework request/agreement, and award list rows now open their edit dialogs directly instead of expanding inline details. Their first-cell name or title remains keyboard accessible, and deep links open the exact record editor too.
+
+- Expanded meeting previews now use a single-column reading flow, with action items directly below the meeting discussion instead of beside it.
+
 - Desktop title bar: the minimize/maximize/close buttons no longer cast the standard button drop shadow, which was blotting out the header separator line beneath them and drawing faint seams between the buttons.
 
 - Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.
@@ -42,7 +46,7 @@
 
 - Employee pages now open on Profile, with Notes at the top. The redundant Overview tab and its repeated summaries have been removed; the dedicated Tasks, Performance, Meetings, and Activity tabs remain available for those records.
 
-- Every list page now shares one interaction grammar: clicking a row (or its keyboard-focusable chevron) expands an inline detail area, and editing is always an explicit button inside that detail — rows never open an edit form directly. Leave, Travel, Telework (requests and agreements), and Awards adopt the expanding-row pattern with their previously hidden fields (partial days, DTS authorization IDs, schedules, citation drafts, notes) visible in the detail; Training's requirement rows now expand into the tracking roster inline instead of a separate section below the table; Projects rows expand their task list on click with editing moved to the project-name button. Deep links and attention items that used to open edit dialogs now land on the expanded row instead.
+- Read-oriented list pages share an expanding-row interaction: Travel exposes trip details, Training expands the tracking roster, and Projects expands linked tasks. Leave, Telework (requests and agreements), and Awards keep the faster edit-oriented behavior, opening the existing dialog directly from a row click or keyboard-accessible name/title button.
 
 - The Meetings and Performance pages replace their two-column list-and-preview layout with full-width tables whose rows expand in place. Clicking a row (or its chevron, which is keyboard-focusable) opens an inline detail area directly beneath it showing the full formatted content — Discussion and Action Items for meetings; Context, Action, and Result / Impact for performance inputs — along with the record's actions (edit, archive/delete, follow-up task, status change). Multiple rows can be open at once, and the Performance "By Employee" view keeps its grouped headings. The Coverage table is unchanged.
 
