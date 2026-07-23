@@ -44,9 +44,49 @@ describe("application settings defaults", () => {
 
   it("adds the default employee profile configuration to legacy settings", () => {
     const normalized = normalizeAppSettings({ schemaVersion: 2, theme: "light" });
-    expect(normalized.schemaVersion).toBe(4);
+    expect(normalized.schemaVersion).toBe(DEFAULT_SETTINGS.schemaVersion);
     expect(normalized.employeeProfileSections.map((section) => section.label)).toContain("Identity");
     expect(normalized.employeeProfileFields.some((field) => field.builtInKey === "workEmail")).toBe(true);
+  });
+
+  it("adds the schema 5 profile fields to a saved configuration without disturbing it", () => {
+    const saved = DEFAULT_SETTINGS.employeeProfileFields
+      .filter((field) => !["gov-passport", "passport-expiration", "sipr-account"].includes(field.id))
+      .map((field) => (field.id === "series" ? { ...field, label: "Pay series" } : field));
+    const normalized = normalizeAppSettings({ ...DEFAULT_SETTINGS, schemaVersion: 4, employeeProfileFields: saved });
+
+    const added = normalized.employeeProfileFields.filter((field) =>
+      ["gov-passport", "passport-expiration", "sipr-account"].includes(field.id)
+    );
+    expect(added.map((field) => field.id)).toEqual(["gov-passport", "passport-expiration", "sipr-account"]);
+    expect(added.every((field) => field.sectionId === "requirements")).toBe(true);
+    // A renamed field keeps its label.
+    expect(normalized.employeeProfileFields.find((field) => field.id === "series")?.label).toBe("Pay series");
+  });
+
+  it("places the new fields in a surviving section when the default one is gone", () => {
+    const normalized = normalizeAppSettings({
+      ...DEFAULT_SETTINGS,
+      schemaVersion: 4,
+      employeeProfileSections: [{ id: "company", label: "Company details", sortOrder: 0, isArchived: false }],
+      employeeProfileFields: []
+    });
+    expect(normalized.employeeProfileFields.map((field) => field.id)).toEqual([
+      "gov-passport",
+      "passport-expiration",
+      "sipr-account"
+    ]);
+    expect(normalized.employeeProfileFields.every((field) => field.sectionId === "company")).toBe(true);
+  });
+
+  it("does not re-add a new field the organization has since removed", () => {
+    const withoutSipr = DEFAULT_SETTINGS.employeeProfileFields.filter((field) => field.id !== "sipr-account");
+    const normalized = normalizeAppSettings({
+      ...DEFAULT_SETTINGS,
+      schemaVersion: DEFAULT_SETTINGS.schemaVersion,
+      employeeProfileFields: withoutSipr
+    });
+    expect(normalized.employeeProfileFields.some((field) => field.id === "sipr-account")).toBe(false);
   });
 
   it("preserves a valid organization-defined employee profile and drops retired field flags", () => {

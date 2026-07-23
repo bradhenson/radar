@@ -22,7 +22,7 @@
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"overview" | "profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("overview");
+  let tab = $state<"profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("profile");
   let editOpen = $state(false);
   let confirmDeleteOpen = $state(false);
   let profileOpen = $state(false);
@@ -68,9 +68,6 @@
       .sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
   );
   let awards = $derived(app.awardRecords.filter((a) => a.employeeId === employeeId));
-  let interactions = $derived(
-    app.employeeInteractions.filter((i) => i.employeeId === employeeId).sort((a, b) => (a.interactionDate < b.interactionDate ? 1 : -1))
-  );
   let meetingNotes = $derived(
     app.meetingNotes
       .filter((note) => !note.isArchived && note.attendeeEmployeeIds.includes(employeeId))
@@ -227,7 +224,6 @@
   }
 
   const TABS = [
-    ["overview", "Overview"],
     ["profile", "Profile"],
     ["tasks", "Tasks"],
     ["performance", "Performance"],
@@ -291,7 +287,7 @@
     </div>
 
     <div id="emp-tabpanel" role="tabpanel" aria-labelledby={`emp-tab-${tab}`}>
-    {#if tab === "overview"}
+    {#if tab === "profile"}
       <div class="notes-header">
         <h2>Notes</h2>
         {#if !noteFormOpen}
@@ -330,66 +326,6 @@
           </div>
         </div>
       {/if}
-      <h2 style="margin-top:1rem">Open work</h2>
-      {#if openTasks.length === 0}
-        <p class="muted">No open tasks.</p>
-      {:else}
-        <table class="data">
-          <tbody>
-            {#each openTasks.sort((a, b) => (a.dueDate ?? "9999") < (b.dueDate ?? "9999") ? -1 : 1) as t (t.id)}
-              <tr>
-                <td><button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button></td>
-                <td>{statusLabel(t.status)}</td>
-                <td>{formatDate(t.dueDate)}</td>
-                <td>{app.projectName(t.projectId)}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-      <h2 style="margin-top:1rem">Recent accomplishments</h2>
-      {#if inputs.length === 0}
-        <p class="muted">No performance inputs recorded yet.</p>
-      {:else}
-        {#each inputs.slice(0, 3) as p (p.id)}
-          <div class="card" style="margin-bottom:.5rem">
-            <div style="display:flex; gap:.5rem; align-items:center">
-              <div class="small muted">{formatDate(p.inputDate)}</div>
-              <span class="spacer"></span>
-              <button type="button" class="icon-btn" aria-label={`Edit performance input from ${formatDate(p.inputDate)}`} title="Edit" onclick={() => (ui.performanceFormInput = p)}><Icon name="edit" size={16} /></button>
-            </div>
-            <RichTextView value={p.actionOrAccomplishment} compact />
-            {#if p.result}<div class="small muted"><strong>Result / Impact:</strong><RichTextView value={p.result} compact /></div>{/if}
-          </div>
-        {/each}
-      {/if}
-      <h2 style="margin-top:1rem">Recent check-ins</h2>
-      {#if interactions.length === 0}
-        <p class="muted">No interactions recorded.</p>
-      {:else}
-        <ul>
-          {#each interactions.slice(0, 5) as i (i.id)}
-            <li><strong>{formatDate(i.interactionDate)}</strong> — {i.interactionType}{i.summary ? `: ${i.summary}` : ""}</li>
-          {/each}
-        </ul>
-      {/if}
-      <h2 style="margin-top:1rem">Recent meeting notes</h2>
-      {#if meetingNotes.length === 0}
-        <p class="muted">No linked meeting notes.</p>
-      {:else}
-        {#each meetingNotes.slice(0, 3) as note (note.id)}
-          <div class="card" style="margin-bottom:.5rem">
-            <div class="small muted">{formatDate(note.meetingDate)} · {note.meetingType}{#if note.projectId} · {app.projectName(note.projectId)}{/if}</div>
-            <div style="display:flex; gap:.5rem; align-items:center">
-              <button type="button" class="link" onclick={() => (editingMeetingNote = note)}>{note.title}</button>
-              <span class="spacer"></span>
-              <button type="button" class="icon-btn" aria-label={`Edit meeting note ${note.title}`} title="Edit" onclick={() => (editingMeetingNote = note)}><Icon name="edit" size={16} /></button>
-            </div>
-            {#if note.actionItems}<div class="small muted"><strong>Actions:</strong><RichTextView value={note.actionItems} compact /></div>{/if}
-          </div>
-        {/each}
-      {/if}
-    {:else if tab === "profile"}
       <div class="tab-title-row">
         <h2>Profile details</h2>
         {#if employee.competencyId}<span class="badge">{app.competencyCode(employee.competencyId)}</span>{/if}

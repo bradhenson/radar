@@ -96,6 +96,11 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       workEmail: `${displayName.toLowerCase().replace(/[^a-z]+/g, ".")}@example.invalid`,
       startDate: addDays(today, -1200 + index * 17),
       lastCheckInDate: index % 6 === 0 ? addDays(today, -45) : addDays(today, -((index % 20) + 5)),
+      // Passport and SIPR states spread across the roster, including one
+      // passport expiring soon, so the profile fields are not all blank.
+      govPassport: (["no", "yes", "in_process"] as const)[index % 3],
+      passportExpiration: index % 3 === 1 ? addDays(today, index % 2 === 1 ? 45 : 600) : undefined,
+      siprAccount: (["yes", "in_process", "no"] as const)[index % 3],
       activeStatus: "active",
       tags: [team],
       isArchived: false,

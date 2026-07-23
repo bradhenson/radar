@@ -570,7 +570,14 @@
 {/if}
 
 <style>
-  .cell-btn { border: none; background: none; padding: 0; cursor: pointer; }
+  .cell-btn {
+    min-height: 0;
+    border: none;
+    background: transparent;
+    box-shadow: none;
+    padding: 0;
+    cursor: pointer;
+  }
   .training-page.matrix-open { max-width: none; }
   .matrix-section { width: 100%; }
   .matrix-wrap {

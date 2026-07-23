@@ -17,6 +17,8 @@ export interface Competency {
 export type EmployeeActiveStatus = "active" | "temporary_inactive" | "departed" | "archived";
 export type ComputerAsset = "rdte" | "nmci";
 export type ClearanceLevel = "s" | "ts" | "ts_sci";
+/** Held / not held / being worked. Used by the passport and SIPR account fields. */
+export type ProvisioningStatus = "yes" | "no" | "in_process";
 export type EmployeeProfileValue = string | boolean | string[];
 
 export interface Employee {
@@ -49,6 +51,9 @@ export interface Employee {
   drugTestRequired?: boolean;
   teleworkAgreementValidThrough?: IsoDate;
   clearance?: ClearanceLevel;
+  govPassport?: ProvisioningStatus;
+  passportExpiration?: IsoDate;
+  siprAccount?: ProvisioningStatus;
   /** Values for organization-defined profile fields, keyed by stable field id. */
   profileValues?: Record<string, EmployeeProfileValue>;
   startDate?: IsoDate;
@@ -433,7 +438,7 @@ export type BuiltInEmployeeProfileKey =
   | "locationBuilding" | "locationCube" | "workEmail" | "workPhone" | "workCellPhone" | "personalPhone" | "govPhone"
   | "team" | "iptLead" | "employeeProject" | "employeeProjectLead"
   | "computerAsset" | "clearance" | "cswfCode" | "cswfLevel" | "financialStatementRequired" | "drugTestRequired"
-  | "teleworkAgreementValidThrough";
+  | "teleworkAgreementValidThrough" | "govPassport" | "passportExpiration" | "siprAccount";
 
 export interface EmployeeProfileSection {
   id: string;
@@ -472,8 +477,15 @@ export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; s
   { value: "graphite", label: "Graphite", swatch: "#47525f", swatchDark: "#a6b2c0" }
 ];
 
+/** Shared options for the Yes / No / In process profile fields. */
+export const PROVISIONING_STATUS_OPTIONS: EmployeeProfileChoice[] = [
+  { value: "yes", label: "Yes" },
+  { value: "no", label: "No" },
+  { value: "in_process", label: "In process" }
+];
+
 export const DEFAULT_SETTINGS: AppSettings = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
@@ -528,7 +540,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     profileField("cswf-level", "requirements", "CSWF Level", "text", 3, "cswfLevel"),
     profileField("financial-statement", "requirements", "Financial Statement Required", "boolean", 4, "financialStatementRequired"),
     profileField("drug-test", "requirements", "Drug Test Required", "boolean", 5, "drugTestRequired"),
-    profileField("telework-valid", "requirements", "Telework Agreement Valid Through", "date", 6, "teleworkAgreementValidThrough")
+    profileField("telework-valid", "requirements", "Telework Agreement Valid Through", "date", 6, "teleworkAgreementValidThrough"),
+    profileChoiceField("gov-passport", "requirements", "Gov Passport", 7, "govPassport", PROVISIONING_STATUS_OPTIONS),
+    profileField("passport-expiration", "requirements", "Passport Expiration", "date", 8, "passportExpiration"),
+    profileChoiceField("sipr-account", "requirements", "SIPR Account", 9, "siprAccount", PROVISIONING_STATUS_OPTIONS)
   ]
 };
 
@@ -563,7 +578,7 @@ const BUILT_IN_PROFILE_KEYS = new Set<BuiltInEmployeeProfileKey>([
   "positionTitle", "series", "edipi", "pernr", "locationBuilding", "locationCube", "workEmail", "workPhone",
   "workCellPhone", "personalPhone", "govPhone", "team", "iptLead", "employeeProject", "employeeProjectLead",
   "computerAsset", "clearance", "cswfCode", "cswfLevel", "financialStatementRequired", "drugTestRequired",
-  "teleworkAgreementValidThrough"
+  "teleworkAgreementValidThrough", "govPassport", "passportExpiration", "siprAccount"
 ]);
 
 function defaultProfileSections(): EmployeeProfileSection[] {
@@ -645,6 +660,48 @@ const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 /** The off-by-one-week anchor shipped before schema 4; see the migration below. */
 const SUPERSEDED_PAY_PERIOD_ANCHOR = "2026-01-04";
 
+/**
+ * Built-in profile fields introduced in schema 5. A saved configuration keeps
+ * its own field list, so new built-ins have to be added to it explicitly —
+ * listing only the new ids means a field the organization deliberately removed
+ * is never resurrected.
+ */
+const PROFILE_FIELDS_ADDED_IN_SCHEMA_5 = ["gov-passport", "passport-expiration", "sipr-account"];
+
+/**
+ * Append built-in fields the saved configuration has not seen yet, preserving
+ * any customization around them. Fields land in their default section when it
+ * still exists, otherwise in the last active section, and are skipped entirely
+ * if the configuration has no usable section left.
+ */
+function addMissingProfileFields(
+  fields: EmployeeProfileField[],
+  sections: EmployeeProfileSection[],
+  fieldIds: string[]
+): EmployeeProfileField[] {
+  const present = new Set(fields.map((field) => field.id));
+  const missing = DEFAULT_SETTINGS.employeeProfileFields.filter(
+    (field) => fieldIds.includes(field.id) && !present.has(field.id)
+  );
+  if (missing.length === 0) return fields;
+
+  const sectionIds = new Set(sections.map((section) => section.id));
+  const fallbackSection = sections.filter((section) => !section.isArchived).at(-1)?.id;
+  const next = fields.slice();
+  for (const field of missing) {
+    const sectionId = sectionIds.has(field.sectionId) ? field.sectionId : fallbackSection;
+    if (!sectionId) continue;
+    next.push({
+      ...field,
+      sectionId,
+      // Place it after whatever the section already holds.
+      sortOrder: next.filter((existing) => existing.sectionId === sectionId).length,
+      options: field.options?.map((option) => ({ ...option }))
+    });
+  }
+  return next;
+}
+
 /** Normalize persisted/imported settings and apply schema migrations. */
 export function normalizeAppSettings(raw: unknown): AppSettings {
   const out: AppSettings = {
@@ -681,6 +738,14 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     if (src.backupChangeThreshold === undefined || src.backupChangeThreshold === 50) {
       out.backupChangeThreshold = DEFAULT_SETTINGS.backupChangeThreshold;
     }
+  }
+
+  if (priorSchema < 5) {
+    out.employeeProfileFields = addMissingProfileFields(
+      out.employeeProfileFields,
+      out.employeeProfileSections,
+      PROFILE_FIELDS_ADDED_IN_SCHEMA_5
+    );
   }
 
   if (priorSchema < 4 && src.payPeriodAnchorDate === SUPERSEDED_PAY_PERIOD_ANCHOR) {

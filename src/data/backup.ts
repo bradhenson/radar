@@ -134,7 +134,7 @@ const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = 
 
 const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["startDate", "dueDate", "reminderDate", "completedDate", "lastVerifiedDate"],
-  employees: ["startDate", "lastCheckInDate", "teleworkAgreementValidThrough"],
+  employees: ["startDate", "lastCheckInDate", "teleworkAgreementValidThrough", "passportExpiration"],
   projects: ["startDate", "targetEndDate", "lastVerifiedDate"],
   evaluationCycles: ["startDate", "endDate", "midyearDate"],
   performanceInputs: ["inputDate"],
@@ -217,7 +217,9 @@ const OPTIONAL_ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readon
   },
   employees: {
     computerAsset: ["rdte", "nmci"],
-    clearance: ["s", "ts", "ts_sci"]
+    clearance: ["s", "ts", "ts_sci"],
+    govPassport: ["yes", "no", "in_process"],
+    siprAccount: ["yes", "no", "in_process"]
   },
   trainingRequirements: {
     recurrenceType: ["none", "days", "months", "annual"],

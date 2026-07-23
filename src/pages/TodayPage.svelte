@@ -245,7 +245,7 @@
                 <tr>
                   <td class="reason-cell"><span class="badge {item.severity === 'critical' || item.severity === 'high' ? 'overdue' : item.severity === 'medium' ? 'warning' : ''}">{item.reasonText}</span></td>
                   <td class="item-cell">
-                    <button type="button" class="link" onclick={() => open(item)}>{item.title}</button>
+                    <button type="button" class="link cell-link" onclick={() => open(item)}>{item.title}</button>
                     {#if item.employeeId && item.entityType === "task"}
                       <span class="muted small">· {app.employeeName(item.employeeId)}</span>
                     {/if}
@@ -302,7 +302,7 @@
             {#each recentlyCompleted as t (t.id)}
               <tr>
                 <td style="width:7rem; white-space:nowrap">{formatDate(t.completedDate)}</td>
-                <td><button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button></td>
+                <td><button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button></td>
                 <td style="width:12rem">
                   {#if t.employeeId && !t.performanceInputCreated}
                     <button
