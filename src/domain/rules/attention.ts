@@ -20,6 +20,7 @@ import type {
 import { compareDates, daysBetween, daysSinceTimestamp, describeDueDistance, formatDate } from "../../utils/dates";
 import { AWARD_FINAL_STATUSES } from "./calendar";
 import { requirementAppliesTo, trainingStatus } from "./training";
+import { isTripCancelled, isVoucherSettled } from "./travel";
 
 export type AttentionSeverity = "info" | "low" | "medium" | "high" | "critical";
 
@@ -447,7 +448,8 @@ export function travelAttention(
   const empById = new Map(ctx.employees.map((e) => [e.id, e]));
 
   for (const trip of ctx.travelRecords) {
-    if (trip.isArchived) continue;
+    // Cancelled trips need nothing: no paperwork, no coverage, no voucher.
+    if (trip.isArchived || isTripCancelled(trip)) continue;
     const emp = empById.get(trip.employeeId);
     if (!emp) continue;
     const base = {
@@ -458,7 +460,8 @@ export function travelAttention(
     };
 
     // Voucher due 5 days after return; overdue vouchers are a hard deadline.
-    if (trip.voucherDueDate) {
+    // Once the voucher is submitted (or was never required) the trip is done.
+    if (trip.voucherDueDate && !isVoucherSettled(trip)) {
       const diff = daysBetween(today, trip.voucherDueDate);
       if (diff < 0) {
         items.push({

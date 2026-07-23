@@ -15,7 +15,8 @@ import type {
   TeleworkStatus,
   TravelDtsAuthStatus,
   TravelIptConcurrence,
-  TravelRecord
+  TravelRecord,
+  TravelVoucherStatus
 } from "../models";
 
 /** Identity for a new record: pre-generated id plus the mutation timestamp. */
@@ -143,10 +144,17 @@ export interface TravelEditFields {
   dtsAuthorizationId: string;
   /** Already defaulted by the form (return + 5 days) when left blank. */
   voucherDueDate: string;
+  voucherStatus: TravelVoucherStatus;
+  voucherSubmittedDate: string;
   notes: string;
 }
 
+/**
+ * The trip's cancelled state is not part of this form — it is set by the
+ * cancel/reinstate action — so it rides through on `...existing`.
+ */
 export function mergeTravelEdit(existing: TravelRecord | undefined, f: TravelEditFields, ctx: EditContext): TravelRecord {
+  const submitted = f.voucherStatus === "submitted";
   return {
     ...existing,
     id: existing?.id ?? ctx.id,
@@ -158,6 +166,9 @@ export function mergeTravelEdit(existing: TravelRecord | undefined, f: TravelEdi
     dtsAuthorizationStatus: f.dtsAuthorizationStatus,
     dtsAuthorizationId: f.dtsAuthorizationId.trim() || undefined,
     voucherDueDate: f.voucherDueDate || undefined,
+    voucherStatus: f.voucherStatus,
+    // Only a submitted voucher carries a submission date.
+    voucherSubmittedDate: submitted ? f.voucherSubmittedDate || undefined : undefined,
     notes: f.notes.trim() || undefined,
     createdAt: existing?.createdAt ?? ctx.now,
     updatedAt: ctx.now

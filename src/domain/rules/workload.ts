@@ -3,6 +3,7 @@
 
 import type { Employee, EmployeeInteraction, IsoDate, LeaveRecord, PerformanceInput, Task, TravelRecord } from "../models";
 import { addDays, compareDates, daysBetween } from "../../utils/dates";
+import { isTripCancelled } from "./travel";
 
 function isOpen(task: Task): boolean {
   return !task.isArchived && task.status !== "complete" && task.status !== "cancelled";
@@ -124,7 +125,8 @@ export function absenceEntries(leaveRecords: LeaveRecord[], travelRecords: Trave
     entries.push({ kind: "leave", employeeId: leave.employeeId, startDate: leave.startDate, endDate: leave.endDate, detail: leave.leaveType });
   }
   for (const trip of travelRecords) {
-    if (trip.isArchived) continue;
+    // Cancelled trips are not absences (mirrors cancelled leave above).
+    if (trip.isArchived || isTripCancelled(trip)) continue;
     entries.push({ kind: "travel", employeeId: trip.employeeId, startDate: trip.startDate, endDate: trip.endDate, detail: trip.destination });
   }
   return entries;

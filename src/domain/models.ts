@@ -289,6 +289,8 @@ export interface TeleworkRecord {
 // Travel awareness (who is on travel, and the DTS paperwork state around it).
 export type TravelIptConcurrence = "pending" | "concurred" | "not_required";
 export type TravelDtsAuthStatus = "not_started" | "created" | "approved";
+export type TravelTripStatus = "scheduled" | "cancelled";
+export type TravelVoucherStatus = "not_submitted" | "submitted" | "not_required";
 
 export interface TravelRecord {
   id: Id;
@@ -302,6 +304,15 @@ export interface TravelRecord {
   // DTS voucher is due five days after the traveler returns (see
   // domain/rules/travel.ts). Stored so it can be overridden for special cases.
   voucherDueDate?: IsoDate;
+  // Trips that never happened stay on the record as cancelled rather than
+  // being deleted. Absent on records written before cancellation existed;
+  // read it through tripStatusOf() in domain/rules/travel.ts.
+  tripStatus?: TravelTripStatus;
+  cancelledDate?: IsoDate;
+  // Voucher completion. Absent on older records, which are treated as
+  // "not_submitted"; read it through voucherStatusOf().
+  voucherStatus?: TravelVoucherStatus;
+  voucherSubmittedDate?: IsoDate;
   notes?: string;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -401,6 +412,12 @@ export interface AppSettings {
   activityRetentionDays: number;
   trainingWarningDays: number;
   leaveLookaheadDays: number;
+  /** Situational telework requests older than this drop off the list. */
+  teleworkLookbackDays: number;
+  /** Telework days each employee may use per bi-weekly pay period. */
+  teleworkDaysPerPayPeriod: number;
+  /** First day of any known pay period; the bi-weekly cycle is counted from here. */
+  payPeriodAnchorDate: IsoDate;
   theme: "light" | "dark" | "system";
   colorTheme: ColorTheme;
   /** Unmodified N/P/Q/T/B/E/M shortcuts; can be disabled for accessibility. */
@@ -456,7 +473,7 @@ export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; s
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  schemaVersion: 3,
+  schemaVersion: 4,
   applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
@@ -469,6 +486,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
   activityRetentionDays: 365,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
+  teleworkLookbackDays: 30,
+  teleworkDaysPerPayPeriod: 2,
+  // A real federal bi-weekly pay period start (Sunday): 2026 periods begin
+  // Jul 12 and Jul 26. The cycle extends both ways from here, so this anchor
+  // covers every year. Organizations on a different cycle set their own in
+  // Settings.
+  payPeriodAnchorDate: "2026-07-12",
   theme: "dark",
   colorTheme: "default",
   enableSingleKeyShortcuts: true,
@@ -614,6 +638,13 @@ function normalizeProfileFields(raw: unknown, sections: EmployeeProfileSection[]
   return fields;
 }
 
+// Shape check only; utils/dates owns full calendar validation, and models
+// stays free of imports from it.
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+/** The off-by-one-week anchor shipped before schema 4; see the migration below. */
+const SUPERSEDED_PAY_PERIOD_ANCHOR = "2026-01-04";
+
 /** Normalize persisted/imported settings and apply schema migrations. */
 export function normalizeAppSettings(raw: unknown): AppSettings {
   const out: AppSettings = {
@@ -632,6 +663,10 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     }
   }
   if (typeof src.userDisplayName === "string") out.userDisplayName = src.userDisplayName;
+  // A malformed anchor would misplace every pay period boundary, so fall back
+  // to the default rather than carrying it through.
+  if (!ISO_DATE_PATTERN.test(out.payPeriodAnchorDate)) out.payPeriodAnchorDate = DEFAULT_SETTINGS.payPeriodAnchorDate;
+  if (out.teleworkDaysPerPayPeriod < 1) out.teleworkDaysPerPayPeriod = DEFAULT_SETTINGS.teleworkDaysPerPayPeriod;
   out.employeeProfileSections = normalizeProfileSections(src.employeeProfileSections);
   out.employeeProfileFields = normalizeProfileFields(src.employeeProfileFields, out.employeeProfileSections);
 
@@ -646,6 +681,13 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
     if (src.backupChangeThreshold === undefined || src.backupChangeThreshold === 50) {
       out.backupChangeThreshold = DEFAULT_SETTINGS.backupChangeThreshold;
     }
+  }
+
+  if (priorSchema < 4 && src.payPeriodAnchorDate === SUPERSEDED_PAY_PERIOD_ANCHOR) {
+    // The first build with pay period tracking anchored the cycle one week off
+    // from the federal bi-weekly calendar. An anchor still on that value was
+    // never chosen deliberately, so correct it; anything else is the user's.
+    out.payPeriodAnchorDate = DEFAULT_SETTINGS.payPeriodAnchorDate;
   }
 
   out.schemaVersion = DEFAULT_SETTINGS.schemaVersion;
@@ -711,6 +753,12 @@ export const TRAVEL_DTS_AUTH_STATUS_OPTIONS: { value: TravelDtsAuthStatus; label
   { value: "not_started", label: "Not started" },
   { value: "created", label: "Created" },
   { value: "approved", label: "Approved" }
+];
+
+export const TRAVEL_VOUCHER_STATUS_OPTIONS: { value: TravelVoucherStatus; label: string }[] = [
+  { value: "not_submitted", label: "Not submitted" },
+  { value: "submitted", label: "Submitted" },
+  { value: "not_required", label: "Not required" }
 ];
 
 export const COMPUTER_ASSET_OPTIONS: { value: ComputerAsset; label: string }[] = [

@@ -10,11 +10,26 @@
   import {
     TRAVEL_DTS_AUTH_STATUS_OPTIONS,
     TRAVEL_IPT_CONCURRENCE_OPTIONS,
+    TRAVEL_VOUCHER_STATUS_OPTIONS,
     type TravelDtsAuthStatus,
     type TravelIptConcurrence,
-    type TravelRecord
+    type TravelRecord,
+    type TravelVoucherStatus
   } from "../domain/models";
-  import { travelVoucherDueDate } from "../domain/rules/travel";
+  import {
+    isPastTravel,
+    isTripCancelled,
+    isVoucherSettled,
+    matchesTravelSummaryFilter,
+    TRAVEL_PHASE_LABELS,
+    travelPhase,
+    travelPhaseRank,
+    travelVoucherDueDate,
+    voucherStatusOf,
+    voucherUrgency,
+    type TravelPhase,
+    type TravelSummaryFilter
+  } from "../domain/rules/travel";
   import { mergeTravelEdit } from "../domain/rules/editMerge";
   import { monthGrid, monthOf } from "../domain/rules/calendar";
   import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -25,6 +40,7 @@
   let view = $state<"list" | "calendar">("list");
   let showPast = $state(false);
   let filterEmployee = $state("");
+  let summaryFilter = $state<TravelSummaryFilter>("");
   let calendarMonth = $state(`${app.today.slice(0, 7)}-01`);
   let formOpen = $state(false);
   let editing = $state<TravelRecord | undefined>(undefined);
@@ -36,6 +52,8 @@
   let fDtsStatus = $state<TravelDtsAuthStatus>("not_started");
   let fDtsId = $state("");
   let fVoucher = $state("");
+  let fVoucherStatus = $state<TravelVoucherStatus>("not_submitted");
+  let fVoucherSubmitted = $state("");
   let fNotes = $state("");
   let fError = $state("");
   // When true the user has typed their own voucher date, so we stop
@@ -43,6 +61,7 @@
   let voucherManual = $state(false);
   let activeCalendarDate = $state<string | undefined>(undefined);
   let pendingDelete = $state<TravelRecord | undefined>(undefined);
+  let pendingCancel = $state<TravelRecord | undefined>(undefined);
   let expanded = $state<Record<string, boolean>>({});
 
   // Deep link: #/travel/{recordId} expands the trip in the list (Today page
@@ -55,6 +74,7 @@
     view = "list";
     if (isPast(record)) showPast = true;
     if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
+    if (!matchesTravelSummaryFilter(record, summaryFilter, app.today)) summaryFilter = "";
     expanded[id] = true;
     router.go("travel");
     requestAnimationFrame(() => {
@@ -83,25 +103,45 @@
     return v === "approved" ? "success" : v === "created" ? "warning" : "";
   }
 
-  // A trip stays visible until its voucher (or return date) has passed.
-  function trailingDate(t: TravelRecord): string {
-    return t.voucherDueDate && t.voucherDueDate > t.endDate ? t.voucherDueDate : t.endDate;
+  function voucherLabel(v: TravelVoucherStatus): string {
+    return TRAVEL_VOUCHER_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v.replace(/_/g, " ");
+  }
+
+  // Lifecycle helpers (domain/rules/travel.ts). A trip is only "past" once it
+  // has returned AND its voucher is settled, or it was cancelled — so someone
+  // who still owes a voucher can't drop off the list.
+  function phaseOf(t: TravelRecord): TravelPhase {
+    return travelPhase(t, app.today);
   }
   function isPast(t: TravelRecord): boolean {
-    return compareDates(trailingDate(t), app.today) < 0;
+    return isPastTravel(t, app.today);
   }
-  function voucherState(t: TravelRecord): "overdue" | "soon" | "" {
-    if (!t.voucherDueDate) return "";
-    if (compareDates(t.voucherDueDate, app.today) < 0) return "overdue";
-    if (compareDates(t.voucherDueDate, addDays(app.today, 5)) <= 0) return "soon";
-    return "";
+  function voucherState(t: TravelRecord): "overdue" | "due_soon" | "" {
+    return voucherUrgency(t, app.today);
+  }
+
+  // Built as strings rather than inline markup: Svelte trims whitespace at
+  // block boundaries, which would glue the separator to the status word.
+  function tripStatusDetail(t: TravelRecord): string {
+    const label = TRAVEL_PHASE_LABELS[phaseOf(t)];
+    return isTripCancelled(t) && t.cancelledDate ? `${label} on ${formatDate(t.cancelledDate)}` : label;
+  }
+  function voucherDetail(t: TravelRecord): string {
+    const status = voucherStatusOf(t);
+    const label = voucherLabel(status);
+    if (status === "submitted" && t.voucherSubmittedDate) return `${label} on ${formatDate(t.voucherSubmittedDate)}`;
+    if (status === "not_submitted" && t.voucherDueDate) return `${label} — due ${formatDate(t.voucherDueDate)}`;
+    return label;
   }
 
   // Snapshot of the values the form opened with, for the unsaved-changes
   // guard. The auto-filled voucher date only counts once the user touches it.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fDestination, fStart, fEnd, fIpt, fDtsStatus, fDtsId, voucherManual ? fVoucher : "", fNotes]);
+    return JSON.stringify([
+      fEmployee, fDestination, fStart, fEnd, fIpt, fDtsStatus, fDtsId,
+      voucherManual ? fVoucher : "", fVoucherStatus, fVoucherSubmitted, fNotes
+    ]);
   }
 
   function openForm(t?: TravelRecord, defaults: Partial<Pick<TravelRecord, "employeeId" | "startDate" | "endDate">> = {}) {
@@ -114,6 +154,8 @@
     fDtsStatus = t?.dtsAuthorizationStatus ?? "not_started";
     fDtsId = t?.dtsAuthorizationId ?? "";
     fVoucher = t?.voucherDueDate ?? "";
+    fVoucherStatus = t ? voucherStatusOf(t) : "not_submitted";
+    fVoucherSubmitted = t?.voucherSubmittedDate ?? "";
     fNotes = t?.notes ?? "";
     voucherManual = Boolean(t?.voucherDueDate);
     fError = "";
@@ -157,6 +199,10 @@
       fError = "Voucher due date must be valid.";
       return;
     }
+    if (fVoucherStatus === "submitted" && fVoucherSubmitted && !isValidIsoDate(fVoucherSubmitted)) {
+      fError = "Voucher submitted date must be valid.";
+      return;
+    }
     // Merge over the existing record so unexposed fields (archive flag) survive.
     const record: TravelRecord = mergeTravelEdit(
       editing,
@@ -169,6 +215,8 @@
         dtsAuthorizationStatus: fDtsStatus,
         dtsAuthorizationId: fDtsId,
         voucherDueDate: fVoucher || travelVoucherDueDate(fEnd),
+        voucherStatus: fVoucherStatus,
+        voucherSubmittedDate: fVoucherSubmitted,
         notes: fNotes
       },
       { id: newId(), now: nowTimestamp() }
@@ -180,16 +228,59 @@
     formOpen = false;
   }
 
+  // The employee filter sets the working set; the quick-filter pills narrow it
+  // without changing their own counts underneath the user (as on the board).
+  let scopedTrips = $derived(app.travelRecords.filter((t) => !filterEmployee || t.employeeId === filterEmployee));
+
+  /** Trips the list would show with no quick filter selected. */
+  let inScopeCount = $derived(scopedTrips.filter((t) => showPast || !isPast(t)).length);
+
+  let phaseCounts = $derived({
+    voucherDue: scopedTrips.filter((t) => phaseOf(t) === "voucher_due").length,
+    onTravel: scopedTrips.filter((t) => phaseOf(t) === "on_travel").length,
+    upcoming: scopedTrips.filter((t) => phaseOf(t) === "upcoming").length
+  });
+
+  /** Date each group is ordered by: the one the supervisor is watching. */
+  function groupSortDate(t: TravelRecord, phase: TravelPhase): string {
+    if (phase === "voucher_due") return t.voucherDueDate ?? t.endDate;
+    if (phase === "on_travel") return t.endDate;
+    return t.startDate;
+  }
+
   let rows = $derived(
-    app.travelRecords
+    scopedTrips
       .filter((t) => showPast || !isPast(t))
-      .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
-      .sort(
-        (a, b) =>
-          compareDates(a.startDate, b.startDate) ||
+      .filter((t) => matchesTravelSummaryFilter(t, summaryFilter, app.today))
+      .sort((a, b) => {
+        const pa = phaseOf(a);
+        const pb = phaseOf(b);
+        const byPhase = travelPhaseRank(pa) - travelPhaseRank(pb);
+        if (byPhase !== 0) return byPhase;
+        // History reads newest first; everything still live reads soonest first.
+        const direction = pa === "complete" || pa === "cancelled" ? -1 : 1;
+        return (
+          direction * compareDates(groupSortDate(a, pa), groupSortDate(b, pb)) ||
           app.employeeName(a.employeeId).localeCompare(app.employeeName(b.employeeId))
-      )
+        );
+      })
   );
+
+  // Rows are already phase-ordered, so a run of equal phases is one group.
+  let groups = $derived.by(() => {
+    const out: { phase: TravelPhase; trips: TravelRecord[] }[] = [];
+    for (const trip of rows) {
+      const phase = phaseOf(trip);
+      const last = out[out.length - 1];
+      if (last && last.phase === phase) last.trips.push(trip);
+      else out.push({ phase, trips: [trip] });
+    }
+    return out;
+  });
+
+  function toggleSummaryFilter(filter: Exclude<TravelSummaryFilter, "">) {
+    summaryFilter = summaryFilter === filter ? "" : filter;
+  }
 
   let calendarTitle = $derived(monthLabel(calendarMonth));
   // Shared month grid (domain/rules/calendar.ts) sizes itself to the month, so
@@ -202,7 +293,9 @@
         day: Number(cell.date.slice(8, 10)),
         inMonth: cell.inMonth,
         isToday: cell.date === app.today,
-        events: rows.filter((t) => t.startDate <= cell.date && cell.date <= t.endDate)
+        // Cancelled trips are visible in the list (with "show past") but never
+        // occupy a calendar day — nobody is away.
+        events: rows.filter((t) => !isTripCancelled(t) && t.startDate <= cell.date && cell.date <= t.endDate)
       }))
     );
   });
@@ -218,16 +311,22 @@
 
   async function exportCsv() {
     const csv = toCsv(
-      ["Employee", "Destination", "Start", "End", "IPT concurrence", "DTS authorization", "DTS auth ID", "Voucher due", "Notes"],
+      [
+        "Employee", "Destination", "Start", "End", "Trip status", "IPT concurrence",
+        "DTS authorization", "DTS auth ID", "Voucher due", "Voucher status", "Voucher submitted", "Notes"
+      ],
       rows.map((t) => [
         app.employeeName(t.employeeId),
         t.destination,
         t.startDate,
         t.endDate,
+        TRAVEL_PHASE_LABELS[phaseOf(t)],
         iptLabel(t.iptConcurrence),
         dtsLabel(t.dtsAuthorizationStatus),
         t.dtsAuthorizationId,
         t.voucherDueDate,
+        voucherLabel(voucherStatusOf(t)),
+        t.voucherSubmittedDate,
         t.notes
       ])
     );
@@ -252,6 +351,77 @@
     pendingDelete = t;
   }
 
+  // --- voucher completion and trip cancellation --------------------------------
+  // Both are ordinary field edits (never deletions), so each writes an activity
+  // entry and offers an Undo toast that restores the record as it was.
+
+  async function writeTrip(next: TravelRecord, summary: string, undoSummary: string) {
+    const before = app.travelRecords.find((t) => t.id === next.id);
+    await app.putRecord("travelRecords", next, { actionType: "updated", summary });
+    return () => {
+      if (!before) return;
+      void app.putRecord(
+        "travelRecords",
+        { ...before, updatedAt: nowTimestamp() },
+        { actionType: "updated", summary: undoSummary }
+      );
+    };
+  }
+
+  async function setVoucherStatus(t: TravelRecord, status: TravelVoucherStatus) {
+    const who = `${app.employeeName(t.employeeId)} (${t.destination})`;
+    const next: TravelRecord = {
+      ...t,
+      voucherStatus: status,
+      voucherSubmittedDate: status === "submitted" ? app.today : undefined,
+      updatedAt: nowTimestamp()
+    };
+    const undo = await writeTrip(
+      next,
+      status === "not_submitted"
+        ? `Travel voucher reopened for ${who}`
+        : `Travel voucher marked ${voucherLabel(status).toLowerCase()} for ${who}`,
+      `Reverted travel voucher status for ${who}`
+    );
+    const message =
+      status === "submitted"
+        ? "Voucher marked submitted"
+        : status === "not_required"
+          ? "Voucher marked not required"
+          : "Voucher reopened";
+    app.toast(message, "success", undo);
+  }
+
+  async function cancelTrip(t: TravelRecord) {
+    const who = `${app.employeeName(t.employeeId)} (${t.destination})`;
+    const next: TravelRecord = {
+      ...t,
+      tripStatus: "cancelled",
+      cancelledDate: app.today,
+      // A trip that never happened cannot owe a voucher.
+      voucherStatus: "not_required",
+      voucherSubmittedDate: undefined,
+      updatedAt: nowTimestamp()
+    };
+    const undo = await writeTrip(next, `Cancelled travel for ${who}`, `Reinstated travel for ${who}`);
+    pendingCancel = undefined;
+    app.toast("Trip cancelled", "success", undo);
+  }
+
+  async function reinstateTrip(t: TravelRecord) {
+    const who = `${app.employeeName(t.employeeId)} (${t.destination})`;
+    const next: TravelRecord = {
+      ...t,
+      tripStatus: "scheduled",
+      cancelledDate: undefined,
+      // Reinstating restores the voucher obligation the cancellation cleared.
+      voucherStatus: t.voucherSubmittedDate ? "submitted" : "not_submitted",
+      updatedAt: nowTimestamp()
+    };
+    const undo = await writeTrip(next, `Reinstated travel for ${who}`, `Cancelled travel for ${who}`);
+    app.toast("Trip reinstated", "success", undo);
+  }
+
   async function deleteTravel(t: TravelRecord) {
     await app.deleteRecord(
       "travelRecords",
@@ -271,6 +441,35 @@
   <div class="page-header">
     <h1>Travel</h1>
     <span class="muted">{rows.length} shown</span>
+  </div>
+
+  <div class="travel-stats" aria-label="Quick travel filters">
+    <button
+      type="button"
+      class:active={!summaryFilter}
+      aria-pressed={!summaryFilter}
+      onclick={() => (summaryFilter = "")}><strong>{inScopeCount}</strong> trips</button
+    >
+    <button
+      type="button"
+      class:alert={phaseCounts.voucherDue > 0}
+      class:active={summaryFilter === "voucher_due"}
+      aria-pressed={summaryFilter === "voucher_due"}
+      onclick={() => toggleSummaryFilter("voucher_due")}><strong>{phaseCounts.voucherDue}</strong> voucher due</button
+    >
+    <button
+      type="button"
+      class:on-travel={phaseCounts.onTravel > 0}
+      class:active={summaryFilter === "on_travel"}
+      aria-pressed={summaryFilter === "on_travel"}
+      onclick={() => toggleSummaryFilter("on_travel")}><strong>{phaseCounts.onTravel}</strong> on travel now</button
+    >
+    <button
+      type="button"
+      class:active={summaryFilter === "upcoming"}
+      aria-pressed={summaryFilter === "upcoming"}
+      onclick={() => toggleSummaryFilter("upcoming")}><strong>{phaseCounts.upcoming}</strong> upcoming</button
+    >
   </div>
 
   <div class="toolbar travel-toolbar">
@@ -294,72 +493,108 @@
     {#if rows.length === 0}
       <EmptyState message="No travel records." hint="Add a trip to track who's away, DTS status, and voucher due dates." />
     {:else}
-      <table class="data">
+      <table class="data travel-table">
         <thead>
           <tr>
-            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher due</th>
+            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher</th>
           </tr>
         </thead>
         <tbody>
-          {#each rows as t (t.id)}
-            {@const open = Boolean(expanded[t.id])}
-            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" class:row-open={open} id={"travel-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
-              <td>
-                <button
-                  type="button"
-                  class="disclosure"
-                  class:open
-                  aria-expanded={open}
-                  aria-label={open ? `Hide travel details for ${app.employeeName(t.employeeId)}` : `Show travel details for ${app.employeeName(t.employeeId)}`}
-                  onclick={(ev) => {
-                    ev.stopPropagation();
-                    toggleRow(t.id);
-                  }}><Icon name="chevron" size={13} /></button>
-                {app.employeeName(t.employeeId)}
-              </td>
-              <td>{t.destination}</td>
-              <td class="date-col">{formatDate(t.startDate)}</td>
-              <td class="date-col">{formatDate(t.endDate)}</td>
-              <td><span class="badge {iptBadgeClass(t.iptConcurrence)}">{iptLabel(t.iptConcurrence)}</span></td>
-              <td><span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span></td>
-              <td>
-                {#if voucherState(t) === "overdue"}
-                  <span class="badge overdue" title="Voucher past due">{formatDate(t.voucherDueDate)}</span>
-                {:else if voucherState(t) === "soon"}
-                  <span class="badge warning" title="Voucher due soon">{formatDate(t.voucherDueDate)}</span>
-                {:else}
-                  {formatDate(t.voucherDueDate)}
-                {/if}
-              </td>
+          <!-- Rows are grouped by lifecycle phase so the answer to "who owes a
+               voucher / who is away / who leaves soon" is readable at a glance. -->
+          {#each groups as group (group.phase)}
+            <tr class="group-row">
+              <td colspan="7">{TRAVEL_PHASE_LABELS[group.phase]} <span>({group.trips.length})</span></td>
             </tr>
-            {#if open}
-              <tr class="detail-row">
-                <td colspan="7">
-                  <div class="detail" aria-label={`Travel details for ${app.employeeName(t.employeeId)}`}>
-                    <dl class="detail-grid">
-                      {#if t.dtsAuthorizationId}
-                        <div><dt>DTS authorization ID</dt><dd>{t.dtsAuthorizationId}</dd></div>
-                      {/if}
-                      <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
-                    </dl>
-                    <div class="detail-footer">
-                      <button type="button" onclick={() => openForm(t)}>Edit</button>
-                      <button
-                        type="button"
-                        class="icon-btn danger"
-                        aria-label="Delete travel"
-                        title="Delete"
-                        onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
-                      <span class="spacer"></span>
-                      <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
-                    </div>
-                  </div>
+            {#each group.trips as t (t.id)}
+              {@const open = Boolean(expanded[t.id])}
+              {@const cancelled = isTripCancelled(t)}
+              {@const voucher = voucherStatusOf(t)}
+              <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <tr
+                class="row-clickable"
+                class:row-open={open}
+                class:row-cancelled={cancelled}
+                id={"travel-row-" + t.id}
+                onclick={() => toggleFromRow(t.id)}
+              >
+                <td>
+                  <button
+                    type="button"
+                    class="disclosure"
+                    class:open
+                    aria-expanded={open}
+                    aria-label={open ? `Hide travel details for ${app.employeeName(t.employeeId)}` : `Show travel details for ${app.employeeName(t.employeeId)}`}
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      toggleRow(t.id);
+                    }}><Icon name="chevron" size={13} /></button>
+                  {app.employeeName(t.employeeId)}
+                </td>
+                <td>
+                  {t.destination}
+                  {#if cancelled}<span class="badge cancelled-badge">Cancelled</span>{/if}
+                </td>
+                <td class="date-col">{formatDate(t.startDate)}</td>
+                <td class="date-col">{formatDate(t.endDate)}</td>
+                <td><span class="badge {iptBadgeClass(t.iptConcurrence)}">{iptLabel(t.iptConcurrence)}</span></td>
+                <td><span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span></td>
+                <td class="voucher-cell">
+                  {#if cancelled}
+                    <span class="muted">Not required</span>
+                  {:else if voucher === "submitted"}
+                    <span class="badge success" title={t.voucherSubmittedDate ? `Submitted ${formatDate(t.voucherSubmittedDate)}` : "Voucher submitted"}>Submitted</span>
+                  {:else if voucher === "not_required"}
+                    <span class="badge">Not required</span>
+                  {:else if voucherState(t) === "overdue"}
+                    <span class="badge overdue" title="Voucher past due">Due {formatDate(t.voucherDueDate)}</span>
+                  {:else if voucherState(t) === "due_soon"}
+                    <span class="badge warning" title="Voucher due soon">Due {formatDate(t.voucherDueDate)}</span>
+                  {:else}
+                    <span class="muted">Due {formatDate(t.voucherDueDate)}</span>
+                  {/if}
                 </td>
               </tr>
-            {/if}
+              {#if open}
+                <tr class="detail-row">
+                  <td colspan="7">
+                    <div class="detail" aria-label={`Travel details for ${app.employeeName(t.employeeId)}`}>
+                      <dl class="detail-grid">
+                        <div><dt>Trip status</dt><dd>{tripStatusDetail(t)}</dd></div>
+                        <div><dt>Voucher</dt><dd>{voucherDetail(t)}</dd></div>
+                        {#if t.dtsAuthorizationId}
+                          <div><dt>DTS authorization ID</dt><dd>{t.dtsAuthorizationId}</dd></div>
+                        {/if}
+                        <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
+                      </dl>
+                      <div class="detail-footer">
+                        <button type="button" onclick={() => openForm(t)}>Edit</button>
+                        {#if cancelled}
+                          <button type="button" onclick={() => void reinstateTrip(t)}>Reinstate trip</button>
+                        {:else}
+                          {#if isVoucherSettled(t)}
+                            <button type="button" onclick={() => void setVoucherStatus(t, "not_submitted")}>Reopen voucher</button>
+                          {:else}
+                            <button type="button" onclick={() => void setVoucherStatus(t, "submitted")}>Mark voucher submitted</button>
+                          {/if}
+                          <button type="button" onclick={() => (pendingCancel = t)}>Cancel trip</button>
+                        {/if}
+                        <button
+                          type="button"
+                          class="icon-btn danger"
+                          aria-label="Delete travel"
+                          title="Delete"
+                          onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
+                        <span class="spacer"></span>
+                        <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {/if}
+            {/each}
           {/each}
         </tbody>
       </table>
@@ -479,6 +714,27 @@
           />
           <div class="field-hint">Defaults to 5 days after return.</div>
         </div>
+        <div>
+          <label for="tv-voucher-status">Voucher status</label>
+          <select
+            id="tv-voucher-status"
+            bind:value={fVoucherStatus}
+            onchange={() => {
+              // Marking it submitted here means "submitted today" unless the
+              // user picks another date.
+              if (fVoucherStatus === "submitted" && !fVoucherSubmitted) fVoucherSubmitted = app.today;
+            }}
+            style="width:100%"
+          >
+            {#each TRAVEL_VOUCHER_STATUS_OPTIONS as o (o.value)}<option value={o.value}>{o.label}</option>{/each}
+          </select>
+        </div>
+        {#if fVoucherStatus === "submitted"}
+          <div>
+            <label for="tv-voucher-submitted">Voucher submitted</label>
+            <input id="tv-voucher-submitted" type="date" bind:value={fVoucherSubmitted} style="width:100%" />
+          </div>
+        {/if}
       </div>
       <label for="tv-notes">Notes</label>
       <textarea id="tv-notes" bind:value={fNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
@@ -492,6 +748,16 @@
       </div>
     </form>
   </Dialog>
+{/if}
+
+{#if pendingCancel}
+  <ConfirmDialog
+    title="Cancel trip"
+    message={`Mark travel for ${app.employeeName(pendingCancel.employeeId)} to ${pendingCancel.destination} (${formatDate(pendingCancel.startDate)} to ${formatDate(pendingCancel.endDate)}) as cancelled? The record is kept, and no voucher will be expected.`}
+    confirmLabel="Cancel trip"
+    onconfirm={() => void cancelTrip(pendingCancel!)}
+    oncancel={() => (pendingCancel = undefined)}
+  />
 {/if}
 
 {#if pendingDelete}
@@ -510,6 +776,74 @@
      calendar spans full width. */
   .travel-page.wide {
     max-width: none;
+  }
+  /* Quick filters: same pill grammar as the board summary. */
+  .travel-stats {
+    display: flex;
+    gap: .45rem;
+    flex-wrap: wrap;
+    margin-bottom: .75rem;
+  }
+  .travel-stats button {
+    display: inline-flex;
+    align-items: baseline;
+    gap: .3rem;
+    padding: .3rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    font-size: .8rem;
+    font-weight: 500;
+    color: var(--text-muted);
+    box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
+    white-space: nowrap;
+  }
+  .travel-stats button:hover { border-color: currentColor; }
+  .travel-stats button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .travel-stats strong {
+    color: var(--text);
+    font-size: .98rem;
+  }
+  .travel-stats button.alert {
+    background: var(--overdue-bg);
+    border-color: transparent;
+    color: var(--overdue-fg);
+  }
+  .travel-stats button.on-travel {
+    background: var(--accent-soft);
+    border-color: transparent;
+    color: var(--accent);
+  }
+  .travel-stats button.alert strong,
+  .travel-stats button.on-travel strong {
+    color: inherit;
+  }
+  .travel-stats button.active {
+    border-color: currentColor;
+    box-shadow: inset 0 0 0 1px currentColor;
+  }
+  .travel-stats button.active::after {
+    content: "✓";
+    font-size: .7rem;
+    font-weight: 800;
+  }
+  /* Phase separators inside the list (same grammar as Performance groups). */
+  .group-row td {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding-top: .45rem;
+    padding-bottom: .45rem;
+  }
+  .group-row td span { font-weight: 500; }
+  .travel-table tbody .group-row:hover td:first-child { box-shadow: none; }
+  .row-cancelled td:not(:first-child) { color: var(--text-muted); }
+  .cancelled-badge { margin-left: .4rem; }
+  .voucher-cell {
+    white-space: nowrap;
   }
   .travel-toolbar {
     align-items: center;

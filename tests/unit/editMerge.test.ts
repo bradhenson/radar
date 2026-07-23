@@ -225,6 +225,8 @@ describe("mergeTravelEdit", () => {
     dtsAuthorizationStatus: "approved",
     dtsAuthorizationId: "DTS-42",
     voucherDueDate: "2026-09-10",
+    voucherStatus: "submitted",
+    voucherSubmittedDate: "2026-09-08",
     notes: "Conference",
     createdAt: "2025-01-01T00:00:00.000Z",
     updatedAt: "2026-01-01T00:00:00.000Z",
@@ -240,6 +242,8 @@ describe("mergeTravelEdit", () => {
     dtsAuthorizationStatus: t.dtsAuthorizationStatus,
     dtsAuthorizationId: t.dtsAuthorizationId ?? "",
     voucherDueDate: t.voucherDueDate ?? "",
+    voucherStatus: t.voucherStatus ?? "not_submitted",
+    voucherSubmittedDate: t.voucherSubmittedDate ?? "",
     notes: t.notes ?? ""
   });
 
@@ -251,5 +255,22 @@ describe("mergeTravelEdit", () => {
   it("preserves the archive flag on edit", () => {
     const merged = mergeTravelEdit(full, { ...formFields(full), destination: "San Diego, CA" }, ctx);
     expect(merged.isArchived).toBe(true);
+  });
+
+  it("preserves a cancelled trip's status through an unrelated edit", () => {
+    const cancelled: TravelRecord = { ...full, tripStatus: "cancelled", cancelledDate: "2026-08-20" };
+    const merged = mergeTravelEdit(cancelled, { ...formFields(cancelled), notes: "Rescheduled next quarter" }, ctx);
+    expect(merged.tripStatus).toBe("cancelled");
+    expect(merged.cancelledDate).toBe("2026-08-20");
+  });
+
+  it("drops the submitted date when the voucher is reopened", () => {
+    const merged = mergeTravelEdit(
+      full,
+      { ...formFields(full), voucherStatus: "not_submitted", voucherSubmittedDate: "2026-09-08" },
+      ctx
+    );
+    expect(merged.voucherStatus).toBe("not_submitted");
+    expect(merged.voucherSubmittedDate).toBeUndefined();
   });
 });

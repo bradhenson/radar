@@ -3,6 +3,7 @@
 
 import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../models";
 import { addDays } from "../../utils/dates";
+import { isTripCancelled } from "./travel";
 
 export interface CalendarCell {
   date: IsoDate;
@@ -108,13 +109,13 @@ export function leaveDayMap(records: LeaveRecord[], start: IsoDate, end: IsoDate
 
 /**
  * Travel records expanded to every day of the trip (clamped to [start, end]).
- * Archived trips are excluded; an end before the start renders on the start
- * date only.
+ * Archived and cancelled trips are excluded; an end before the start renders
+ * on the start date only.
  */
 export function travelDayMap(records: TravelRecord[], start: IsoDate, end: IsoDate): Map<IsoDate, TravelRecord[]> {
   const map = new Map<IsoDate, TravelRecord[]>();
   for (const trip of records) {
-    if (trip.isArchived) continue;
+    if (trip.isArchived || isTripCancelled(trip)) continue;
     const rangeEnd = trip.endDate < trip.startDate ? trip.startDate : trip.endDate;
     if (rangeEnd < start || trip.startDate > end) continue;
     let day = trip.startDate < start ? start : trip.startDate;

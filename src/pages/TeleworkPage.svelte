@@ -9,12 +9,27 @@
   import { TELEWORK_RECORD_TYPES, type TeleworkRecord, type TeleworkStatus } from "../domain/models";
   import { mergeTeleworkEdit } from "../domain/rules/editMerge";
   import { monthGrid, monthOf } from "../domain/rules/calendar";
+  import {
+    allowanceState,
+    countsTowardTeleworkLimit,
+    isSituationalRequest,
+    isWithinTeleworkWindow,
+    payPeriodFor,
+    payPeriodLabel,
+    requestEndDate,
+    requestPayPeriodStart,
+    SITUATIONAL_REQUEST_TYPE,
+    teleworkDays,
+    teleworkUsageByPayPeriod,
+    usageKey,
+    type TeleworkPayPeriodUsage
+  } from "../domain/rules/telework";
   import { addMonths, daysBetween, formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
 
-  const SITUATIONAL_TYPE = "Situational request";
+  const SITUATIONAL_TYPE = SITUATIONAL_REQUEST_TYPE;
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
   const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
     { value: "pending", label: "Pending" },
@@ -73,7 +88,7 @@
     const record = app.teleworkRecords.find((t) => t.id === id);
     if (!record) return;
     view = "list";
-    if (isHistorical(record)) showHistorical = true;
+    if (isSituationalRequest(record) ? !inRequestWindow(record) : isHistorical(record)) showHistorical = true;
     if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
     if (filterStatus && filterStatus !== record.status) filterStatus = "";
     expanded[id] = true;
@@ -97,18 +112,20 @@
     return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
   }
 
-  function isSituationalRequest(t: TeleworkRecord): boolean {
-    return t.recordType === SITUATIONAL_TYPE;
-  }
-
-  function requestEndDate(t: Pick<TeleworkRecord, "effectiveDate" | "expirationDate">): string | undefined {
-    return t.expirationDate || t.effectiveDate;
-  }
-
+  /**
+   * Agreements keep the original rule (final states and lapsed records are
+   * history). Situational requests use the date window instead — see
+   * `inRequestWindow` — so a denied or cancelled request from last week still
+   * shows up in the record of who asked for what.
+   */
   function isHistorical(t: TeleworkRecord): boolean {
     const end = requestEndDate(t);
     if (HISTORICAL_STATUSES.has(t.status)) return true;
     return Boolean(end && end < app.today && (t.status === "approved" || t.status === "active"));
+  }
+
+  function inRequestWindow(t: TeleworkRecord): boolean {
+    return isWithinTeleworkWindow(t, app.today, app.settings.teleworkLookbackDays);
   }
 
   // Snapshots of the values each form opened with, for the unsaved-changes guards.
@@ -259,10 +276,12 @@
     return "";
   }
 
+  // Default view: everything from the last `teleworkLookbackDays` days plus
+  // every upcoming request. "Show historical" reaches further back.
   let rows = $derived(
     app.teleworkRecords
       .filter(isSituationalRequest)
-      .filter((t) => showHistorical || !isHistorical(t))
+      .filter((t) => showHistorical || inRequestWindow(t))
       .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
       .filter((t) => !filterStatus || t.status === filterStatus)
       .sort((a, b) => {
@@ -271,6 +290,69 @@
         return aDate.localeCompare(bDate) || app.employeeName(a.employeeId).localeCompare(app.employeeName(b.employeeId));
       })
   );
+
+  // --- pay period allowance ------------------------------------------------
+  // Usage is computed from every situational request in the database, not just
+  // the visible rows: filtering the list to one status must not make an
+  // employee look under their allowance.
+  let teleworkLimit = $derived(app.settings.teleworkDaysPerPayPeriod);
+  let usageByPeriod = $derived(teleworkUsageByPayPeriod(app.teleworkRecords, app.settings.payPeriodAnchorDate));
+  let currentPeriodStart = $derived(payPeriodFor(app.today, app.settings.payPeriodAnchorDate).start);
+
+  function usageFor(t: TeleworkRecord): TeleworkPayPeriodUsage | undefined {
+    const periodStart = requestPayPeriodStart(t, app.settings.payPeriodAnchorDate);
+    return periodStart ? usageByPeriod.get(usageKey(t.employeeId, periodStart)) : undefined;
+  }
+
+  function usageDetail(t: TeleworkRecord): string {
+    const usage = usageFor(t);
+    if (!usage) {
+      return countsTowardTeleworkLimit(t)
+        ? "No telework date on this request"
+        : `A ${statusLabel(t.status).toLowerCase()} request uses none of the pay period allowance`;
+    }
+    const period = payPeriodLabel(payPeriodFor(usage.periodStart, app.settings.payPeriodAnchorDate));
+    const parts = [`${usage.totalDays} of ${teleworkLimit} day${teleworkLimit === 1 ? "" : "s"} used in ${period}`];
+    if (usage.pendingDays > 0) parts.push(`${usage.approvedDays} approved, ${usage.pendingDays} pending`);
+    if (usage.totalDays > teleworkLimit) parts.push("over the pay period allowance");
+    return parts.join(" — ");
+  }
+
+  function usageTitle(t: TeleworkRecord): string {
+    const usage = usageFor(t);
+    if (!usage) return "";
+    const period = payPeriodLabel(payPeriodFor(usage.periodStart, app.settings.payPeriodAnchorDate));
+    const pending = usage.pendingDays > 0 ? `, ${usage.pendingDays} still pending` : "";
+    return `${app.employeeName(t.employeeId)} has ${usage.totalDays} telework day${usage.totalDays === 1 ? "" : "s"}${pending} in the pay period ${period} (allowance ${teleworkLimit})`;
+  }
+
+  // Rows are sorted by date, so a run of equal pay periods is one group.
+  let requestGroups = $derived.by(() => {
+    const anchor = app.settings.payPeriodAnchorDate;
+    const groups: { periodStart: string; rows: TeleworkRecord[] }[] = [];
+    for (const row of rows) {
+      const periodStart = requestPayPeriodStart(row, anchor) ?? "";
+      const last = groups[groups.length - 1];
+      if (last && last.periodStart === periodStart) last.rows.push(row);
+      else groups.push({ periodStart, rows: [row] });
+    }
+    return groups.map((group) => {
+      const period = payPeriodFor(group.periodStart || app.today, anchor);
+      // Employees over their allowance in this period, counted once each.
+      const over = new Set(
+        group.rows
+          .map((row) => usageFor(row))
+          .filter((usage): usage is TeleworkPayPeriodUsage => Boolean(usage) && usage!.totalDays > teleworkLimit)
+          .map((usage) => usage.employeeId)
+      );
+      return {
+        ...group,
+        label: group.periodStart ? payPeriodLabel(period) : "No telework date",
+        isCurrent: group.periodStart === currentPeriodStart,
+        overCount: over.size
+      };
+    });
+  });
 
   let agreementRows = $derived(
     app.teleworkRecords
@@ -324,6 +406,10 @@
         "Request received",
         "Telework start",
         "Telework end",
+        "Telework days",
+        "Pay period",
+        "Days used in pay period",
+        "Pay period allowance",
         "Notes",
         "Created",
         "Updated"
@@ -334,6 +420,10 @@
         t.requestDate,
         t.effectiveDate,
         requestEndDate(t),
+        teleworkDays(t).length,
+        requestPayPeriodStart(t, app.settings.payPeriodAnchorDate),
+        usageFor(t)?.totalDays,
+        teleworkLimit,
         t.notes,
         t.createdAt.slice(0, 10),
         t.updatedAt.slice(0, 10)
@@ -399,62 +489,101 @@
 
   {#if view === "list"}
     <h2 class="section-heading">Situational requests</h2>
+    <p class="small muted section-hint">
+      Requests from the last {app.settings.teleworkLookbackDays} days plus everything upcoming, grouped by pay period.
+      Each employee may use {teleworkLimit} telework day{teleworkLimit === 1 ? "" : "s"} per pay period.
+    </p>
     {#if rows.length === 0}
       <EmptyState message="No situational telework requests." hint="Add requests as they arrive by email." />
     {:else}
-      <table class="data">
+      <table class="data request-table">
         <thead>
           <tr>
-            <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th>
+            <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Pay period use</th>
           </tr>
         </thead>
         <tbody>
-          {#each rows as t (t.id)}
-            {@const open = Boolean(expanded[t.id])}
-            <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
-            <!-- svelte-ignore a11y_click_events_have_key_events -->
-            <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-            <tr class="row-clickable" class:row-open={open} id={"telework-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
-              <td>
-                <button
-                  type="button"
-                  class="disclosure"
-                  class:open
-                  aria-expanded={open}
-                  aria-label={open ? `Hide request details for ${app.employeeName(t.employeeId)}` : `Show request details for ${app.employeeName(t.employeeId)}`}
-                  onclick={(ev) => {
-                    ev.stopPropagation();
-                    toggleRow(t.id);
-                  }}><Icon name="chevron" size={13} /></button>
-                {app.employeeName(t.employeeId)}
+          {#each requestGroups as group (group.periodStart)}
+            <tr class="group-row">
+              <td colspan="6">
+                {group.label}
+                {#if group.isCurrent}<span class="current-tag">This pay period</span>{/if}
+                <span>({group.rows.length})</span>
+                {#if group.overCount > 0}
+                  <span class="over-tag">{group.overCount} over allowance</span>
+                {/if}
               </td>
-              <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
-              <td class="date-cell">{formatDate(t.requestDate)}</td>
-              <td class="date-cell">{formatDate(t.effectiveDate)}</td>
-              <td class="date-cell">{formatDate(requestEndDate(t))}</td>
             </tr>
-            {#if open}
-              <tr class="detail-row">
-                <td colspan="5">
-                  <div class="detail" aria-label={`Request details for ${app.employeeName(t.employeeId)}`}>
-                    <dl class="detail-grid">
-                      <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
-                    </dl>
-                    <div class="detail-footer">
-                      <button type="button" onclick={() => openForm(t)}>Edit</button>
-                      <button
-                        type="button"
-                        class="icon-btn danger"
-                        aria-label="Delete telework request"
-                        title="Delete"
-                        onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
-                      <span class="spacer"></span>
-                      <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
-                    </div>
-                  </div>
+            {#each group.rows as t (t.id)}
+              {@const open = Boolean(expanded[t.id])}
+              {@const usage = usageFor(t)}
+              {@const state = usage ? allowanceState(usage.totalDays, teleworkLimit) : "under"}
+              <!-- Row click toggles the inline detail; the chevron is the keyboard control. -->
+              <!-- svelte-ignore a11y_click_events_have_key_events -->
+              <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+              <tr class="row-clickable" class:row-open={open} id={"telework-row-" + t.id} onclick={() => toggleFromRow(t.id)}>
+                <td>
+                  <button
+                    type="button"
+                    class="disclosure"
+                    class:open
+                    aria-expanded={open}
+                    aria-label={open ? `Hide request details for ${app.employeeName(t.employeeId)}` : `Show request details for ${app.employeeName(t.employeeId)}`}
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      toggleRow(t.id);
+                    }}><Icon name="chevron" size={13} /></button>
+                  {app.employeeName(t.employeeId)}
+                </td>
+                <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
+                <td class="date-cell">{formatDate(t.requestDate)}</td>
+                <td class="date-cell">{formatDate(t.effectiveDate)}</td>
+                <td class="date-cell">{formatDate(requestEndDate(t))}</td>
+                <td class="usage-cell">
+                  {#if usage}
+                    <span
+                      class="badge"
+                      class:overdue={state === "over"}
+                      class:warning={state === "at"}
+                      title={usageTitle(t)}
+                    >{usage.totalDays} of {teleworkLimit}</span>
+                    {#if usage.pendingDays > 0}
+                      <span class="muted small">{usage.pendingDays} pending</span>
+                    {/if}
+                  {:else if !countsTowardTeleworkLimit(t)}
+                    <span class="muted" title={`A ${statusLabel(t.status).toLowerCase()} request uses none of the pay period allowance`}>Not counted</span>
+                  {:else}
+                    <span class="muted">—</span>
+                  {/if}
                 </td>
               </tr>
-            {/if}
+              {#if open}
+                <tr class="detail-row">
+                  <td colspan="6">
+                    <div class="detail" aria-label={`Request details for ${app.employeeName(t.employeeId)}`}>
+                      <dl class="detail-grid">
+                        <div>
+                          <dt>Pay period use</dt>
+                          <dd>{usageDetail(t)}</dd>
+                        </div>
+                        <div><dt>Notes</dt><dd class="prewrap">{t.notes || "None"}</dd></div>
+                      </dl>
+                      <div class="detail-footer">
+                        <button type="button" onclick={() => openForm(t)}>Edit</button>
+                        <button
+                          type="button"
+                          class="icon-btn danger"
+                          aria-label="Delete telework request"
+                          title="Delete"
+                          onclick={() => requestDelete(t)}><Icon name="trash" size={16} /></button>
+                        <span class="spacer"></span>
+                        <button type="button" onclick={() => router.go("employees", t.employeeId)}>Open employee</button>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              {/if}
+            {/each}
           {/each}
         </tbody>
       </table>
@@ -944,6 +1073,45 @@
   .status-approved,
   .status-active {
     background: var(--success-bg, var(--surface-2));
+  }
+  /* Pay period separators in the request list (same grammar as Performance
+     groups and the Travel phase groups). */
+  .group-row td {
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    padding-top: .45rem;
+    padding-bottom: .45rem;
+  }
+  .group-row td span { font-weight: 500; }
+  .request-table tbody .group-row:hover td:first-child { box-shadow: none; }
+  .current-tag {
+    margin-left: .35rem;
+    padding: .05rem .4rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .over-tag {
+    margin-left: .35rem;
+    padding: .05rem .4rem;
+    border-radius: 999px;
+    background: var(--overdue-bg);
+    color: var(--overdue-fg);
+    letter-spacing: normal;
+    text-transform: none;
+  }
+  .usage-cell {
+    white-space: nowrap;
+  }
+  .usage-cell .small {
+    margin-left: .35rem;
+    font-size: .72rem;
   }
   .section-heading {
     margin: 1.1rem 0 .4rem;

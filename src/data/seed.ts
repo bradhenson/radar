@@ -10,11 +10,13 @@ import {
   type Project,
   type Task,
   type TaskPriority,
+  type TeleworkStatus,
   type TrainingRequirement
 } from "../domain/models";
 import { addDays, nowTimestamp, todayIso } from "../utils/dates";
 import { newId } from "../utils/ids";
 import { ORDER_GAP } from "../domain/rules/boardOrder";
+import { payPeriodStartFor, PAY_PERIOD_DAYS } from "../domain/rules/telework";
 
 export function createSampleSnapshot(): DatabaseSnapshot {
   const now = nowTimestamp();
@@ -472,23 +474,63 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   }
 
   for (let i = 0; i < 24; i++) {
+    if (i % 4 === 0) continue; // Situational requests are seeded separately below.
     const employee = employees[(i * 3 + 2) % employees.length]!;
-    const situational = i % 4 === 0;
     c.teleworkRecords.push({
       id: newId(),
       employeeId: employee.id,
-      recordType: situational ? "Situational request" : i % 5 === 0 ? "Renewal" : "Agreement",
+      recordType: i % 5 === 0 ? "Renewal" : "Agreement",
       requestDate: addDays(today, -((i % 10) + 1)),
-      effectiveDate: addDays(today, situational ? i + 1 : -90 + i),
-      expirationDate: addDays(today, situational ? i + 1 : 30 + i * 4),
-      status: situational
-        ? (["pending", "approved", "denied", "cancelled"] as const)[(i / 4) % 4]!
-        : i % 7 === 0
-          ? "pending_approval"
-          : "active",
-      scheduleSummary: situational ? "One-day remote work request for focused analysis." : "Hybrid schedule captured for planning.",
+      effectiveDate: addDays(today, -90 + i),
+      expirationDate: addDays(today, 30 + i * 4),
+      status: i % 7 === 0 ? "pending_approval" : "active",
+      scheduleSummary: "Hybrid schedule captured for planning.",
       sourceSystem: "Email",
       sourceReference: `Synthetic telework reference ${i + 1}`,
+      ...stamp
+    });
+  }
+
+  // Situational requests are anchored to real pay period boundaries so the
+  // sample shows the allowance in action: someone over it, someone at it,
+  // requests still pending, and history just inside and outside the window.
+  const payPeriodStart = payPeriodStartFor(today, DEFAULT_SETTINGS.payPeriodAnchorDate);
+  const previousPeriodStart = addDays(payPeriodStart, -PAY_PERIOD_DAYS);
+  const nextPeriodStart = addDays(payPeriodStart, PAY_PERIOD_DAYS);
+  // Offsets from a period start (a Sunday), so every day below is a weekday.
+  const teleworkSeeds: [employeeIndex: number, periodStart: string, dayOffset: number, status: TeleworkStatus, note: string][] = [
+    // Over the two-day allowance this pay period, with the third still pending.
+    [1, payPeriodStart, 1, "approved", "Focused analysis day."],
+    [1, payPeriodStart, 3, "approved", "Report drafting."],
+    [1, payPeriodStart, 9, "pending", "Requested by email; would be a third day this pay period."],
+    // At the allowance.
+    [4, payPeriodStart, 2, "approved", "Home internet install window."],
+    [4, payPeriodStart, 10, "approved", "Documentation day."],
+    // Under the allowance, plus a denied request that uses none of it.
+    [6, payPeriodStart, 8, "pending", "Awaiting supervisor decision."],
+    [2, payPeriodStart, 4, "denied", "Coverage needed on site that day."],
+    // Next pay period.
+    [1, nextPeriodStart, 2, "pending", "Planned ahead for a quiet week."],
+    [6, nextPeriodStart, 9, "approved", "Approved in advance."],
+    // Previous pay period: recent history, still inside the 30-day window.
+    [4, previousPeriodStart, 3, "approved", "Weather closure follow-up."],
+    [2, previousPeriodStart, 11, "cancelled", "Employee came in after all."],
+    // Older than the 30-day window: only visible under "Show historical".
+    [1, addDays(payPeriodStart, -PAY_PERIOD_DAYS * 3), 2, "approved", "Older request, kept for the record."],
+    [4, addDays(payPeriodStart, -PAY_PERIOD_DAYS * 3), 10, "approved", "Older request, kept for the record."]
+  ];
+  for (const [employeeIndex, periodStart, dayOffset, status, note] of teleworkSeeds) {
+    const date = addDays(periodStart, dayOffset);
+    c.teleworkRecords.push({
+      id: newId(),
+      employeeId: employees[employeeIndex % employees.length]!.id,
+      recordType: "Situational request",
+      requestDate: addDays(date, -4),
+      effectiveDate: date,
+      expirationDate: date,
+      status,
+      sourceSystem: "Email",
+      notes: note,
       ...stamp
     });
   }
@@ -518,10 +560,48 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       dtsAuthorizationStatus,
       dtsAuthorizationId: dtsAuthorizationStatus === "not_started" ? undefined : `A${(240000 + i * 137).toString()}`,
       voucherDueDate: addDays(end, 5),
+      tripStatus: "scheduled",
+      voucherStatus: "not_submitted",
       notes: i % 4 === 0 ? "Conference travel; coordinate coverage during the trip." : undefined,
       ...stamp
     });
   }
+
+  // Two more trips so the travel list shows the rest of the lifecycle: one
+  // finished and settled (hidden behind "show past"), and one cancelled.
+  const settledEnd = addDays(today, -16);
+  c.travelRecords.push({
+    id: newId(),
+    employeeId: employees[2 % employees.length]!.id,
+    destination: "Patuxent River, MD",
+    startDate: addDays(today, -20),
+    endDate: settledEnd,
+    iptConcurrence: "concurred",
+    dtsAuthorizationStatus: "approved",
+    dtsAuthorizationId: "A241800",
+    voucherDueDate: addDays(settledEnd, 5),
+    tripStatus: "scheduled",
+    voucherStatus: "submitted",
+    voucherSubmittedDate: addDays(settledEnd, 3),
+    notes: "Test event support; voucher closed out.",
+    ...stamp
+  });
+  c.travelRecords.push({
+    id: newId(),
+    employeeId: employees[5 % employees.length]!.id,
+    destination: "Albuquerque, NM",
+    startDate: addDays(today, 9),
+    endDate: addDays(today, 12),
+    iptConcurrence: "concurred",
+    dtsAuthorizationStatus: "created",
+    dtsAuthorizationId: "A241937",
+    voucherDueDate: addDays(today, 17),
+    tripStatus: "cancelled",
+    cancelledDate: addDays(today, -1),
+    voucherStatus: "not_required",
+    notes: "Program review postponed; trip cancelled.",
+    ...stamp
+  });
 
   for (let i = 0; i < 8; i++) {
     const employee = employees[(i * 4 + 3) % employees.length]!;

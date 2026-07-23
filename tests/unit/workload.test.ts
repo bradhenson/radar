@@ -120,11 +120,12 @@ describe("availability", () => {
     ],
     [
       travel({ id: "t1", employeeId: "e3", startDate: "2026-07-16", endDate: "2026-07-22" }),
-      travel({ id: "t2", employeeId: "e4", startDate: "2026-08-20", endDate: "2026-08-22", isArchived: true })
+      travel({ id: "t2", employeeId: "e4", startDate: "2026-08-20", endDate: "2026-08-22", isArchived: true }),
+      travel({ id: "t3", employeeId: "e5", startDate: "2026-07-20", endDate: "2026-07-22", tripStatus: "cancelled" })
     ]
   );
 
-  it("excludes cancelled leave and archived travel", () => {
+  it("excludes cancelled leave and archived or cancelled travel", () => {
     expect(entries.map((e) => e.employeeId).sort()).toEqual(["e1", "e3"]);
   });
 

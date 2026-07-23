@@ -56,6 +56,13 @@ export function addMonths(date: IsoDate, months: number): IsoDate {
   return `${ny}-${pad(nm)}-${pad(nd)}`;
 }
 
+/** Saturday or Sunday. Day-of-week comes from UTC day arithmetic, never a local timestamp. */
+export function isWeekend(date: IsoDate): boolean {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return dow === 0 || dow === 6;
+}
+
 /** Whole days from `a` to `b`; positive when b is after a. */
 export function daysBetween(a: IsoDate, b: IsoDate): number {
   const [ay, am, ad] = a.split("-").map(Number) as [number, number, number];

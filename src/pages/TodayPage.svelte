@@ -8,6 +8,7 @@
   import type { AttentionItem } from "../domain/rules/attention";
   import { AWARD_FINAL_STATUSES } from "../domain/rules/calendar";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
+  import { isTripCancelled, isVoucherSettled } from "../domain/rules/travel";
   import { addDays, daysBetween, formatDate } from "../utils/dates";
 
   let overdueCount = $derived(app.attention.filter((i) => i.reasonCode === "overdue").length);
@@ -104,11 +105,11 @@
       }
     }
     for (const trip of app.travelRecords) {
-      if (trip.isArchived) continue;
+      if (trip.isArchived || isTripCancelled(trip)) continue;
       if (trip.startDate >= app.today && trip.startDate <= horizon) {
         events.push({ date: trip.startDate, label: `${app.employeeName(trip.employeeId)} travel to ${trip.destination}`, kind: "Travel" });
       }
-      if (trip.voucherDueDate && trip.voucherDueDate >= app.today && trip.voucherDueDate <= horizon) {
+      if (trip.voucherDueDate && !isVoucherSettled(trip) && trip.voucherDueDate >= app.today && trip.voucherDueDate <= horizon) {
         events.push({ date: trip.voucherDueDate, label: `Voucher due — ${app.employeeName(trip.employeeId)} (${trip.destination})`, kind: "Travel" });
       }
     }

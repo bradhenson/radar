@@ -142,7 +142,7 @@ const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employeeTrainingRecords: ["assignedDate", "dueDate", "completedDate", "expirationDate", "lastVerifiedDate"],
   leaveRecords: ["startDate", "endDate", "lastVerifiedDate"],
   teleworkRecords: ["requestDate", "effectiveDate", "expirationDate", "lastVerifiedDate"],
-  travelRecords: ["startDate", "endDate", "voucherDueDate"],
+  travelRecords: ["startDate", "endDate", "voucherDueDate", "cancelledDate", "voucherSubmittedDate"],
   awardRecords: ["accomplishmentPeriodStart", "accomplishmentPeriodEnd", "nominationDueDate", "submittedDate", "decisionDate"],
   meetingNotes: ["meetingDate"],
   employeeInteractions: ["interactionDate"],
@@ -226,6 +226,12 @@ const OPTIONAL_ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readon
   tasks: {
     verificationStatus: ["not_required", "unverified", "verified", "needs_recheck"],
     showOnCard: ["description", "checklist"]
+  },
+  // Absent on trips written before cancellation and voucher completion
+  // existed; domain/rules/travel.ts defaults them.
+  travelRecords: {
+    tripStatus: ["scheduled", "cancelled"],
+    voucherStatus: ["not_submitted", "submitted", "not_required"]
   }
 };
 
@@ -604,7 +610,9 @@ const SETTING_NUMBER_FIELDS: (keyof AppSettings)[] = [
   "backupReminderDays",
   "backupChangeThreshold",
   "trainingWarningDays",
-  "leaveLookaheadDays"
+  "leaveLookaheadDays",
+  "teleworkLookbackDays",
+  "teleworkDaysPerPayPeriod"
 ];
 
 /**
@@ -630,6 +638,12 @@ function validateSettings(raw: unknown, errors: string[]): void {
     if (value !== undefined && (!Number.isInteger(value) || (value as number) < 0 || (value as number) > 1_000_000)) {
       errors.push(`settings.${key} must be a whole number from 0 to 1,000,000.`);
     }
+  }
+  if (
+    settings.payPeriodAnchorDate !== undefined &&
+    (typeof settings.payPeriodAnchorDate !== "string" || !isValidIsoDate(settings.payPeriodAnchorDate))
+  ) {
+    errors.push("settings.payPeriodAnchorDate must be a YYYY-MM-DD date.");
   }
   if (settings.theme !== undefined && !["light", "dark", "system"].includes(String(settings.theme))) {
     errors.push("settings.theme must be light, dark, or system.");

@@ -11,6 +11,7 @@ import {
 import { createSampleSnapshot } from "../../src/data/seed";
 import { InMemoryDataStore } from "../../src/data/InMemoryDataStore";
 import { COLLECTION_NAMES } from "../../src/data/DataStore";
+import { DEFAULT_SETTINGS } from "../../src/domain/models";
 
 /**
  * Re-seal a deliberately mutated package (recompute counts + checksum) so a
@@ -296,7 +297,7 @@ describe("backup validation rejects bad input", () => {
     };
     const r = parseAndValidateBackup(reseal(pkg));
     expect(r.valid).toBe(true);
-    expect(r.package!.data.settings.schemaVersion).toBe(3);
+    expect(r.package!.data.settings.schemaVersion).toBe(DEFAULT_SETTINGS.schemaVersion);
     expect(r.package!.data.settings.backupReminderDays).toBe(1);
     expect(r.package!.data.settings.backupChangeThreshold).toBe(10);
   });

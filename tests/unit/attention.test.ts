@@ -412,6 +412,29 @@ describe("travel attention rules", () => {
     );
     expect(items).toHaveLength(0);
   });
+
+  it("goes quiet once the voucher is submitted or was never required", () => {
+    const returned = { startDate: "2026-06-20", endDate: "2026-06-25", voucherDueDate: "2026-06-30" } as const;
+    expect(
+      travelAttention(baseCtx({ employees, travelRecords: [makeTravel({ ...returned, voucherStatus: "submitted" })] }))
+    ).toHaveLength(0);
+    expect(
+      travelAttention(baseCtx({ employees, travelRecords: [makeTravel({ ...returned, voucherStatus: "not_required" })] }))
+    ).toHaveLength(0);
+  });
+
+  it("skips cancelled trips entirely", () => {
+    const items = travelAttention(
+      baseCtx({
+        employees,
+        travelRecords: [
+          makeTravel({ startDate: "2026-07-06", iptConcurrence: "pending", tripStatus: "cancelled" }),
+          makeTravel({ id: "tv2", startDate: "2026-06-20", endDate: "2026-06-25", voucherDueDate: "2026-06-30", tripStatus: "cancelled" })
+        ]
+      })
+    );
+    expect(items).toHaveLength(0);
+  });
 });
 
 describe("award attention rules", () => {

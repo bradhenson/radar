@@ -12,7 +12,8 @@
   } from "../data/backup";
   import { COLOR_THEMES, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
-  import { formatTimestamp } from "../utils/dates";
+  import { payPeriodFor, payPeriodLabel } from "../domain/rules/telework";
+  import { formatTimestamp, isValidIsoDate } from "../utils/dates";
   import { newId } from "../utils/ids";
 
   let importResult = $state<BackupValidationResult | undefined>(undefined);
@@ -60,6 +61,12 @@
       const v = parseInt((e.currentTarget as HTMLInputElement).value, 10);
       if (Number.isFinite(v) && v >= 0) void updateSetting(key, v as never);
     };
+  }
+
+  // An invalid anchor would shift every pay period boundary, so ignore it.
+  function payPeriodAnchorInput(e: Event) {
+    const value = (e.currentTarget as HTMLInputElement).value;
+    if (isValidIsoDate(value)) void updateSetting("payPeriodAnchorDate", value);
   }
 
   async function saveProfileConfiguration(sections: EmployeeProfileSection[], fields: EmployeeProfileField[]) {
@@ -453,6 +460,24 @@
         <input type="number" min="0" value={app.settings.activityRetentionDays} onchange={numberInput("activityRetentionDays")} />
         <span class="field-hint">Older entries are pruned at startup. 0 keeps everything.</span></label>
     </div>
+  </section>
+
+  <section class="card" style="margin-bottom:1rem">
+    <h2>Telework and pay periods</h2>
+    <div class="settings-grid">
+      <label>Telework days per pay period
+        <input type="number" min="1" value={app.settings.teleworkDaysPerPayPeriod} onchange={numberInput("teleworkDaysPerPayPeriod")} />
+        <span class="field-hint">Situational telework each employee may use in one bi-weekly pay period.</span></label>
+      <label>Pay period start date
+        <input type="date" value={app.settings.payPeriodAnchorDate} onchange={payPeriodAnchorInput} />
+        <span class="field-hint">Any day that began a pay period; periods are counted bi-weekly from here.</span></label>
+      <label>Telework request history (days)
+        <input type="number" min="0" value={app.settings.teleworkLookbackDays} onchange={numberInput("teleworkLookbackDays")} />
+        <span class="field-hint">How far back the Telework list reaches; upcoming requests always show.</span></label>
+    </div>
+    <p class="small muted" style="margin:.6rem 0 0">
+      Current pay period: {payPeriodLabel(payPeriodFor(app.today, app.settings.payPeriodAnchorDate))}
+    </p>
   </section>
 
   <section class="card" style="margin-bottom:1rem">
