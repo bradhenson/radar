@@ -23,7 +23,6 @@
   import TeleworkPage from "../pages/TeleworkPage.svelte";
   import TravelPage from "../pages/TravelPage.svelte";
   import AwardsPage from "../pages/AwardsPage.svelte";
-  import ReportsPage from "../pages/ReportsPage.svelte";
   import ActivityPage from "../pages/ActivityPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
@@ -68,8 +67,7 @@
     { page: "telework", label: "Telework", icon: "telework" },
     { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "reports", label: "Reports", icon: "reports", section: "System" },
-    { page: "activity", label: "Activity", icon: "activity" },
+    { page: "activity", label: "Activity", icon: "activity", section: "System" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
@@ -82,7 +80,7 @@
   );
 
   // Narrow windows get a compact primary nav plus a "More" menu instead of a
-  // 14-destination horizontal scroll strip.
+  // long horizontal scroll strip.
   const PRIMARY_NAV = new Set(["board", "calendar", "today", "employees"]);
   let primaryNavItems = $derived(NAV.filter((i) => PRIMARY_NAV.has(i.page)));
   let moreNavItems = $derived(NAV.filter((i) => !PRIMARY_NAV.has(i.page)));
@@ -466,8 +464,6 @@
           <TravelPage />
         {:else if router.current.page === "awards"}
           <AwardsPage />
-        {:else if router.current.page === "reports"}
-          <ReportsPage />
         {:else if router.current.page === "activity"}
           <ActivityPage />
         {:else if router.current.page === "archive"}

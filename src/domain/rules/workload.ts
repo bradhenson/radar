@@ -1,5 +1,5 @@
-// Reports (plan 32): pure aggregations for the Reports page. Informational
-// views for coverage and planning — never an employee performance ranking.
+// Pure workload and availability aggregations retained for future review tools.
+// Informational only — never an employee performance ranking.
 
 import type { Employee, EmployeeInteraction, IsoDate, LeaveRecord, PerformanceInput, Task, TravelRecord } from "../models";
 import { addDays, compareDates, daysBetween } from "../../utils/dates";
@@ -157,7 +157,7 @@ export function availabilityByWeek(entries: AbsenceEntry[], today: IsoDate, week
   return out;
 }
 
-/** Absences covering a single day (the Reports "out today" strip). */
+/** Absences covering a single day. */
 export function absencesOn(entries: AbsenceEntry[], date: IsoDate): AbsenceEntry[] {
   return entries
     .filter((entry) => entry.startDate <= date && entry.endDate >= date)

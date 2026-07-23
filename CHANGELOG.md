@@ -16,8 +16,6 @@
 
 - Activity page (System section): the full audit trail is now inspectable — filter by record type, action, or summary text, page through history, and jump back to records that still exist. Alongside it, an activity retention policy: entries older than a configurable window (default 365 days; 0 keeps everything) are pruned automatically at startup so years of daily use never slow the app down. The prune itself is recorded as a maintenance entry, and the setting lives under Attention rule thresholds in Settings.
 
-- Reports page (System section) with two reports. Workload: supervisor-level stat cards (open, overdue, waiting, due in 7/30 days, unassigned) plus a per-employee table of open/overdue/waiting counts, due-soon work, distinct projects, outstanding training actions, and last performance input / check-in dates — informational coverage, never a ranking. Availability: who is out today and a four-week look-ahead of leave and travel grouped by calendar week. The workload table exports to CSV, and both reports print cleanly (navigation and toolbars are stripped by new print styles).
-
 - Optional MCP server (`mcp/`, development-machine tool) that points an LLM client you already use — Claude Code, Codex, Claude Desktop — at your RADAR database. It can list and search people, tasks, and projects, run RADAR's attention engine, read the activity log, and record work: create and update tasks (including archive/restore), update employee profile fields by their configured labels (built-in and organization-defined, with per-type validation for dates, yes/no, and choice options), add employee notes, and log check-ins. It uses your existing LLM subscription and holds no API key; the server itself makes no network calls. Writes follow the same contract as the app's own service layer — the read and the write share one transaction (a concurrent edit in the app is never reverted from a stale read), record, activity entry, and backup counter commit together, board column and status stay in sync, nothing is hard-deleted — and an ambiguous name is an error listing candidates rather than a guess. The shipped browser and desktop artifacts are unchanged and still make no network calls. See `mcp/README.md`.
 
 - The desktop app now notices when another process writes to the same `radar.db` and reloads automatically, showing a toast. This keeps RADAR usable while the MCP server records work in the background: without it, those records would stay invisible and editing the same record afterwards would silently overwrite them from stale memory.
@@ -41,6 +39,8 @@
 - Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.
 
 ### Changed
+
+- Reports has been removed from the app for now so a different reporting approach can be designed later. It no longer appears in navigation, routing, or global page search.
 
 - Training matrix status cells no longer show the standard button outline and shadow. Their status indicators, hover feedback, click behavior, and keyboard focus ring remain intact.
 

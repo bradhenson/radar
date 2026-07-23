@@ -24,7 +24,6 @@
     { page: "telework", label: "Telework" },
     { page: "travel", label: "Travel" },
     { page: "awards", label: "Awards" },
-    { page: "reports", label: "Reports" },
     { page: "activity", label: "Activity" },
     { page: "archive", label: "Archive" },
     { page: "settings", label: "Settings" }

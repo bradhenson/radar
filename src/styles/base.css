@@ -483,7 +483,7 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
 }
 
 /* ---------- print ----------
-   Reports (and any page) print as content only: navigation, toolbars, and
+   Printable pages render as content only: navigation, toolbars, and
    on-screen controls disappear; tables flatten to plain bordered rows. */
 @media print {
   .topbar, .sidenav, .compactnav, .toolbar, .no-print { display: none !important; }
