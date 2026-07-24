@@ -425,6 +425,8 @@ export interface AppSettings {
   payPeriodAnchorDate: IsoDate;
   theme: "light" | "dark" | "system";
   colorTheme: ColorTheme;
+  /** Visual style: classic solid panels, or translucent glass over an ambient backdrop. */
+  look: AppLook;
   /** Unmodified N/P/Q/T/B/E/M shortcuts; can be disabled for accessibility. */
   enableSingleKeyShortcuts: boolean;
   employeeProfileSections: EmployeeProfileSection[];
@@ -464,6 +466,15 @@ export interface EmployeeProfileField {
 }
 
 export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
+
+export type AppLook = "standard" | "glass" | "glass_strong";
+
+/** Selectable visual styles; applied via the data-look attribute (base.css). */
+export const APP_LOOKS: { value: AppLook; label: string; hint: string }[] = [
+  { value: "standard", label: "Standard", hint: "Solid panels" },
+  { value: "glass", label: "Glass", hint: "Translucent panels" },
+  { value: "glass_strong", label: "Glass+", hint: "Bolder translucency and color" }
+];
 
 const LEGACY_DEFAULT_APPLICATION_NAMES = new Set(["Supervisor Assistant"]);
 
@@ -507,6 +518,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   payPeriodAnchorDate: "2026-07-12",
   theme: "dark",
   colorTheme: "default",
+  look: "standard",
   enableSingleKeyShortcuts: true,
   employeeProfileSections: [
     { id: "identity", label: "Identity", sortOrder: 0, isArchived: false },

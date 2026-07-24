@@ -39,7 +39,7 @@
   });
 
   // Theme handling: light / dark / system via data-theme attribute,
-  // accent palette via data-palette.
+  // accent palette via data-palette, visual style via data-look.
   $effect(() => {
     const apply = () => {
       const pref = app.settings.theme;
@@ -47,6 +47,7 @@
         pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
       document.documentElement.dataset.palette = app.settings.colorTheme ?? "default";
+      document.documentElement.dataset.look = app.settings.look ?? "standard";
     };
     apply();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

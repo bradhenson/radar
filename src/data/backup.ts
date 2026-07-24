@@ -653,6 +653,9 @@ function validateSettings(raw: unknown, errors: string[]): void {
   if (settings.colorTheme !== undefined && !["default", "ocean", "forest", "violet", "sunset", "graphite"].includes(String(settings.colorTheme))) {
     errors.push("settings.colorTheme is not recognized.");
   }
+  if (settings.look !== undefined && !["standard", "glass", "glass_strong"].includes(String(settings.look))) {
+    errors.push("settings.look is not recognized.");
+  }
   if (settings.enableSingleKeyShortcuts !== undefined && typeof settings.enableSingleKeyShortcuts !== "boolean") {
     errors.push("settings.enableSingleKeyShortcuts must be true or false.");
   }

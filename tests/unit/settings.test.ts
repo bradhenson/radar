@@ -37,6 +37,14 @@ describe("application settings defaults", () => {
     );
   });
 
+  it("defaults the visual look to standard and preserves a saved glass choice", () => {
+    expect(DEFAULT_SETTINGS.look).toBe("standard");
+    // Databases saved before the look setting existed normalize to standard.
+    expect(normalizeAppSettings({ schemaVersion: 2 }).look).toBe("standard");
+    expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, look: "glass" }).look).toBe("glass");
+    expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, look: "glass_strong" }).look).toBe("glass_strong");
+  });
+
   it("refuses a telework allowance below one day", () => {
     expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, teleworkDaysPerPayPeriod: 0 }).teleworkDaysPerPayPeriod).toBe(2);
     expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, teleworkDaysPerPayPeriod: 3 }).teleworkDaysPerPayPeriod).toBe(3);

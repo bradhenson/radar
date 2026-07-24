@@ -10,7 +10,7 @@
     parseAndValidateBackup,
     type BackupValidationResult
   } from "../data/backup";
-  import { COLOR_THEMES, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
+  import { APP_LOOKS, COLOR_THEMES, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { payPeriodFor, payPeriodLabel } from "../domain/rules/telework";
   import { formatTimestamp, isValidIsoDate } from "../utils/dates";
@@ -501,6 +501,24 @@
       />
       Single-key shortcuts (N new task, Q quick add, P performance input, T/B/E/M navigation)
     </label>
+
+    <div class="palette-label" id="set-look">Look</div>
+    <div class="palette-row" role="group" aria-labelledby="set-look">
+      {#each APP_LOOKS as l (l.value)}
+        <button
+          type="button"
+          class="palette-btn"
+          class:selected={(app.settings.look ?? "standard") === l.value}
+          aria-pressed={(app.settings.look ?? "standard") === l.value}
+          title={l.hint}
+          onclick={() => void updateSetting("look", l.value)}
+        >
+          {l.label}
+          {#if (app.settings.look ?? "standard") === l.value}<span aria-hidden="true">✓</span>{/if}
+        </button>
+      {/each}
+    </div>
+    <p class="field-hint" style="margin:.3rem 0 0">Glass renders panels as translucent, frosted layers over a soft color backdrop.</p>
 
     <div class="palette-label" id="set-color-theme">Color theme</div>
     <div class="palette-row" role="group" aria-labelledby="set-color-theme">

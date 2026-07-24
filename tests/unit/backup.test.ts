@@ -319,12 +319,13 @@ describe("backup validation rejects bad input", () => {
   it("rejects invalid setting values instead of silently accepting them", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     const data = pkg.data as unknown as Record<string, unknown>;
-    data.settings = { dueSoonDays: "nope", theme: "night", enableSingleKeyShortcuts: "yes" };
+    data.settings = { dueSoonDays: "nope", theme: "night", enableSingleKeyShortcuts: "yes", look: "frosted" };
     const r = parseAndValidateBackup(reseal(pkg));
     expect(r.valid).toBe(false);
     expect(r.errors.some((e) => e.includes("settings.dueSoonDays"))).toBe(true);
     expect(r.errors.some((e) => e.includes("settings.theme"))).toBe(true);
     expect(r.errors.some((e) => e.includes("enableSingleKeyShortcuts"))).toBe(true);
+    expect(r.errors.some((e) => e.includes("settings.look"))).toBe(true);
   });
 
   it("round-trips custom employee profile fields and values", () => {

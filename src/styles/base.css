@@ -6,6 +6,10 @@
 :root {
   --font: "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, sans-serif;
 
+  /* Native widget chrome (select popups, date pickers, popup scrollbars)
+     follows the app theme instead of defaulting to light. */
+  color-scheme: light;
+
   /* Neutrals — cool-tinted, low-border, shadow-driven layering */
   --bg: #f2f4f8;
   --surface: #ffffff;
@@ -53,6 +57,7 @@
 
 /* Dark neutrals: flat editor greys (VS Code-like), no blue cast. */
 [data-theme="dark"] {
+  color-scheme: dark;
   --bg: #1e1e1e;
   --surface: #252526;
   --surface-2: #2d2d30;
@@ -492,6 +497,206 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   table.data { box-shadow: none; border-radius: 0; }
   table.data tbody tr:hover { background: transparent; }
   a { text-decoration: none; color: inherit; }
+}
+
+/* ---------- glass looks (data-look="glass" | "glass_strong") ----------
+   Optional visual styles selected in Settings → Appearance. Base rules match
+   both variants via [data-look^="glass"]; the stronger variant then layers
+   its overrides in the subsection further down. Panels become
+   translucent frosted layers over a fixed ambient backdrop of accent-tinted
+   gradients (the backdrop is what makes translucency visible). Everything
+   lives in this one section: surface/border/shadow variable overrides plus
+   targeted backdrop-filter rules for chrome that real content passes behind
+   (sticky top bar) or that floats above content (dialogs, menus, toasts).
+   Content panels stay blur-free on purpose — nothing sharp sits behind them,
+   so translucency alone gives the same visual at zero compositing cost.
+   Status colors (overdue/due-soon/success) stay solid for legibility.
+   Selectors use :root[data-look^="glass"] so they outrank component-scoped
+   rules (.topbar.svelte-xyz) and dark palette blocks. */
+
+:root[data-look^="glass"] {
+  --bg: #e9edf5;
+  --surface: rgba(255, 255, 255, 0.62);
+  --surface-2: rgba(237, 241, 249, 0.55);
+  --surface-elevated: rgba(255, 255, 255, 0.72);
+  --bucket-bg: rgba(255, 255, 255, 0.32);
+  --border: rgba(101, 119, 148, 0.17);
+  --border-strong: rgba(101, 119, 148, 0.35);
+  /* Derived from the live accent so every palette gets a matching tint. */
+  --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
+  --avatar-bg: color-mix(in srgb, var(--accent) 16%, transparent);
+  --shadow-xs: 0 1px 3px rgba(23, 32, 54, 0.07);
+  --shadow: 0 2px 6px rgba(23, 32, 54, 0.05), 0 12px 32px rgba(23, 32, 54, 0.09);
+  --shadow-lg: 0 8px 24px rgba(23, 32, 54, 0.12), 0 28px 64px rgba(23, 32, 54, 0.2);
+  /* Overscroll + canvas color while body itself is transparent. */
+  background: var(--bg);
+}
+
+:root[data-theme="dark"][data-look^="glass"] {
+  --bg: #111318;
+  --surface: rgba(39, 44, 56, 0.55);
+  --surface-2: rgba(53, 59, 75, 0.5);
+  --surface-elevated: rgba(41, 46, 59, 0.7);
+  --bucket-bg: rgba(17, 20, 28, 0.4);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.17);
+  --accent-soft: color-mix(in srgb, var(--accent) 17%, transparent);
+  --avatar-bg: color-mix(in srgb, var(--accent) 22%, transparent);
+  --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 36px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.55), 0 32px 72px rgba(0, 0, 0, 0.5);
+}
+
+/* Ambient backdrop: fixed so panels frost over a stationary field while the
+   page scrolls. Painted on a pseudo-element (not background-attachment) so
+   scrolling stays compositor-only. body goes transparent to reveal it. */
+:root[data-look^="glass"] body { background: transparent; }
+:root[data-look^="glass"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #7c3aed 13%, transparent), transparent 64%),
+    radial-gradient(44rem 32rem at 55% 112%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 66%),
+    var(--bg);
+}
+:root[data-theme="dark"][data-look^="glass"] body::before {
+  background:
+    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
+    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #8b5cf6 12%, transparent), transparent 62%),
+    radial-gradient(44rem 32rem at 55% 114%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 64%),
+    var(--bg);
+}
+/* The shell's own gradient wash would hide the backdrop. */
+:root[data-look^="glass"] .shell { background: transparent; }
+
+/* Sticky top bar: page content scrolls beneath it, so it gets a real blur. */
+:root[data-look^="glass"] .topbar {
+  background: color-mix(in srgb, var(--surface) 82%, transparent);
+  backdrop-filter: blur(16px) saturate(1.5);
+}
+/* Side / compact nav sit beside content, not over it: translucency only. */
+:root[data-look^="glass"] .sidenav,
+:root[data-look^="glass"] .compactnav {
+  background: color-mix(in srgb, var(--surface) 42%, transparent);
+}
+
+/* Floating layers blur whatever they cover. The dimming overlay itself stays
+   blur-free: a backdrop-filter there would become the backdrop root and the
+   dialog's own blur would no longer sample the page behind it. */
+:root[data-look^="glass"] .overlay {
+  background: color-mix(in srgb, #0a0e14 45%, transparent);
+}
+:root[data-look^="glass"] .dialog,
+:root[data-look^="glass"] .palette,
+:root[data-look^="glass"] .more-menu,
+:root[data-look^="glass"] .toast {
+  backdrop-filter: blur(22px) saturate(1.45);
+}
+
+/* Native select popups derive their colors from the select's rendered
+   background-color; a translucent one gets composited over the popup's own
+   base and washes out (light grey lists over a dark theme). Selects keep an
+   opaque surface matching the frosted composite so the popup inherits a
+   correct solid color. */
+:root[data-look^="glass"] select { background-color: #f5f7fb; }
+:root[data-theme="dark"][data-look^="glass"] select { background-color: #1d212a; }
+
+/* ---- stronger variant (data-look="glass_strong") ----
+   The same system turned up: thinner surfaces, bolder ambient color, deeper
+   chrome blur, and real frost on content panels too (cards, tables, stat
+   tiles, board columns — a bounded set, still not every task card). Light
+   mode picks up the classic white glass-edge border. */
+:root[data-look="glass_strong"] {
+  --surface: rgba(255, 255, 255, 0.45);
+  --surface-2: rgba(240, 244, 250, 0.4);
+  --surface-elevated: rgba(255, 255, 255, 0.55);
+  --bucket-bg: rgba(255, 255, 255, 0.22);
+  --border: rgba(255, 255, 255, 0.55);
+  --border-strong: rgba(96, 112, 140, 0.42);
+  --accent-soft: color-mix(in srgb, var(--accent) 16%, transparent);
+}
+:root[data-theme="dark"][data-look="glass_strong"] {
+  --surface: rgba(41, 47, 60, 0.4);
+  --surface-2: rgba(56, 63, 80, 0.38);
+  --surface-elevated: rgba(43, 49, 63, 0.55);
+  --bucket-bg: rgba(13, 16, 24, 0.35);
+  --border: rgba(255, 255, 255, 0.11);
+  --border-strong: rgba(255, 255, 255, 0.22);
+  --accent-soft: color-mix(in srgb, var(--accent) 22%, transparent);
+}
+:root[data-look="glass_strong"] body::before {
+  background:
+    radial-gradient(50rem 34rem at 10% -8%, color-mix(in srgb, var(--accent) 32%, transparent), transparent 64%),
+    radial-gradient(56rem 38rem at 108% 6%, color-mix(in srgb, #7c3aed 22%, transparent), transparent 66%),
+    radial-gradient(48rem 34rem at 50% 115%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 68%),
+    var(--bg);
+}
+:root[data-theme="dark"][data-look="glass_strong"] body::before {
+  background:
+    radial-gradient(50rem 34rem at 10% -8%, color-mix(in srgb, var(--accent) 26%, transparent), transparent 62%),
+    radial-gradient(56rem 38rem at 108% 6%, color-mix(in srgb, #8b5cf6 20%, transparent), transparent 64%),
+    radial-gradient(48rem 34rem at 50% 117%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 66%),
+    var(--bg);
+}
+:root[data-look="glass_strong"] .topbar {
+  backdrop-filter: blur(24px) saturate(1.6);
+}
+:root[data-look="glass_strong"] .card,
+:root[data-look="glass_strong"] table.data,
+:root[data-look="glass_strong"] .summary-cards .stat,
+:root[data-look="glass_strong"] .column {
+  backdrop-filter: blur(12px) saturate(1.25);
+}
+:root[data-look="glass_strong"] .dialog,
+:root[data-look="glass_strong"] .palette,
+:root[data-look="glass_strong"] .more-menu,
+:root[data-look="glass_strong"] .toast {
+  backdrop-filter: blur(28px) saturate(1.5);
+}
+
+/* Frosting is presentation only — anyone asking for reduced transparency
+   gets the standard opaque surfaces while keeping their look choice. */
+@media (prefers-reduced-transparency: reduce) {
+  :root[data-look^="glass"] {
+    --surface: #ffffff;
+    --surface-2: #eef1f6;
+    --surface-elevated: #ffffff;
+    --bucket-bg: #f6f8fb;
+    --border: #e4e8ef;
+    --border-strong: #cfd6e0;
+  }
+  :root[data-theme="dark"][data-look^="glass"] {
+    --surface: #252526;
+    --surface-2: #2d2d30;
+    --surface-elevated: #2b2b2e;
+    --bucket-bg: #232324;
+    --border: #333336;
+    --border-strong: #48484c;
+  }
+  :root[data-look^="glass"] body::before { background: var(--bg); }
+  :root[data-look^="glass"] .topbar,
+  :root[data-look^="glass"] .sidenav,
+  :root[data-look^="glass"] .compactnav { background: var(--surface); }
+  :root[data-look^="glass"] .topbar,
+  :root[data-look^="glass"] .dialog,
+  :root[data-look^="glass"] .palette,
+  :root[data-look^="glass"] .more-menu,
+  :root[data-look^="glass"] .toast,
+  :root[data-look^="glass"] .card,
+  :root[data-look^="glass"] table.data,
+  :root[data-look^="glass"] .summary-cards .stat,
+  :root[data-look^="glass"] .column { backdrop-filter: none; }
+}
+
+/* Paper is opaque: kill the backdrop and translucency for printing. */
+@media print {
+  :root[data-look^="glass"] { background: #fff; }
+  :root[data-look^="glass"] body { background: #fff; }
+  :root[data-look^="glass"] body::before { display: none; }
 }
 
 /* ---------- interactive and expanding rows ----------
