@@ -1,17 +1,39 @@
 <script lang="ts">
-  import { parseRichText, type RichTextInline } from "../../utils/richText";
+  import { parseRichText, richTextInlineToPlainText, type RichTextInline } from "../../utils/richText";
 
   let {
     value,
     emptyText,
-    compact = false
+    compact = false,
+    onToggleItem
   }: {
     value?: string;
     emptyText?: string;
     compact?: boolean;
+    /**
+     * Supply this to make checklist items tickable here rather than only inside
+     * the editor. The index counts checklist items in document order, matching
+     * `toggleChecklistItemAt`. Left out, markers stay decorative — which is
+     * right wherever there is nothing to save the change to.
+     */
+    onToggleItem?: (index: number) => void;
   } = $props();
 
   let blocks = $derived(parseRichText(value));
+
+  /**
+   * Document-order index for every checklist item, keyed by its position in the
+   * block list. Precomputed because a running counter cannot be threaded
+   * through two nested each blocks.
+   */
+  let itemIndex = $derived.by(() => {
+    const map = new Map<string, number>();
+    let next = 0;
+    blocks.forEach((block, b) => {
+      if (block.kind === "checklist") block.items.forEach((_, i) => map.set(`${b}:${i}`, next++));
+    });
+    return map;
+  });
 </script>
 
 {#snippet inline(nodes: RichTextInline[])}
@@ -32,7 +54,7 @@
   {#if blocks.length === 0}
     {#if emptyText}<span>{emptyText}</span>{/if}
   {:else}
-    {#each blocks as block}
+    {#each blocks as block, b}
       {#if block.kind === "paragraph"}
         <p>{@render inline(block.content)}</p>
       {:else if block.kind === "heading"}
@@ -53,9 +75,21 @@
         </ul>
       {:else}
         <ul class="checklist">
-          {#each block.items as item}
+          {#each block.items as item, i}
             <li>
-              <span class="check" aria-label={item.checked ? "Completed" : "Not completed"}>{item.checked ? "☑" : "☐"}</span>
+              {#if onToggleItem}
+                {@const index = itemIndex.get(`${b}:${i}`) ?? -1}
+                <button
+                  type="button"
+                  class="check toggle"
+                  role="checkbox"
+                  aria-checked={item.checked === true}
+                  aria-label={richTextInlineToPlainText(item.content) || "Checklist item"}
+                  onclick={() => onToggleItem(index)}
+                >{item.checked ? "☑" : "☐"}</button>
+              {:else}
+                <span class="check" aria-label={item.checked ? "Completed" : "Not completed"}>{item.checked ? "☑" : "☐"}</span>
+              {/if}
               <span class:checked={item.checked}>{@render inline(item.content)}</span>
             </li>
           {/each}
@@ -88,6 +122,21 @@
   .checklist { list-style: none; padding-left: 0; }
   .checklist li { display: flex; align-items: flex-start; gap: .45rem; }
   .check { flex: 0 0 auto; color: var(--accent); }
+  /* The interactive marker is a real button, so it keeps keyboard activation
+     and a focus ring; the glyph stays the same size as the static one. */
+  .check.toggle {
+    min-height: 0;
+    padding: 0 .1rem;
+    border: 0;
+    border-radius: var(--radius);
+    background: none;
+    box-shadow: none;
+    color: var(--accent);
+    font: inherit;
+    line-height: inherit;
+    cursor: pointer;
+  }
+  .check.toggle:hover { background: var(--accent-soft); }
   .checked { color: var(--text-muted); text-decoration: line-through; }
   .compact { font-size: inherit; line-height: 1.4; }
   .compact p { margin-bottom: .35rem; }

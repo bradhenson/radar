@@ -32,6 +32,16 @@
 
 ### Fixed
 
+- Rich-text editor: a line that merely looks like a list is no longer turned into one. "1985. A good year." used to come back as "1. A good year." the next time the record was opened — the year silently eaten — and lines starting with a dash or a "#" became bullets and headings against your wishes. Those lines are now kept as the prose they are. Pasting a genuine list still makes a list: dashes, asterisks, "#" headings, and "- [ ]" checkboxes are recognized when pasted onto a blank line, while numbered prefixes stay as text, because a number followed by a full stop is a sentence far more often than it is a list item. Pasting into the middle of a sentence always inserts plain text.
+
+- Rich-text editor: typing no longer fights phone keyboards or any input method that composes characters. The editor tidied its own contents after every keystroke, and doing that mid-composition cancels it, which is what broke mobile autocorrect, accented characters, and candidate windows. The tidy-up now waits until the word is finished, and keys being used to pick a candidate are no longer mistaken for formatting shortcuts.
+
+- Rich-text editor: reaching a field's character limit now says so instead of silently refusing to accept typing, an over-long paste reports how much was left out rather than trimming in silence, and a remaining-character count appears as a field fills up. Applying bold or a checklist can no longer push a note past its limit and have the save rejected afterwards.
+
+- Rich-text editor: the formatting buttons now show which formats apply where the cursor sits, rather than giving no indication at all. The toolbar is also a single stop when tabbing through a form, with arrow keys moving between its buttons, so tabbing out of a note reaches the next field instead of walking through seven buttons.
+
+- Rich-text: a list nested inside another list no longer runs its words together when flattened — "Parent" followed by "Child" came out as "ParentChild". Checklists can also now be ticked directly in a read-only view, wherever a screen chooses to offer it, instead of only inside the editor.
+
 - Leave, telework request/agreement, and award list rows now open their edit dialogs directly instead of expanding inline details. Their first-cell name or title remains keyboard accessible, and deep links open the exact record editor too.
 
 - Expanded meeting previews now use a single-column reading flow, with action items directly below the meeting discussion instead of beside it.

@@ -93,6 +93,22 @@ type ParsedLine =
   | { kind: "unordered-list" | "ordered-list"; text: string }
   | { kind: "checklist"; text: string; checked: boolean };
 
+/**
+ * Prose can legitimately begin the way a block does — "1985. A good year.",
+ * "- not a list, just a dash", "# 1 priority". Without a guard the serializer
+ * writes those lines verbatim and the parser reads them back as a list or a
+ * heading, silently eating the marker ("1985." becomes "1."). Paragraph lines
+ * that would reparse as a block are therefore stored with a leading backslash,
+ * which `stripBlockGuard` removes on the way back in.
+ */
+export function guardParagraphLine(line: string): string {
+	return parseBlockLine(line) ? `\\${line}` : line;
+}
+
+function stripBlockGuard(line: string): string {
+	return line.startsWith('\\') && parseBlockLine(line.slice(1)) ? line.slice(1) : line;
+}
+
 function parseBlockLine(line: string): ParsedLine | undefined {
   const heading = /^(#{1,3})\s+(.+)$/.exec(line);
   if (heading) return { kind: "heading", level: heading[1]!.length as 1 | 2 | 3, text: heading[2]! };
@@ -147,15 +163,53 @@ export function parseRichText(value: string | undefined): RichTextBlock[] {
       continue;
     }
 
-    const paragraph: string[] = [line];
+    // Guards are stripped from every line, not just the first: a guarded line
+    // never matches parseBlockLine, so it is also how a paragraph continues.
+    const paragraph: string[] = [stripBlockGuard(line)];
     i++;
     while (i < lines.length && lines[i]!.trim() && !parseBlockLine(lines[i]!)) {
-      paragraph.push(lines[i]!);
+      paragraph.push(stripBlockGuard(lines[i]!));
       i++;
     }
     blocks.push({ kind: "paragraph", content: parseRichTextInline(paragraph.join("\n")) });
   }
   return blocks;
+}
+
+/**
+ * Matches a checklist line, capturing the parts around its state box so a
+ * toggle can rewrite one character and leave the rest of the line untouched.
+ * Deliberately the same shape as the checklist branch of `parseBlockLine`, so
+ * the items this counts are exactly the items `parseRichText` produces — an
+ * index from the rendered view always lands on the line it came from.
+ */
+const CHECKLIST_LINE = /^(\s*[-*]\s+\[)([ xX])(\]\s+.+)$/;
+
+/**
+ * Flip the checked state of the `index`-th checklist item, counting in document
+ * order across every list in the value.
+ *
+ * Works on the stored source rather than on parsed blocks so that everything
+ * else survives byte for byte: a reparse-and-reserialize would also normalize
+ * spacing, renumber ordered lists, and drop empty items, which is far too much
+ * collateral for ticking a box. Out-of-range indexes return the value unchanged
+ * rather than throwing, since the view can race a concurrent edit.
+ */
+export function toggleChecklistItemAt(value: string | undefined, index: number): string {
+  const source = value ?? "";
+  if (index < 0) return source;
+  const lines = source.split("\n");
+  let seen = -1;
+  for (let i = 0; i < lines.length; i++) {
+    const match = CHECKLIST_LINE.exec(lines[i]!);
+    if (!match) continue;
+    seen += 1;
+    if (seen !== index) continue;
+    const checked = match[2]!.toLowerCase() === "x";
+    lines[i] = `${match[1]}${checked ? " " : "x"}${match[3]}`;
+    return lines.join("\n");
+  }
+  return source;
 }
 
 export function richTextInlineToPlainText(nodes: RichTextInline[]): string {

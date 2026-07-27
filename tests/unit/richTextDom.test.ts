@@ -124,6 +124,57 @@ describe("serializeRichTextDom", () => {
     expect(out).toBe("a\n\nb");
   });
 
+  it("keeps a word boundary when flattening a nested list", () => {
+    // The editor never builds nested lists, but a browser command can. They
+    // flatten by design; running the words together is the part that is wrong.
+    const out = serializeRichTextDom(
+      root(
+        el("ul", [
+          el("li", [text("Parent"), el("ul", [el("li", [text("Child A")]), el("li", [text("Child B")])])])
+        ])
+      )
+    );
+    expect(out).toBe("- Parent Child A Child B");
+    expect(richTextToPlainText(out)).toBe("• Parent Child A Child B");
+  });
+
+  it("guards paragraph text that would otherwise reparse as a block", () => {
+    // Prose can start the way a block does. Without the guard the marker is
+    // eaten on the way back in: "1985." would come back as "1.".
+    const cases: [string, string][] = [
+      ["1985. A good year.", "\\1985. A good year."],
+      ["3) See the note above", "\\3) See the note above"],
+      ["- not a list, just a dash", "\\- not a list, just a dash"],
+      ["# 1 priority for the week", "\\# 1 priority for the week"],
+      ["- [ ] pasted from somewhere else", "\\- [ ] pasted from somewhere else"]
+    ];
+    for (const [typed, stored] of cases) {
+      const out = serializeRichTextDom(root(el("div", [text(typed)])));
+      expect(out).toBe(stored);
+      expect(parseRichText(out).map((b) => b.kind)).toEqual(["paragraph"]);
+      expect(richTextToPlainText(out)).toBe(typed);
+    }
+  });
+
+  it("guards every line of a multi-line paragraph, not just the first", () => {
+    const out = serializeRichTextDom(
+      root(el("div", [text("Years covered:"), el("br"), text("1985. The first one")]))
+    );
+    expect(parseRichText(out).map((b) => b.kind)).toEqual(["paragraph"]);
+    expect(richTextToPlainText(out)).toBe("Years covered:\n1985. The first one");
+  });
+
+  it("leaves real blocks unguarded and does not guard literal backslashes", () => {
+    const list = serializeRichTextDom(root(el("ul", [el("li", [text("Alpha")])])));
+    expect(list).toBe("- Alpha");
+    expect(parseRichText(list).map((b) => b.kind)).toEqual(["unordered-list"]);
+
+    // A user-typed backslash is escaped by the inline escaper, so it must not
+    // be mistaken for a guard on the way back.
+    const literal = serializeRichTextDom(root(el("div", [text("\\- typed backslash")])));
+    expect(richTextToPlainText(literal)).toBe("\\- typed backslash");
+  });
+
   it("round-trips a mixed document through parseRichText", () => {
     const out = serializeRichTextDom(
       root(

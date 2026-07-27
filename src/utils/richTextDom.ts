@@ -1,3 +1,5 @@
+import { guardParagraphLine } from './richText';
+
 const TEXT_NODE = 3;
 const ELEMENT_NODE = 1;
 
@@ -15,6 +17,13 @@ export interface DomNodeLike {
 }
 
 const BLOCK_TAGS = new Set(["DIV", "P", "H1", "H2", "H3", "H4", "H5", "H6", "UL", "OL"]);
+
+/**
+ * Tags that end a line when met inside inline context. Every block tag, plus
+ * LI — which is not a top-level block here but does separate its text from a
+ * sibling's when a list turns up nested somewhere it should not be.
+ */
+const BREAKS_LINE = new Set([...BLOCK_TAGS, "LI"]);
 
 function isElement(node: DomNodeLike): boolean {
   return node.nodeType === ELEMENT_NODE;
@@ -54,8 +63,12 @@ function collectInline(
     out.push({ text: "\n", bold, italic, underline });
     return;
   }
-  // Nested block containers inside inline context still break the line.
-  if (name === "DIV" || name === "P") out.push({ text: "\n", bold: false, italic: false, underline: false });
+  // Nested block containers inside inline context still break the line. Without
+  // this a structure the editor never builds but a browser command might — a
+  // list nested inside a list item — would run its text straight into the
+  // parent's ("Parent" + "Child" serializing as "ParentChild"). The flattening
+  // itself is intended; losing the word boundary is not.
+  if (BREAKS_LINE.has(name)) out.push({ text: "\n", bold: false, italic: false, underline: false });
   const nextBold = bold || name === "B" || name === "STRONG";
   const nextItalic = italic || name === "I" || name === "EM";
   const nextUnderline = underline || name === "U";
@@ -122,6 +135,15 @@ function singleLine(text: string): string {
   return text.replace(/\s*\n\s*/g, " ").trim();
 }
 
+/**
+ * Paragraph text is the only place a stored line can be mistaken for a block,
+ * so every line of it is guarded. Headings and list items already carry their
+ * own marker and are read back as that block kind regardless of what follows.
+ */
+function guardParagraph(text: string): string {
+  return text.split("\n").map(guardParagraphLine).join("\n");
+}
+
 function serializeList(list: DomNodeLike): string {
   const checklist = list.nodeName === "UL" && isChecklist(list);
   const lines: string[] = [];
@@ -142,7 +164,7 @@ function serializeBlockElement(node: DomNodeLike): string {
     const text = singleLine(inlineChildren(node));
     return text ? `${headingPrefix(name)} ${text}` : "";
   }
-  return inlineChildren(node).replace(/^\n+|\n+$/g, "");
+  return guardParagraph(inlineChildren(node).replace(/^\n+|\n+$/g, ""));
 }
 
 /**
@@ -156,7 +178,7 @@ export function serializeRichTextDom(root: DomNodeLike): string {
   let run: DomNodeLike[] = [];
   const flushRun = () => {
     if (run.length === 0) return;
-    const text = inlineOf(run).replace(/^\n+|\n+$/g, "");
+    const text = guardParagraph(inlineOf(run).replace(/^\n+|\n+$/g, ""));
     run = [];
     if (text.trim()) blocks.push(text);
   };
