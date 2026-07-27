@@ -266,7 +266,7 @@
 {/if}
 
 <style>
-  .meeting-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: var(--bg); }
+  .meeting-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: transparent; }
   .title-cell { min-width: 14rem; }
   .attendees-cell {
     max-width: 16rem;

@@ -32,6 +32,8 @@
 
 ### Fixed
 
+- Meeting Notes no longer paints an opaque background behind its filter row, allowing the page's ambient theme color to remain visible around the controls.
+
 - Rich-text editor: a line that merely looks like a list is no longer turned into one. "1985. A good year." used to come back as "1. A good year." the next time the record was opened — the year silently eaten — and lines starting with a dash or a "#" became bullets and headings against your wishes. Those lines are now kept as the prose they are. Pasting a genuine list still makes a list: dashes, asterisks, "#" headings, and "- [ ]" checkboxes are recognized when pasted onto a blank line, while numbered prefixes stay as text, because a number followed by a full stop is a sentence far more often than it is a list item. Pasting into the middle of a sentence always inserts plain text.
 
 - Rich-text editor: typing no longer fights phone keyboards or any input method that composes characters. The editor tidied its own contents after every keystroke, and doing that mid-composition cancels it, which is what broke mobile autocorrect, accented characters, and candidate windows. The tidy-up now waits until the word is finished, and keys being used to pick a candidate are no longer mistaken for formatting shortcuts.
