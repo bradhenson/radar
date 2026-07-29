@@ -2,10 +2,10 @@
 // results out. The index is rebuilt only when data changes; queries then run
 // against pre-flattened text so keystrokes never re-parse rich text.
 
-import type { Employee, MeetingNote, PerformanceInput, Project, Task } from "../models";
+import type { Employee, MeetingNote, PerformanceInput, Project, QuickNote, Task } from "../models";
 import { richTextToPlainText } from "../../utils/richText";
 
-export type SearchResultType = "task" | "employee" | "project" | "meeting" | "performance" | "page";
+export type SearchResultType = "task" | "employee" | "project" | "note" | "meeting" | "performance" | "page";
 
 export interface SearchEntry {
   type: SearchResultType;
@@ -24,6 +24,7 @@ export interface SearchIndexSource {
   tasks: Task[];
   employees: Employee[];
   projects: Project[];
+  quickNotes: QuickNote[];
   meetingNotes: MeetingNote[];
   performanceInputs: PerformanceInput[];
   /** Navigation destinations, e.g. [{ page: "board", label: "Board" }]. */
@@ -37,6 +38,7 @@ const TYPE_LABEL: Record<SearchResultType, string> = {
   task: "Task",
   employee: "Employee",
   project: "Project",
+  note: "Note",
   meeting: "Meeting note",
   performance: "Performance input",
   page: "Go to page"
@@ -79,6 +81,16 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
       .filter(Boolean)
       .join(" · ");
     entries.push(entry("task", t.id, t.title, subtitle, [t.description, ...t.tags].filter(Boolean).join(" ")));
+  }
+
+  for (const note of src.quickNotes) {
+    if (note.isArchived) continue;
+    const plain = richTextToPlainText(note.body).replace(/\s*\n\s*/g, " ");
+    const title = truncate(plain, 80);
+    const subtitle = [note.purpose.replace("_", " "), src.employeeName(note.employeeId) || undefined, src.projectName(note.projectId) || undefined]
+      .filter(Boolean)
+      .join(" · ");
+    entries.push(entry("note", note.id, title, subtitle, plain));
   }
 
   for (const note of src.meetingNotes) {

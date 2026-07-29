@@ -197,6 +197,7 @@
 
   <div class="toolbar">
     <button type="button" class="primary" onclick={() => (ui.quickAddOpen = true)}>Quick Add</button>
+    <button type="button" onclick={() => (ui.quickNoteOpen = true)}>Quick Note</button>
     <button type="button" onclick={() => ui.openNewTask()}>New Task</button>
     <button type="button" onclick={() => (ui.performanceFormPrefill = {})}>New Performance Input</button>
     <button type="button" onclick={() => router.go("training")}>Record Training</button>

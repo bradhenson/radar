@@ -21,6 +21,7 @@
     checklistItems: "Checklist item",
     employees: "Employee",
     employeeNotes: "Employee note",
+    quickNotes: "Workbench note",
     employeeInteractions: "Check-in",
     projects: "Project",
     boardColumns: "Board column",
@@ -93,6 +94,8 @@
         return app.projects.some((p) => p.id === id && !p.isArchived) ? () => router.go("projects", id) : undefined;
       case "meetingNotes":
         return app.meetingNotes.some((n) => n.id === id && !n.isArchived) ? () => router.go("meetings", id) : undefined;
+      case "quickNotes":
+        return app.quickNotes.some((n) => n.id === id && !n.isArchived) ? () => router.go("notes", id) : undefined;
       case "performanceInputs":
         return app.performanceInputs.some((p) => p.id === id && !p.isArchived) ? () => router.go("performance", id) : undefined;
       case "leaveRecords":

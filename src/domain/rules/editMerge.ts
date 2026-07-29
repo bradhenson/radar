@@ -84,6 +84,7 @@ export interface LeaveEditFields {
   leaveType: string;
   startDate: string;
   endDate: string;
+  hours?: number;
   status: LeaveStatus;
   workloadImpactNote: string;
 }
@@ -96,6 +97,7 @@ export function mergeLeaveEdit(existing: LeaveRecord | undefined, f: LeaveEditFi
     leaveType: f.leaveType || undefined,
     startDate: f.startDate,
     endDate: f.endDate,
+    hours: f.hours,
     status: f.status,
     workloadImpactNote: f.workloadImpactNote.trim() || undefined,
     createdAt: existing?.createdAt ?? ctx.now,

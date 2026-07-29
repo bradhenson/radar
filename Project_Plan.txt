@@ -46,7 +46,7 @@ Current implemented application state:
 - IndexedDB is the primary local store, with an in-memory fallback and a visible warning when persistent storage is unavailable.
 - An optional Wails v2 Windows build uses a local SQLite database while preserving the same frontend and DataStore contract.
 - Backup export/import, replace confirmation, database health checks, reset confirmation, and backup reminders are implemented.
-- Main navigation includes Today, Board, Calendar, Employees, Performance, Training, Leave, Telework, Awards, Meetings, Projects, Archive, and Settings.
+- Main navigation includes Today, Board, Calendar, Notes, Employees, Performance, Training, Leave, Telework, Travel, Awards, Meetings, Projects, Activity, Archive, and Settings.
 - Implemented major workflows include:
   - Today attention dashboard with fixed-alignment summary cards and grouped attention tables.
   - Kanban Board with editable/reorderable columns, task drag-and-drop, keyboard card movement, filters, inline card checklist preview, and improved hover/focus highlighting.
@@ -55,6 +55,7 @@ Current implemented application state:
   - Employee directory and 360-degree employee profile with tasks, performance, meetings, training, leave, telework, awards, and activity.
   - Performance input creation, editing, import-from-task, completed-task conversion prompt, coverage table, and text export.
   - Meeting notes with linked employees/projects, action items, CSV export, archive/restore, and follow-up task creation.
+  - Notes Workbench with global quick capture, a dated notebook stream, purpose labels, contextual links, a pinned reference shelf, review state, archive/restore, task/performance conversion, and global search.
   - Training requirements, bulk assignment, matrix view, completions, expiration calculation, and Today warnings.
   - Leave and telework tracking with calendars/lists, CSV export, verification/source fields, and pending-action attention.
   - Awards list, archive, settings, editable competencies, editable board columns, editable task categories, themes, color palettes, sample data, and diagnostic environment test.
@@ -63,7 +64,6 @@ Current remaining planned work:
 
 - Recurring task templates and generated instances.
 - Saved views.
-- Global search.
 - Bulk actions.
 - Merge-on-import conflict handling.
 - Useful report/print views.
@@ -1018,21 +1018,24 @@ Primary navigation:
 1. Today
 2. Board
 3. Calendar
-4. Employees
-5. Performance
-6. Training
-7. Leave
-8. Telework
-9. Awards
-10. Meetings
-11. Projects
-12. Reports
-13. Archive
-14. Settings
+4. Notes
+5. Employees
+6. Performance
+7. Training
+8. Leave
+9. Telework
+10. Travel
+11. Awards
+12. Meetings
+13. Projects
+14. Activity
+15. Archive
+16. Settings
 
 Global controls:
 
 - Keyboard shortcut for New Task.
+- Keyboard shortcut and top-bar control for Quick Note.
 - Backup status.
 - Light/dark theme toggle.
 - Memory-only storage warning when IndexedDB is unavailable.
@@ -1055,7 +1058,7 @@ PEOPLE
 WORK
 - Meetings
 - Projects
-- Reports
+- Notes
 - Archive
 
 SYSTEM
@@ -1539,6 +1542,26 @@ Current implementation:
 - Archive/restore.
 - Follow-up task creation from a meeting note.
 - Meeting notes appear on employee profiles when linked to an employee.
+
+12.16 Notes Workbench
+
+Purpose:
+Capture work-related thoughts that do not yet have a structured home, then connect or promote
+them without turning the app into an unrestricted diary or a second task board.
+
+Current implementation:
+
+- Quick Note is available globally from the top bar, Today, and the J keyboard shortcut.
+- The Notes page opens with a writing-first capture surface rather than a table.
+- Notes appear in a dated stream with purpose labels: Scratch note, Decision, Reference, Idea,
+  Follow-up, and Observation.
+- Optional employee, project, and task links provide context without duplicating the linked record.
+- Pinned notes live on a visible reference shelf.
+- Unreviewed notes are visible as a review queue, but do not enter the Attention engine unless a
+  later design adds an explicit reminder date.
+- Notes can prefill a task or, when linked to an employee, a performance input.
+- Notes participate in global search, JSON backup/restore, browser IndexedDB, desktop SQLite,
+  activity history, and Archive restore/permanent-delete workflows.
 
 ======================================================================
 13. KANBAN BOARD SPECIFICATION
@@ -2228,6 +2251,7 @@ Track availability and supervisory follow-ups, not official leave accounting.
 - startDate.
 - endDate.
 - partialDay.
+- hours (optional total hours represented by the record).
 - status.
 - sourceSystem.
 - sourceReference.
@@ -2244,8 +2268,11 @@ Keep broad:
 - Annual.
 - Sick.
 - Comp Time.
+- Travel Comp.
 - Credit Hours.
 - Administrative.
+- Scheduled Overtime.
+- Non-Scheduled Overtime.
 - Other.
 - Not specified.
 
@@ -3059,6 +3086,7 @@ interface LeaveRecord {
   startDate: IsoDate;
   endDate: IsoDate;
   partialDay?: string;
+  hours?: number;
   status: "planned" | "requested" | "approved" | "changed" | "cancelled" | "complete" | "unknown";
   sourceSystem?: string;
   sourceReference?: string;

@@ -22,6 +22,7 @@ import type {
   PerformanceElement,
   PerformanceInput,
   Project,
+  QuickNote,
   Task,
   TaskNote,
   TeleworkRecord,
@@ -48,6 +49,7 @@ export interface CollectionTypes {
   awardRecords: AwardRecord;
   employeeInteractions: EmployeeInteraction;
   employeeNotes: EmployeeNote;
+  quickNotes: QuickNote;
   meetingNotes: MeetingNote;
   activityEntries: ActivityEntry;
   attentionSnoozes: AttentionSnooze;
@@ -74,6 +76,7 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "awardRecords",
   "employeeInteractions",
   "employeeNotes",
+  "quickNotes",
   "meetingNotes",
   "activityEntries",
   "attentionSnoozes"

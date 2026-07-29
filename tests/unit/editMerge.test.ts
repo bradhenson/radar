@@ -128,6 +128,7 @@ describe("mergeLeaveEdit", () => {
     startDate: "2026-08-03",
     endDate: "2026-08-07",
     partialDay: "PM only on Friday",
+    hours: 28.5,
     status: "approved",
     sourceSystem: "ERP",
     sourceReference: "LV-77",
@@ -143,6 +144,7 @@ describe("mergeLeaveEdit", () => {
     leaveType: l.leaveType ?? "",
     startDate: l.startDate,
     endDate: l.endDate,
+    hours: l.hours,
     status: l.status,
     workloadImpactNote: l.workloadImpactNote ?? ""
   });
@@ -159,6 +161,11 @@ describe("mergeLeaveEdit", () => {
     expect(merged.sourceSystem).toBe("ERP");
     expect(merged.sourceReference).toBe("LV-77");
     expect(merged.lastVerifiedDate).toBe("2026-07-01");
+  });
+
+  it("allows an exposed hours value to be cleared", () => {
+    const merged = mergeLeaveEdit(full, { ...formFields(full), hours: undefined }, ctx);
+    expect(merged.hours).toBeUndefined();
   });
 });
 

@@ -5,12 +5,14 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
-  import type { Employee, MeetingNote } from "../domain/models";
+  import type { Employee, MeetingNote, QuickNote } from "../domain/models";
+  import { quickNotePurposeLabel, quickNoteTitle } from "../domain/rules/quickNotes";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { statusLabel } from "../domain/models";
 
   let search = $state("");
   let pendingDeleteMeetingNote = $state<MeetingNote | undefined>(undefined);
+  let pendingDeleteQuickNote = $state<QuickNote | undefined>(undefined);
   let pendingDeleteEmployee = $state<Employee | undefined>(undefined);
 
   let archivedTasks = $derived(
@@ -21,6 +23,11 @@
   let archivedMeetingNotes = $derived(
     app.meetingNotes
       .filter((note) => note.isArchived && (!search || note.title.toLowerCase().includes(search.toLowerCase())))
+      .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
+  );
+  let archivedQuickNotes = $derived(
+    app.quickNotes
+      .filter((note) => note.isArchived && (!search || note.body.toLowerCase().includes(search.toLowerCase())))
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   );
   let inactiveEmployees = $derived(app.employees.filter((e) => e.activeStatus !== "active" || e.isArchived));
@@ -63,6 +70,21 @@
     app.toast("Meeting note deleted", "success");
   }
 
+  async function restoreQuickNote(note: QuickNote) {
+    await app.putRecord(
+      "quickNotes",
+      { ...note, isArchived: false, updatedAt: nowTimestamp() },
+      { actionType: "restored", summary: `Restored note "${quickNoteTitle(note.body, 60)}" from archive` }
+    );
+    app.toast("Note restored", "success");
+  }
+
+  async function deleteQuickNote(note: QuickNote) {
+    await app.deleteRecord("quickNotes", note.id, `Deleted note "${quickNoteTitle(note.body, 60)}"`);
+    pendingDeleteQuickNote = undefined;
+    app.toast("Note deleted", "success");
+  }
+
   function deleteEmployeeMessage(employee: Employee): string {
     const counts = app.employeeLinkedRecordCounts(employee.id);
     const owned: [number, string][] = [
@@ -83,6 +105,7 @@
     }
     const unlinked: [number, string][] = [
       [counts.meetingAttendances, "meeting attendee link(s)"],
+      [counts.quickNoteLinks, "workbench note link(s)"],
       [counts.projectLeads, "project lead assignment(s)"],
       [counts.trainingAssignments, "training assignment(s)"]
     ];
@@ -154,6 +177,30 @@
     </table>
   {/if}
 
+  <h2>Archived workbench notes</h2>
+  {#if archivedQuickNotes.length === 0}
+    <p class="muted">No archived workbench notes.</p>
+  {:else}
+    <table class="data" style="margin-bottom:1.2rem">
+      <thead><tr><th>Note</th><th>Purpose</th><th>Captured</th><th></th></tr></thead>
+      <tbody>
+        {#each archivedQuickNotes as note (note.id)}
+          <tr>
+            <td>{quickNoteTitle(note.body)}</td>
+            <td>{quickNotePurposeLabel(note.purpose)}</td>
+            <td>{formatDate(note.createdAt.slice(0, 10))}</td>
+            <td>
+              <div class="row-actions">
+                <button type="button" class="icon-btn" aria-label="Restore note" title="Restore" onclick={() => void restoreQuickNote(note)}><Icon name="unarchive" size={16} /></button>
+                <button type="button" class="icon-btn danger" aria-label="Delete note" title="Delete" onclick={() => (pendingDeleteQuickNote = note)}><Icon name="trash" size={16} /></button>
+              </div>
+            </td>
+          </tr>
+        {/each}
+      </tbody>
+    </table>
+  {/if}
+
   <h2>Inactive employees</h2>
   {#if inactiveEmployees.length === 0}
     <p class="muted">No inactive employees.</p>
@@ -186,6 +233,17 @@
     danger
     onconfirm={() => void deleteMeetingNote(pendingDeleteMeetingNote!)}
     oncancel={() => (pendingDeleteMeetingNote = undefined)}
+  />
+{/if}
+
+{#if pendingDeleteQuickNote}
+  <ConfirmDialog
+    title="Delete note"
+    message={`Permanently delete "${quickNoteTitle(pendingDeleteQuickNote.body, 80)}"?`}
+    confirmLabel="Delete note"
+    danger
+    onconfirm={() => void deleteQuickNote(pendingDeleteQuickNote!)}
+    oncancel={() => (pendingDeleteQuickNote = undefined)}
   />
 {/if}
 

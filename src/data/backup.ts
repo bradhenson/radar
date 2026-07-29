@@ -12,8 +12,9 @@ import { COLLECTION_NAMES, emptyCollections, type CollectionName, type DatabaseS
 export const BACKUP_FORMAT = "SupervisorAssistantBackup";
 // v2: integrity checksum; required arrays/booleans/enums validated strictly.
 // v3: retired task follow-up/wait-detail fields are removed on import.
+// v4: quick-note workbench records were added.
 // Older backups are migrated on import.
-export const BACKUP_FORMAT_VERSION = 3;
+export const BACKUP_FORMAT_VERSION = 4;
 export const APPLICATION_VERSION = "0.1.0";
 
 /** Hard ceiling on accepted backup file size (characters of JSON text). */
@@ -117,6 +118,7 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   awardRecords: ["id", "employeeId", "title", "status"],
   employeeInteractions: ["id", "employeeId", "interactionDate", "interactionType"],
   employeeNotes: ["id", "employeeId", "noteText"],
+  quickNotes: ["id", "body", "purpose"],
   meetingNotes: ["id", "meetingDate", "title", "meetingType"],
   activityEntries: ["id", "entityType", "entityId", "actionType", "timestamp"],
   attentionSnoozes: ["id", "snoozedUntil"]
@@ -166,6 +168,7 @@ const TIMESTAMP_FIELDS: Partial<Record<CollectionName, string[]>> = {
   awardRecords: ["createdAt", "updatedAt"],
   employeeInteractions: ["createdAt", "updatedAt"],
   employeeNotes: ["createdAt", "updatedAt"],
+  quickNotes: ["createdAt", "updatedAt"],
   meetingNotes: ["createdAt", "updatedAt"],
   activityEntries: ["timestamp"]
 };
@@ -173,7 +176,8 @@ const TIMESTAMP_FIELDS: Partial<Record<CollectionName, string[]>> = {
 // Optional ISO timestamps validated only when present.
 const OPTIONAL_TIMESTAMP_FIELDS: Partial<Record<CollectionName, string[]>> = {
   checklistItems: ["completedAt"],
-  tasks: ["waitingSince"]
+  tasks: ["waitingSince"],
+  quickNotes: ["reviewedAt"]
 };
 
 // Allowed values per enum-typed field. Task statuses include the legacy
@@ -188,6 +192,9 @@ const ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readonly string
   tasks: {
     status: ["open", "waiting", "complete", "cancelled", "inbox", "planned", "in_progress", "needs_review"],
     priority: ["low", "normal", "high", "critical"]
+  },
+  quickNotes: {
+    purpose: ["scratch", "decision", "reference", "idea", "follow_up", "observation"]
   },
   performanceInputs: {
     inputStatus: ["draft", "ready", "used_midyear", "used_annual", "archived"]
@@ -244,6 +251,11 @@ const NUMBER_FIELDS: Partial<Record<CollectionName, string[]>> = {
   checklistItems: ["order"]
 };
 
+// Optional finite-number fields validated only when present.
+const OPTIONAL_NUMBER_FIELDS: Partial<Record<CollectionName, string[]>> = {
+  leaveRecords: ["hours"]
+};
+
 // Required boolean fields.
 const BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
   competencies: ["active"],
@@ -257,6 +269,7 @@ const BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
   trainingRequirements: ["active"],
   employeeInteractions: ["followUpRequired"],
   employeeNotes: ["isArchived"],
+  quickNotes: ["isPinned", "isArchived"],
   meetingNotes: ["isArchived"]
 };
 
@@ -318,6 +331,13 @@ function migrateV1toV2(data: Record<string, unknown>, warnings: string[]): void 
   }
 }
 
+function migrateV3toV4(data: Record<string, unknown>, warnings: string[]): void {
+  if (data.quickNotes === undefined) {
+    data.quickNotes = [];
+    warnings.push('Collection "quickNotes" missing; treated as empty (format v3 migration).');
+  }
+}
+
 /** Upgrade the parsed package in place to the current format version. */
 function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
   let version = pkg.formatVersion as number;
@@ -329,6 +349,11 @@ function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
   if (version === 2) {
     version = 3;
     warnings.push("Backup migrated from format version 2 to 3.");
+  }
+  if (version === 3) {
+    migrateV3toV4(pkg.data as Record<string, unknown>, warnings);
+    version = 4;
+    warnings.push("Backup migrated from format version 3 to 4.");
   }
   pkg.formatVersion = version;
 }
@@ -494,6 +519,15 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
           result.errors.push(`${name}[${i}].${field} must be a finite number.`);
         }
       }
+      for (const field of OPTIONAL_NUMBER_FIELDS[name] ?? []) {
+        const v = rec[field];
+        if (v !== undefined && v !== null && (typeof v !== "number" || !Number.isFinite(v))) {
+          result.errors.push(`${name}[${i}].${field} must be a finite number when provided.`);
+        }
+      }
+      if (name === "leaveRecords" && typeof rec.hours === "number" && rec.hours <= 0) {
+        result.errors.push(`${name}[${i}].hours must be greater than zero.`);
+      }
       for (const field of BOOLEAN_FIELDS[name] ?? []) {
         if (typeof rec[field] !== "boolean") {
           result.errors.push(`${name}[${i}].${field} must be true or false.`);
@@ -550,6 +584,9 @@ const RELATIONSHIPS: { from: CollectionName; field: string; to: CollectionName; 
   { from: "awardRecords", field: "employeeId", to: "employees", describe: "award record(s) reference an employee" },
   { from: "employeeInteractions", field: "employeeId", to: "employees", describe: "interaction(s) reference an employee" },
   { from: "employeeNotes", field: "employeeId", to: "employees", describe: "employee note(s) reference an employee" },
+  { from: "quickNotes", field: "employeeId", to: "employees", describe: "quick note(s) reference an employee" },
+  { from: "quickNotes", field: "projectId", to: "projects", describe: "quick note(s) reference a project" },
+  { from: "quickNotes", field: "taskId", to: "tasks", describe: "quick note(s) reference a task" },
   { from: "meetingNotes", field: "projectId", to: "projects", describe: "meeting note(s) reference a project" }
 ];
 

@@ -125,6 +125,9 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
   completion-to-input conversion prompt, coverage table, text export for evaluation preparation.
 - **Meetings**: product-team meeting note capture with linked employees/projects, discussion
   notes, action items, CSV export, archive/restore, and follow-up task creation.
+- **Notes Workbench**: quick capture from anywhere, a dated notebook stream, purpose labels,
+  employee/project/task links, a pinned reference shelf, review state, archive/restore, global
+  search, and task/performance-input conversion.
 - **Training**: requirements, employee × requirement matrix, completion with expiration
   calculation, and due warnings.
 - **Leave / Telework / Travel / Awards**: calendar/list tracking, CSV export, direct links from
@@ -132,12 +135,12 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
 - **Archive**, **Settings** (thresholds, light/dark/system theme, accent palettes, editable
   competencies and board columns, data-health checks, sample data, backup import/export).
 
-Not yet implemented (later phases): recurring-task templates (Phase 7), saved views, global
-search, bulk actions, merge-on-import, useful reporting/print views. See `CHANGELOG.md`.
+Not yet implemented (later phases): recurring-task templates (Phase 7), saved views, bulk actions,
+merge-on-import, useful reporting/print views. See `CHANGELOG.md`.
 
 ## Keyboard shortcuts
 
-`N` new task · `Q` quick add · `P` new performance input · `T` Today · `B` Board · `E` Employees ·
+`N` new task · `Q` quick add · `J` quick note · `P` new performance input · `T` Today · `B` Board · `E` Employees ·
 `M` Meetings · on a focused board card: `[`/`]` move, `C` complete, `Enter` open, `Alt`+arrow
 reorders · on a focused calendar task:
 `[`/`]` moves by day and `{`/`}` moves by week · `Esc` closes dialogs.

@@ -33,7 +33,7 @@
     // Focus the first meaningful field; fall back to the container (which is
     // also the focus-trap entry point).
     const first = dialogEl.querySelector<HTMLElement>(
-      '.body input:not([type="hidden"]):not(:disabled), .body select:not(:disabled), .body textarea:not(:disabled)'
+      '.body [contenteditable="true"], .body input:not([type="hidden"]):not(:disabled), .body select:not(:disabled), .body textarea:not(:disabled)'
     );
     (first ?? dialogEl).focus();
   });

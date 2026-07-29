@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildSearchIndex, querySearchIndex, type SearchIndexSource } from "../../src/domain/rules/search";
-import type { Employee, MeetingNote, PerformanceInput, Project, Task } from "../../src/domain/models";
+import type { Employee, MeetingNote, PerformanceInput, Project, QuickNote, Task } from "../../src/domain/models";
 
 const NOW = "2026-01-01T00:00:00.000Z";
 
@@ -45,6 +45,17 @@ function meetingNote(partial: Partial<MeetingNote> & { id: string; title: string
   };
 }
 
+function quickNote(partial: Partial<QuickNote> & { id: string; body: string }): QuickNote {
+  return {
+    purpose: "scratch",
+    isPinned: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+    isArchived: false,
+    ...partial
+  };
+}
+
 function performanceInput(partial: Partial<PerformanceInput> & { id: string; employeeId: string }): PerformanceInput {
   return {
     inputDate: "2026-01-05",
@@ -64,6 +75,7 @@ function source(overrides: Partial<SearchIndexSource> = {}): SearchIndexSource {
     tasks: [],
     employees: [],
     projects: [],
+    quickNotes: [],
     meetingNotes: [],
     performanceInputs: [],
     pages: [{ page: "board", label: "Board" }],
@@ -105,6 +117,21 @@ describe("search index", () => {
     const note = index.find((entry) => entry.id === "m1")!;
     expect(note.haystack).toContain("budget cuts");
     expect(note.haystack).not.toContain("**");
+  });
+
+  it("indexes active quick notes with linked context", () => {
+    const index = buildSearchIndex(
+      source({
+        quickNotes: [
+          quickNote({ id: "n1", body: "Remember the **Harbor rehearsal**", projectId: "p1" }),
+          quickNote({ id: "n2", body: "Archived thought", isArchived: true })
+        ]
+      })
+    );
+    const result = querySearchIndex(index, "harbor rehearsal");
+    expect(result.map((entry) => entry.id)).toEqual(["n1"]);
+    expect(index.find((entry) => entry.id === "n1")?.subtitle).toContain("Falcon");
+    expect(index.some((entry) => entry.id === "n2")).toBe(false);
   });
 
   it("requires every term to match and ranks title over body", () => {

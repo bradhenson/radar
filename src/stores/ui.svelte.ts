@@ -8,6 +8,8 @@ class UiState {
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */
   quickAddOpen = $state(false);
+  /** Low-friction capture dialog available from any page. */
+  quickNoteOpen = $state(false);
   /** Global search palette (Ctrl+K). */
   searchOpen = $state(false);
   /** Task id currently open in the full-page editor. */

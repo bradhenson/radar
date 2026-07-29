@@ -440,12 +440,12 @@
         <EmptyState message="No leave records." />
       {:else}
         <table class="data">
-          <thead><tr><th>Start</th><th>End</th><th>Type</th><th>Status</th><th>Note</th></tr></thead>
+          <thead><tr><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th><th>Note</th></tr></thead>
           <tbody>
             {#each leave as l (l.id)}
               <tr>
                 <td><button type="button" class="link" aria-label={`Edit leave starting ${formatDate(l.startDate)}`} onclick={() => router.go("leave", l.id)}>{formatDate(l.startDate)}</button></td><td>{formatDate(l.endDate)}</td>
-                <td>{l.leaveType ?? ""}</td><td>{l.status}</td><td>{l.workloadImpactNote ?? ""}</td>
+                <td>{l.leaveType ?? ""}</td><td>{l.hours ?? ""}</td><td>{l.status}</td><td>{l.workloadImpactNote ?? ""}</td>
               </tr>
             {/each}
           </tbody>

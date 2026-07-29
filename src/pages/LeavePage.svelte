@@ -25,7 +25,8 @@
   let fType = $state("Not specified");
   let fStart = $state("");
   let fEnd = $state("");
-  let fStatus = $state<LeaveStatus>("planned");
+  let fHours = $state<number | undefined>(undefined);
+  let fStatus = $state<LeaveStatus>("approved");
   let fNote = $state("");
   let fError = $state("");
   let activeCalendarDate = $state<string | undefined>(undefined);
@@ -46,7 +47,7 @@
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fType, fStart, fEnd, fStatus, fNote]);
+    return JSON.stringify([fEmployee, fType, fStart, fEnd, fHours, fStatus, fNote]);
   }
 
   function openForm(l?: LeaveRecord, defaults: Partial<Pick<LeaveRecord, "employeeId" | "startDate" | "endDate">> = {}) {
@@ -55,7 +56,8 @@
     fType = l?.leaveType ?? "Not specified";
     fStart = l?.startDate ?? defaults.startDate ?? "";
     fEnd = l?.endDate ?? defaults.endDate ?? "";
-    fStatus = l?.status ?? "planned";
+    fHours = l?.hours;
+    fStatus = l?.status ?? "approved";
     fNote = l?.workloadImpactNote ?? "";
     fError = "";
     openedSnapshot = formSnapshot();
@@ -92,6 +94,10 @@
       fError = "End date must be on or after the start date.";
       return;
     }
+    if (fHours !== undefined && (!Number.isFinite(fHours) || fHours <= 0)) {
+      fError = "Hours must be greater than zero.";
+      return;
+    }
     // Merge over the existing record so fields this form doesn't expose
     // (partial day, related task, source system/reference) survive.
     const record: LeaveRecord = mergeLeaveEdit(
@@ -101,6 +107,7 @@
         leaveType: fType === "Not specified" ? "" : fType,
         startDate: fStart,
         endDate: fEnd,
+        hours: fHours,
         status: fStatus,
         workloadImpactNote: fNote
       },
@@ -194,7 +201,7 @@
       <EmptyState message="No leave records." hint="Track upcoming absences for workload awareness. Details stay broad — no reasons required." />
     {:else}
       <table class="data leave-table">
-        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Status</th></tr></thead>
+        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
             <!-- Row click is a mouse convenience; the employee button is the keyboard path. -->
@@ -213,6 +220,7 @@
               <td class="date-cell">{formatDate(l.startDate)}</td>
               <td class="date-cell">{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
+              <td>{l.hours ?? ""}</td>
               <td><span class="badge">{l.status}</span></td>
             </tr>
           {/each}
@@ -319,8 +327,12 @@
             {/each}
           </select>
         </div>
+        <div>
+          <label for="lf-hours">Hours</label>
+          <input id="lf-hours" type="number" min="0.25" step="0.25" bind:value={fHours} placeholder="Optional" style="width:100%" />
+        </div>
       </div>
-      <label for="lf-note">Workload impact note</label>
+      <label for="lf-note">Notes</label>
       <input id="lf-note" type="text" bind:value={fNote} maxlength="500" style="width:100%" />
       <div class="dialog-actions">
         {#if editing}

@@ -59,6 +59,7 @@ describe("backup round trip", () => {
     expect(pkg.integrity.recordCounts.employees).toBe(snapshot.collections.employees.length);
     expect(pkg.integrity.recordCounts.tasks).toBe(snapshot.collections.tasks.length);
     expect(pkg.integrity.recordCounts.meetingNotes).toBe(snapshot.collections.meetingNotes.length);
+    expect(pkg.integrity.recordCounts.quickNotes).toBe(snapshot.collections.quickNotes.length);
     expect(pkg.integrity.checksum).toMatch(/^[0-9a-f]{8}$/);
     expect(pkg.format).toBe(BACKUP_FORMAT);
     expect(pkg.formatVersion).toBe(BACKUP_FORMAT_VERSION);
@@ -115,7 +116,7 @@ describe("backup integrity verification", () => {
   });
 });
 
-describe("format v1 migration", () => {
+describe("backup format migrations", () => {
   it("fills missing collections and required arrays with warnings", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     pkg.formatVersion = 1;
@@ -158,6 +159,21 @@ describe("format v1 migration", () => {
     expect(restored.collections.tasks[0]).not.toHaveProperty("waitingOn");
     expect(restored.collections.tasks[0]).not.toHaveProperty("waitingReason");
     expect(restored.collections.tasks[0]).not.toHaveProperty("followUpDate");
+  });
+
+  it("adds an empty quick-note collection when importing a v3 backup", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.formatVersion = 3;
+    delete (pkg.data as unknown as Record<string, unknown>).quickNotes;
+    delete pkg.integrity.recordCounts.quickNotes;
+    pkg.integrity.checksum = backupChecksum(JSON.stringify(pkg.data));
+
+    const result = parseAndValidateBackup(JSON.stringify(pkg));
+
+    expect(result.valid).toBe(true);
+    expect(result.package!.data.quickNotes).toEqual([]);
+    expect(result.warnings.some((warning) => warning.includes("quickNotes"))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("version 3 to 4"))).toBe(true);
   });
 });
 
@@ -204,6 +220,14 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors.some((e) => e.includes("noteText"))).toBe(true);
   });
 
+  it("rejects invalid quick-note purposes", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.quickNotes[0] as Record<string, unknown>).purpose = "private_diary";
+    const r = parseAndValidateBackup(reseal(pkg));
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e) => e.includes("quickNotes") && e.includes("purpose"))).toBe(true);
+  });
+
   it("rejects duplicate ids", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     (pkg.data.tasks[1] as Record<string, unknown>).id = (pkg.data.tasks[0] as Record<string, unknown>).id;
@@ -218,6 +242,20 @@ describe("backup validation rejects bad input", () => {
     const r = parseAndValidateBackup(reseal(pkg));
     expect(r.valid).toBe(false);
     expect(r.errors.some((e) => e.includes("dueDate"))).toBe(true);
+  });
+
+  it("rejects non-numeric or non-positive leave hours", () => {
+    const wrongType = createBackupPackage(createSampleSnapshot());
+    (wrongType.data.leaveRecords[0] as Record<string, unknown>).hours = "eight";
+    const typeResult = parseAndValidateBackup(reseal(wrongType));
+    expect(typeResult.valid).toBe(false);
+    expect(typeResult.errors.some((e) => e.includes("leaveRecords") && e.includes("hours"))).toBe(true);
+
+    const nonPositive = createBackupPackage(createSampleSnapshot());
+    (nonPositive.data.leaveRecords[0] as Record<string, unknown>).hours = 0;
+    const valueResult = parseAndValidateBackup(reseal(nonPositive));
+    expect(valueResult.valid).toBe(false);
+    expect(valueResult.errors.some((e) => e.includes("hours must be greater than zero"))).toBe(true);
   });
 
   it("rejects invalid employee profile dates", () => {

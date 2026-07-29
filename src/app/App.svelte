@@ -5,6 +5,7 @@
   import Toasts from "../components/common/Toasts.svelte";
   import TaskDetail from "../components/forms/TaskDetail.svelte";
   import QuickAddTask from "../components/forms/QuickAddTask.svelte";
+  import QuickNoteForm from "../components/forms/QuickNoteForm.svelte";
   import PerformanceInputForm from "../components/forms/PerformanceInputForm.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
@@ -18,6 +19,7 @@
   import ProjectsPage from "../pages/ProjectsPage.svelte";
   import PerformancePage from "../pages/PerformancePage.svelte";
   import MeetingsPage from "../pages/MeetingsPage.svelte";
+  import NotesPage from "../pages/NotesPage.svelte";
   import TrainingPage from "../pages/TrainingPage.svelte";
   import LeavePage from "../pages/LeavePage.svelte";
   import TeleworkPage from "../pages/TeleworkPage.svelte";
@@ -61,6 +63,7 @@
     { page: "today", label: "Today", icon: "today" },
     { page: "projects", label: "Projects", icon: "projects" },
     { page: "meetings", label: "Meetings", icon: "meetings" },
+    { page: "notes", label: "Notes", icon: "notes" },
     { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },
@@ -190,7 +193,7 @@
     const target = e.target as HTMLElement;
     const typing = ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) || target.isContentEditable;
     if (typing || e.ctrlKey || e.altKey || e.metaKey) return;
-    if (ui.newTaskOpen || ui.quickAddOpen || ui.searchOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performanceFormInput || ui.performancePromptTask || ui.archivePromptTaskId)
+    if (ui.newTaskOpen || ui.quickAddOpen || ui.quickNoteOpen || ui.searchOpen || ui.detailTaskId || ui.performanceFormPrefill || ui.performanceFormInput || ui.performancePromptTask || ui.archivePromptTaskId)
       return;
     switch (e.key.toLowerCase()) {
       case "n":
@@ -200,6 +203,10 @@
       case "q":
         e.preventDefault();
         ui.quickAddOpen = true;
+        break;
+      case "j":
+        e.preventDefault();
+        ui.quickNoteOpen = true;
         break;
       case "p":
         e.preventDefault();
@@ -349,6 +356,9 @@
       <button type="button" class="icon-btn" onclick={() => (ui.searchOpen = true)} title="Search everything (Ctrl+K)" aria-label="Search">
         <Icon name="search" size={17} />
       </button>
+      <button type="button" class="icon-btn" onclick={() => (ui.quickNoteOpen = true)} title="Jot a quick note (J)" aria-label="Quick note">
+        <Icon name="notes" size={17} />
+      </button>
       <button type="button" class="icon-btn" onclick={toggleTheme} title="Toggle light/dark theme" aria-label="Toggle theme">
         <Icon name={isDark ? "sun" : "moon"} size={17} />
       </button>
@@ -453,6 +463,8 @@
           <ProjectsPage />
         {:else if router.current.page === "meetings"}
           <MeetingsPage />
+        {:else if router.current.page === "notes"}
+          <NotesPage />
         {:else if router.current.page === "performance"}
           <PerformancePage />
         {:else if router.current.page === "training"}
@@ -481,6 +493,9 @@
 
   {#if ui.quickAddOpen}
     <QuickAddTask onclose={() => (ui.quickAddOpen = false)} />
+  {/if}
+  {#if ui.quickNoteOpen}
+    <QuickNoteForm onclose={() => (ui.quickNoteOpen = false)} />
   {/if}
   {#if ui.searchOpen}
     <CommandPalette onclose={() => (ui.searchOpen = false)} />

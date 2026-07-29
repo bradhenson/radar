@@ -13,8 +13,10 @@ describe("sample seed data", () => {
     expect(c.trainingRequirements).toHaveLength(10);
     expect(c.performanceInputs.length).toBeGreaterThanOrEqual(20);
     expect(c.leaveRecords.length).toBeGreaterThanOrEqual(10);
+    expect(c.leaveRecords.every((record) => record.hours === undefined || record.hours > 0)).toBe(true);
     expect(c.teleworkRecords.length).toBeGreaterThanOrEqual(10);
     expect(c.meetingNotes.length).toBeGreaterThanOrEqual(5);
+    expect(c.quickNotes.length).toBeGreaterThanOrEqual(4);
     expect(c.awardRecords.length).toBeGreaterThanOrEqual(5);
     expect(c.employeeNotes.length).toBeGreaterThanOrEqual(3);
     expect(c.employeeNotes.every((note) => c.employees.some((employee) => employee.id === note.employeeId))).toBe(true);

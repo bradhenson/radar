@@ -251,6 +251,8 @@ export interface LeaveRecord {
   startDate: IsoDate;
   endDate: IsoDate;
   partialDay?: string;
+  /** Optional total hours represented by this availability record. */
+  hours?: number;
   status: LeaveStatus;
   sourceSystem?: string;
   sourceReference?: string;
@@ -365,6 +367,28 @@ export interface EmployeeNote {
   id: Id;
   employeeId: Id;
   noteText: string;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+  isArchived: boolean;
+}
+
+export const QUICK_NOTE_PURPOSES = ["scratch", "decision", "reference", "idea", "follow_up", "observation"] as const;
+export type QuickNotePurpose = (typeof QUICK_NOTE_PURPOSES)[number];
+
+/**
+ * A low-friction note captured before it necessarily has a structured home.
+ * Links are optional context; dated employee events still belong in
+ * EmployeeInteraction and formal discussions in MeetingNote.
+ */
+export interface QuickNote {
+  id: Id;
+  body: string;
+  purpose: QuickNotePurpose;
+  employeeId?: Id;
+  projectId?: Id;
+  taskId?: Id;
+  isPinned: boolean;
+  reviewedAt?: IsoTimestamp;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   isArchived: boolean;
@@ -816,7 +840,18 @@ export const INTERACTION_TYPES = [
 
 export const MEETING_TYPES = ["Product team", "Project", "Staff", "Customer", "One-on-one", "Other"];
 
-export const LEAVE_TYPES = ["Annual", "Sick", "Comp Time", "Credit Hours", "Administrative", "Other", "Not specified"];
+export const LEAVE_TYPES = [
+  "Annual",
+  "Sick",
+  "Comp Time",
+  "Travel Comp",
+  "Credit Hours",
+  "Administrative",
+  "Scheduled Overtime",
+  "Non-Scheduled Overtime",
+  "Other",
+  "Not specified"
+];
 
 export const TELEWORK_RECORD_TYPES = ["Agreement", "Routine request", "Situational request", "Renewal", "Modification", "Other"];
 

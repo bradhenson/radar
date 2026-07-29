@@ -13,7 +13,7 @@ import {
 } from "./DataStore";
 
 const DB_NAME = "supervisor-assistant";
-const DB_VERSION = 6; // v6: travelRecords object store
+const DB_VERSION = 7; // v7: quickNotes object store
 const META_STORE = "app_meta"; // holds settings + store metadata by key
 
 // Single-writer lease (plan: one editing window at a time). The active window

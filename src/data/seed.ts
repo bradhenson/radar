@@ -341,6 +341,49 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     meeting("Knowledge base refresh planning", "Project", 8, projects.knowledge, [17, 34, 37, 39])
   );
 
+  c.quickNotes.push(
+    {
+      id: newId(),
+      body: "Ask whether the customer demo should include the new dashboard filters. If yes, add a rehearsal before Friday.",
+      purpose: "follow_up",
+      projectId: projects.harbor.id,
+      isPinned: false,
+      createdAt: atNoon(today),
+      updatedAt: atNoon(today),
+      isArchived: false
+    },
+    {
+      id: newId(),
+      body: "## Weekly review rhythm\n\n- Clear the task inbox\n- Review waiting work\n- Capture accomplishments\n- Export a backup",
+      purpose: "reference",
+      isPinned: true,
+      reviewedAt: atNoon(addDays(today, -1)),
+      createdAt: atNoon(addDays(today, -3)),
+      updatedAt: atNoon(addDays(today, -1)),
+      isArchived: false
+    },
+    {
+      id: newId(),
+      body: "The knowledge-base refresh should use one owner per article and a second person as reviewer. Bring this proposal to the next planning session.",
+      purpose: "idea",
+      projectId: projects.knowledge.id,
+      isPinned: false,
+      createdAt: atNoon(addDays(today, -1)),
+      updatedAt: atNoon(addDays(today, -1)),
+      isArchived: false
+    },
+    {
+      id: newId(),
+      body: "Decision: keep the training exception review on the first staff meeting of each month so follow-up has a predictable home.",
+      purpose: "decision",
+      isPinned: false,
+      reviewedAt: atNoon(addDays(today, -4)),
+      createdAt: atNoon(addDays(today, -7)),
+      updatedAt: atNoon(addDays(today, -4)),
+      isArchived: false
+    }
+  );
+
   function meeting(title: string, meetingType: string, offset: number, project: Project | undefined, indexes: number[]) {
     return {
       id: newId(),
@@ -470,6 +513,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       leaveType: i % 5 === 0 ? "Sick" : i % 4 === 0 ? "Credit Hours" : "Annual",
       startDate: addDays(today, i * 3 - 6),
       endDate: addDays(today, i * 3 - 4),
+      hours: i % 4 === 0 ? 8 : 24,
       status: i % 6 === 0 ? "requested" : "approved",
       sourceSystem: "ERP",
       sourceReference: `Synthetic leave record ${i + 1}`,

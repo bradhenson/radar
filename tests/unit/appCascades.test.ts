@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppStore } from "../../src/stores/app.svelte";
 import { InMemoryDataStore } from "../../src/data/InMemoryDataStore";
 import { emptyCollections, type DatabaseSnapshot, type MutationOp } from "../../src/data/DataStore";
-import { DEFAULT_SETTINGS, type Employee, type LeaveRecord, type PerformanceInput, type Project, type Task, type TaskNote } from "../../src/domain/models";
+import { DEFAULT_SETTINGS, type Employee, type LeaveRecord, type PerformanceInput, type Project, type QuickNote, type Task, type TaskNote } from "../../src/domain/models";
 
 const NOW = "2026-01-01T00:00:00.000Z";
 
@@ -82,6 +82,19 @@ function makeNote(id: string, taskId: string): TaskNote {
   return { id, taskId, body: "note", noteType: "general", createdAt: NOW, updatedAt: NOW };
 }
 
+function makeQuickNote(id: string, partial: Partial<QuickNote> = {}): QuickNote {
+  return {
+    id,
+    body: "A captured thought",
+    purpose: "scratch",
+    isPinned: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+    isArchived: false,
+    ...partial
+  };
+}
+
 /** InMemory store whose next mutate() call fails before applying anything. */
 class FailingMutateStore extends InMemoryDataStore {
   failNextMutate = false;
@@ -105,6 +118,7 @@ function baseSnapshot(): DatabaseSnapshot {
   collections.taskNotes = [makeNote("n1", "t1")];
   collections.performanceInputs = [makeInput("pi1", "e1", { relatedTaskId: "t1", projectId: "p1" })];
   collections.leaveRecords = [makeLeave("l1", "e1", { relatedTaskId: "t1" })];
+  collections.quickNotes = [makeQuickNote("qn1", { employeeId: "e1", projectId: "p1", taskId: "t1" })];
   return {
     collections,
     settings: { ...DEFAULT_SETTINGS },
@@ -142,6 +156,7 @@ describe("deleteEmployee cascade", () => {
     const t1 = app.tasks.find((t) => t.id === "t1")!;
     expect(t1.employeeId).toBeUndefined();
     expect(t1.performanceInputCreated).toBe(false);
+    expect(app.quickNotes[0]!.employeeId).toBeUndefined();
     // The audit trail landed in the same batch.
     expect(app.activityEntries.some((a) => a.actionType === "deleted" && a.entityType === "employees")).toBe(true);
     expect(app.meta.changesSinceBackup).toBe(1);
@@ -160,6 +175,7 @@ describe("deleteEmployee cascade", () => {
     expect(app.performanceInputs).toHaveLength(1);
     expect(app.leaveRecords).toHaveLength(1);
     expect(app.tasks.find((t) => t.id === "t1")!.employeeId).toBe("e1");
+    expect(app.quickNotes[0]!.employeeId).toBe("e1");
     expect(app.meta.changesSinceBackup).toBe(0);
     expect(app.saveStatus).toBe("error");
     expect(await store.getAll("employees")).toHaveLength(1);
@@ -177,6 +193,7 @@ describe("deleteTask cascade", () => {
     expect(app.taskNotes).toHaveLength(0);
     expect(app.performanceInputs[0]!.relatedTaskId).toBeUndefined();
     expect(app.leaveRecords[0]!.relatedTaskId).toBeUndefined();
+    expect(app.quickNotes[0]!.taskId).toBeUndefined();
     expect((await store.getAll("taskNotes"))).toHaveLength(0);
   });
 
@@ -190,6 +207,7 @@ describe("deleteTask cascade", () => {
     expect(app.taskNotes).toHaveLength(1);
     expect(app.performanceInputs[0]!.relatedTaskId).toBe("t1");
     expect(app.leaveRecords[0]!.relatedTaskId).toBe("t1");
+    expect(app.quickNotes[0]!.taskId).toBe("t1");
     expect((await store.getAll("tasks")).some((t) => t.id === "t1")).toBe(true);
     expect(await store.getAll("taskNotes")).toHaveLength(1);
   });
@@ -203,6 +221,7 @@ describe("deleteProject cascade", () => {
     expect(app.projects).toHaveLength(0);
     expect(app.tasks.every((t) => t.projectId === undefined)).toBe(true);
     expect(app.performanceInputs[0]!.projectId).toBeUndefined();
+    expect(app.quickNotes[0]!.projectId).toBeUndefined();
     expect(await store.getAll("projects")).toHaveLength(0);
   });
 
@@ -215,6 +234,7 @@ describe("deleteProject cascade", () => {
     expect(app.projects).toHaveLength(1);
     expect(app.tasks.filter((t) => t.projectId === "p1")).toHaveLength(2);
     expect(app.performanceInputs[0]!.projectId).toBe("p1");
+    expect(app.quickNotes[0]!.projectId).toBe("p1");
     expect(await store.getAll("projects")).toHaveLength(1);
   });
 });

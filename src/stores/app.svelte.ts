@@ -21,6 +21,7 @@ import type {
   PerformanceElement,
   PerformanceInput,
   Project,
+  QuickNote,
   Task,
   TaskNote,
   TeleworkRecord,
@@ -92,6 +93,7 @@ export class AppStore {
   awardRecords = $state<AwardRecord[]>([]);
   employeeInteractions = $state<EmployeeInteraction[]>([]);
   employeeNotes = $state<EmployeeNote[]>([]);
+  quickNotes = $state<QuickNote[]>([]);
   meetingNotes = $state<MeetingNote[]>([]);
   activityEntries = $state<ActivityEntry[]>([]);
   attentionSnoozes = $state<AttentionSnooze[]>([]);
@@ -161,6 +163,7 @@ export class AppStore {
       this.awardRecords.length > 0 ||
       this.employeeInteractions.length > 0 ||
       this.employeeNotes.length > 0 ||
+      this.quickNotes.length > 0 ||
       this.meetingNotes.length > 0
   );
   competencyList = $derived(
@@ -516,6 +519,7 @@ export class AppStore {
     this.awardRecords = snapshot.collections.awardRecords;
     this.employeeInteractions = snapshot.collections.employeeInteractions;
     this.employeeNotes = snapshot.collections.employeeNotes;
+    this.quickNotes = snapshot.collections.quickNotes;
     this.meetingNotes = snapshot.collections.meetingNotes;
     this.activityEntries = snapshot.collections.activityEntries;
     this.attentionSnoozes = snapshot.collections.attentionSnoozes;
@@ -1075,6 +1079,9 @@ export class AppStore {
       const unlinkedLeave = unlink(this.leaveRecords);
       const unlinkedTelework = unlink(this.teleworkRecords);
       const unlinkedInteractions = unlink(this.employeeInteractions);
+      const unlinkedQuickNotes = this.quickNotes
+        .filter((note) => note.taskId === id)
+        .map((note) => this.plainRecord({ ...note, taskId: undefined, updatedAt }));
 
       const entry = this.buildActivityEntry("tasks", id, "deleted", `Deleted task "${task.title}"`);
       const nextMeta = this.bumpedMeta("deleted");
@@ -1085,6 +1092,7 @@ export class AppStore {
         ...unlinkedLeave.map((record) => putOp("leaveRecords", record)),
         ...unlinkedTelework.map((record) => putOp("teleworkRecords", record)),
         ...unlinkedInteractions.map((record) => putOp("employeeInteractions", record)),
+        ...unlinkedQuickNotes.map((record) => putOp("quickNotes", record)),
         deleteOp("tasks", id),
         putOp("activityEntries", entry)
       ];
@@ -1104,6 +1112,9 @@ export class AppStore {
       );
       this.employeeInteractions = this.employeeInteractions.map((record) =>
         record.relatedTaskId === id ? { ...record, relatedTaskId: undefined, updatedAt } : record
+      );
+      this.quickNotes = this.quickNotes.map((note) =>
+        note.taskId === id ? { ...note, taskId: undefined, updatedAt } : note
       );
       this.tasks = this.tasks.filter((t) => t.id !== id);
 
@@ -1197,6 +1208,7 @@ export class AppStore {
       notes: this.employeeNotes.filter((r) => r.employeeId === employeeId).length,
       linkedTasks: this.tasks.filter((t) => t.employeeId === employeeId).length,
       meetingAttendances: this.meetingNotes.filter((n) => n.attendeeEmployeeIds.includes(employeeId)).length,
+      quickNoteLinks: this.quickNotes.filter((n) => n.employeeId === employeeId).length,
       projectLeads: this.projects.filter((p) => p.leadEmployeeId === employeeId).length,
       trainingAssignments: this.trainingRequirements.filter((r) => r.assignedEmployeeIds?.includes(employeeId)).length
     };
@@ -1259,6 +1271,10 @@ export class AppStore {
         .filter((n) => n.attendeeEmployeeIds.includes(id))
         .map((n) => ({ ...n, attendeeEmployeeIds: n.attendeeEmployeeIds.filter((e) => e !== id), updatedAt }));
 
+      const updatedQuickNotes = this.quickNotes
+        .filter((n) => n.employeeId === id)
+        .map((n) => ({ ...n, employeeId: undefined, updatedAt }));
+
       const updatedProjects = this.projects
         .filter((p) => p.leadEmployeeId === id)
         .map((p) => ({ ...p, leadEmployeeId: undefined, updatedAt }));
@@ -1281,6 +1297,7 @@ export class AppStore {
         ...updatedTasks.map((t) => putOp("tasks", this.plainRecord(t))),
         ...updatedAwards.map((a) => putOp("awardRecords", this.plainRecord(a))),
         ...updatedMeetings.map((n) => putOp("meetingNotes", this.plainRecord(n))),
+        ...updatedQuickNotes.map((n) => putOp("quickNotes", this.plainRecord(n))),
         ...updatedProjects.map((p) => putOp("projects", this.plainRecord(p))),
         ...updatedRequirements.map((r) => putOp("trainingRequirements", this.plainRecord(r))),
         deleteOp("employees", id),
@@ -1301,6 +1318,7 @@ export class AppStore {
         .map((a) => updatedAwards.find((u) => u.id === a.id) ?? a);
       this.tasks = this.tasks.map((t) => updatedTasks.find((u) => u.id === t.id) ?? t);
       this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
+      this.quickNotes = this.quickNotes.map((n) => updatedQuickNotes.find((u) => u.id === n.id) ?? n);
       this.projects = this.projects.map((p) => updatedProjects.find((u) => u.id === p.id) ?? p);
       this.trainingRequirements = this.trainingRequirements.map(
         (r) => updatedRequirements.find((u) => u.id === r.id) ?? r
@@ -1324,6 +1342,7 @@ export class AppStore {
     return {
       tasks: this.tasks.filter((t) => t.projectId === projectId).length,
       meetingNotes: this.meetingNotes.filter((n) => n.projectId === projectId).length,
+      quickNotes: this.quickNotes.filter((n) => n.projectId === projectId).length,
       performanceInputs: this.performanceInputs.filter((p) => p.projectId === projectId).length
     };
   }
@@ -1352,12 +1371,17 @@ export class AppStore {
         .filter((p) => p.projectId === id)
         .map((p) => ({ ...p, projectId: undefined, updatedAt }));
 
+      const updatedQuickNotes = this.quickNotes
+        .filter((n) => n.projectId === id)
+        .map((n) => ({ ...n, projectId: undefined, updatedAt }));
+
       const entry = this.buildActivityEntry("projects", id, "deleted", `Deleted project ${name}`);
       const nextMeta = this.bumpedMeta("deleted");
       const ops: MutationOp[] = [
         ...updatedTasks.map((t) => putOp("tasks", this.plainRecord(t))),
         ...updatedMeetings.map((n) => putOp("meetingNotes", this.plainRecord(n))),
         ...updatedInputs.map((p) => putOp("performanceInputs", this.plainRecord(p))),
+        ...updatedQuickNotes.map((n) => putOp("quickNotes", this.plainRecord(n))),
         deleteOp("projects", id),
         putOp("activityEntries", entry)
       ];
@@ -1367,6 +1391,7 @@ export class AppStore {
       this.tasks = this.tasks.map((t) => updatedTasks.find((u) => u.id === t.id) ?? t);
       this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
       this.performanceInputs = this.performanceInputs.map((p) => updatedInputs.find((u) => u.id === p.id) ?? p);
+      this.quickNotes = this.quickNotes.map((n) => updatedQuickNotes.find((u) => u.id === n.id) ?? n);
       this.projects = this.projects.filter((p) => p.id !== id);
 
       this.activityEntries.push(entry);

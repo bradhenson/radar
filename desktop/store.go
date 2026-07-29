@@ -41,6 +41,7 @@ var collectionNames = []string{
 	"awardRecords",
 	"employeeInteractions",
 	"employeeNotes",
+	"quickNotes",
 	"meetingNotes",
 	"activityEntries",
 	"attentionSnoozes",

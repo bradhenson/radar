@@ -1,6 +1,6 @@
 <script lang="ts">
   // Global search palette (plan 24.1): one input that searches tasks, people,
-  // projects, meeting notes, and performance inputs, and doubles as page
+  // projects, quick notes, meeting notes, and performance inputs, and doubles as page
   // navigation. Opened with Ctrl+K or the topbar search button.
   import { app } from "../../stores/app.svelte";
   import { ui } from "../../stores/ui.svelte";
@@ -17,6 +17,7 @@
     { page: "today", label: "Today" },
     { page: "projects", label: "Projects" },
     { page: "meetings", label: "Meetings" },
+    { page: "notes", label: "Notes" },
     { page: "employees", label: "Employees" },
     { page: "performance", label: "Performance" },
     { page: "training", label: "Training" },
@@ -43,6 +44,7 @@
       tasks: app.tasks,
       employees: app.employees,
       projects: app.projects,
+      quickNotes: app.quickNotes,
       meetingNotes: app.meetingNotes,
       performanceInputs: app.performanceInputs,
       pages: PAGES,
@@ -79,6 +81,9 @@
         break;
       case "project":
         router.go("projects", item.id);
+        break;
+      case "note":
+        router.go("notes", item.id);
         break;
       case "meeting":
         router.go("meetings", item.id);
