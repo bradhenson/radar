@@ -11,11 +11,13 @@
   import { downloadText, backupFilename } from "../utils/download";
   import type { Employee } from "../domain/models";
   import { activeProfileFields, activeProfileSections, formattedProfileValue } from "../domain/employeeProfile";
+  import { travelPhase } from "../domain/rules/travel";
 
   const NO_COMPETENCY_FILTER = "__none";
   const STALE_INPUT_DAYS = 30;
 
-  type SortKey = "name" | "competency" | "open" | "overdue" | "training" | "lastInput";
+  type SortKey = "name" | "competency" | "training";
+  type SummaryFilter = "" | "overdue" | "training" | "stale_input" | "on_leave";
 
   let search = $state("");
   let filterCompetency = $state("");
@@ -24,6 +26,7 @@
   let editing = $state<Employee | undefined>(undefined);
   let sortKey = $state<SortKey>("name");
   let sortAsc = $state(true);
+  let summaryFilter = $state<SummaryFilter>("");
 
   let rows = $derived(
     app.employees
@@ -63,6 +66,19 @@
             return compareDates(a.startDate, b.startDate) || compareDates(a.endDate, b.endDate);
           })[0];
         const onLeaveNow = Boolean(upcomingLeave && compareDates(upcomingLeave.startDate, app.today) <= 0);
+        const upcomingTravel = app.travelRecords
+          .filter((t) => {
+            if (t.employeeId !== e.id || t.isArchived) return false;
+            const phase = travelPhase(t, app.today);
+            return phase === "on_travel" || phase === "upcoming";
+          })
+          .sort((a, b) => {
+            const aNow = travelPhase(a, app.today) === "on_travel";
+            const bNow = travelPhase(b, app.today) === "on_travel";
+            if (aNow !== bNow) return aNow ? -1 : 1;
+            return compareDates(a.startDate, b.startDate) || compareDates(a.endDate, b.endDate);
+          })[0];
+        const onTravelNow = Boolean(upcomingTravel && travelPhase(upcomingTravel, app.today) === "on_travel");
         const staleInput = !lastInput || daysBetween(lastInput, app.today) > STALE_INPUT_DAYS;
         return {
           e,
@@ -72,6 +88,8 @@
           lastInput,
           upcomingLeave,
           onLeaveNow,
+          upcomingTravel,
+          onTravelNow,
           staleInput
         };
       })
@@ -84,26 +102,41 @@
     onLeave: rows.filter((r) => r.onLeaveNow).length
   });
 
+  let visibleRows = $derived(
+    rows.filter((r) => {
+      switch (summaryFilter) {
+        case "overdue":
+          return r.overdueCount > 0;
+        case "training":
+          return r.trainingDueCount > 0;
+        case "stale_input":
+          return r.staleInput;
+        case "on_leave":
+          return r.onLeaveNow;
+        default:
+          return true;
+      }
+    })
+  );
+
   let sorted = $derived.by(() => {
     const dir = sortAsc ? 1 : -1;
     const cmp = (a: (typeof rows)[number], b: (typeof rows)[number]): number => {
       switch (sortKey) {
         case "competency":
           return app.competencyCode(a.e.competencyId).localeCompare(app.competencyCode(b.e.competencyId));
-        case "open":
-          return a.openCount - b.openCount;
-        case "overdue":
-          return a.overdueCount - b.overdueCount;
         case "training":
           return a.trainingDueCount - b.trainingDueCount;
-        case "lastInput":
-          return (a.lastInput ?? "").localeCompare(b.lastInput ?? "");
         default:
           return a.e.displayName.localeCompare(b.e.displayName);
       }
     };
-    return [...rows].sort((a, b) => cmp(a, b) * dir || a.e.displayName.localeCompare(b.e.displayName));
+    return [...visibleRows].sort((a, b) => cmp(a, b) * dir || a.e.displayName.localeCompare(b.e.displayName));
   });
+
+  function toggleSummaryFilter(filter: Exclude<SummaryFilter, "">) {
+    summaryFilter = summaryFilter === filter ? "" : filter;
+  }
 
   function setSort(key: SortKey) {
     if (sortKey === key) {
@@ -117,11 +150,6 @@
 
   function ariaSort(key: SortKey): "ascending" | "descending" | undefined {
     return sortKey === key ? (sortAsc ? "ascending" : "descending") : undefined;
-  }
-
-  function statusLabel(status: Employee["activeStatus"]): string {
-    const text = status.replace(/_/g, " ");
-    return text.charAt(0).toUpperCase() + text.slice(1);
   }
 
   // CSV export with explicit column selection. The default is a minimal
@@ -222,26 +250,53 @@
 <div class="page">
   <div class="page-header">
     <h1>Employees</h1>
-    <span class="muted">{rows.length} shown</span>
+    <span class="muted">{sorted.length} shown</span>
   </div>
 
-  <div class="summary-cards">
-    <div class="stat" class:alert={stats.overdue > 0}>
+  <div class="summary-cards" aria-label="Quick employee filters">
+    <button
+      type="button"
+      class="stat"
+      class:alert={stats.overdue > 0}
+      class:active={summaryFilter === "overdue"}
+      aria-pressed={summaryFilter === "overdue"}
+      onclick={() => toggleSummaryFilter("overdue")}
+    >
       <div class="num">{stats.overdue}</div>
       <div class="lbl">Overdue tasks</div>
-    </div>
-    <div class="stat" class:warn={stats.trainingDue > 0}>
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:warn={stats.trainingDue > 0}
+      class:active={summaryFilter === "training"}
+      aria-pressed={summaryFilter === "training"}
+      onclick={() => toggleSummaryFilter("training")}
+    >
       <div class="num">{stats.trainingDue}</div>
       <div class="lbl">Training due</div>
-    </div>
-    <div class="stat" class:warn={stats.staleInput > 0}>
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:warn={stats.staleInput > 0}
+      class:active={summaryFilter === "stale_input"}
+      aria-pressed={summaryFilter === "stale_input"}
+      onclick={() => toggleSummaryFilter("stale_input")}
+    >
       <div class="num">{stats.staleInput}</div>
       <div class="lbl">No input {STALE_INPUT_DAYS}+ days</div>
-    </div>
-    <div class="stat">
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:active={summaryFilter === "on_leave"}
+      aria-pressed={summaryFilter === "on_leave"}
+      onclick={() => toggleSummaryFilter("on_leave")}
+    >
       <div class="num">{stats.onLeave}</div>
       <div class="lbl">On leave now</div>
-    </div>
+    </button>
   </div>
 
   <div class="toolbar">
@@ -266,8 +321,11 @@
     >
   </div>
 
-  {#if rows.length === 0}
-    <EmptyState message="No employees match." hint="Add an employee, or load sample data from Settings." />
+  {#if sorted.length === 0}
+    <EmptyState
+      message={summaryFilter ? "No employees match this quick filter." : "No employees match."}
+      hint={summaryFilter ? "Select the active summary card again to clear it." : "Add an employee, or load sample data from Settings."}
+    />
   {:else}
     <!-- Wide table scrolls inside this container; the Name column and the
          header row stay pinned so rows remain identifiable. -->
@@ -277,14 +335,10 @@
         <tr>
           <th aria-sort={ariaSort("name")}>{@render sortHeader("name", "Name")}</th>
           <th aria-sort={ariaSort("competency")}>{@render sortHeader("competency", "Competency")}</th>
-          <th>Title</th>
           <th>IPT</th>
-          <th>Status</th>
-          <th class="num" aria-sort={ariaSort("open")}>{@render sortHeader("open", "Open")}</th>
-          <th class="num" aria-sort={ariaSort("overdue")}>{@render sortHeader("overdue", "Overdue")}</th>
-          <th class="num" aria-sort={ariaSort("training")}>{@render sortHeader("training", "Training due")}</th>
-          <th>Upcoming leave</th>
-          <th aria-sort={ariaSort("lastInput")}>{@render sortHeader("lastInput", "Last input")}</th>
+          <th aria-sort={ariaSort("training")}>{@render sortHeader("training", "Training")}</th>
+          <th>Leave</th>
+          <th>Travel</th>
           <th></th>
         </tr>
       </thead>
@@ -304,17 +358,13 @@
               >
             </td>
             <td>{@render textOrDash(app.competencyCode(r.e.competencyId))}</td>
-            <td>{@render textOrDash(r.e.positionTitle)}</td>
             <td>{@render textOrDash(r.e.team)}</td>
             <td>
-              <span class="badge" class:success={r.e.activeStatus === "active"}>{statusLabel(r.e.activeStatus)}</span>
-            </td>
-            <td class="num" class:muted={r.openCount === 0}>{r.openCount}</td>
-            <td class="num" class:muted={r.overdueCount === 0}>
-              {#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}
-            </td>
-            <td class="num" class:muted={r.trainingDueCount === 0}>
-              {#if r.trainingDueCount}<span class="badge warning">{r.trainingDueCount}</span>{:else}0{/if}
+              {#if r.trainingDueCount}
+                <span class="badge warning">{r.trainingDueCount} due</span>
+              {:else}
+                <span class="badge success">Current</span>
+              {/if}
             </td>
             <td>
               {#if r.upcomingLeave}
@@ -329,12 +379,15 @@
               {/if}
             </td>
             <td>
-              {#if !r.lastInput}
-                <span class="badge warning">None</span>
-              {:else if r.staleInput}
-                <span class="badge warning">{formatDate(r.lastInput)}</span>
+              {#if r.upcomingTravel}
+                {#if r.onTravelNow}
+                  <span class="badge warning">On travel</span>
+                  <span class="small muted">until {formatDate(r.upcomingTravel.endDate)}</span>
+                {:else}
+                  {formatDate(r.upcomingTravel.startDate)} – {formatDate(r.upcomingTravel.endDate)}
+                {/if}
               {:else}
-                {formatDate(r.lastInput)}
+                <span class="muted">—</span>
               {/if}
             </td>
             <td>
@@ -407,6 +460,26 @@
 {/if}
 
 <style>
+  .summary-cards button.stat {
+    text-align: left;
+  }
+  .summary-cards button.stat:hover {
+    background: var(--surface-2);
+    border-color: var(--accent);
+  }
+  .summary-cards button.stat.active {
+    border-color: var(--accent);
+    box-shadow: var(--shadow), inset 0 0 0 1px var(--accent);
+  }
+  .summary-cards button.stat.active::after {
+    content: "✓";
+    position: absolute;
+    top: .45rem;
+    right: .6rem;
+    color: var(--accent);
+    font-size: .75rem;
+    font-weight: 800;
+  }
   th .th-sort {
     font: inherit;
     font-weight: inherit;
@@ -431,13 +504,6 @@
     font-size: 0.55rem;
     min-width: 0.7rem;
   }
-  th.num,
-  td.num {
-    text-align: right;
-  }
-  td.num {
-    font-variant-numeric: tabular-nums;
-  }
   tbody tr {
     cursor: pointer;
   }
@@ -446,7 +512,7 @@
     max-width: 100%;
   }
   .employee-table {
-    min-width: 56rem;
+    min-width: 46rem;
   }
   .employee-table thead th {
     position: sticky;

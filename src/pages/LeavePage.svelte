@@ -18,6 +18,7 @@
 
   let view = $state<"list" | "calendar">("list");
   let showPast = $state(false);
+  let filterEmployee = $state("");
   let calendarMonth = $state(`${app.today.slice(0, 7)}-01`);
   let formOpen = $state(false);
   let editing = $state<LeaveRecord | undefined>(undefined);
@@ -40,6 +41,7 @@
     if (!record) return;
     view = "list";
     if (compareDates(record.endDate, app.today) < 0) showPast = true;
+    if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
     router.go("leave");
     openForm(record);
   });
@@ -65,7 +67,7 @@
   }
 
   function openFormForDate(date: string) {
-    openForm(undefined, { startDate: date, endDate: date });
+    openForm(undefined, { employeeId: filterEmployee || undefined, startDate: date, endDate: date });
   }
 
   function showDayActions(date: string) {
@@ -120,11 +122,12 @@
     formOpen = false;
   }
 
-  let rows = $derived(
-    app.leaveRecords
+  let rows = $derived.by(() => {
+    return app.leaveRecords
       .filter((l) => showPast || compareDates(l.endDate, app.today) >= 0)
-      .sort((a, b) => compareDates(a.startDate, b.startDate))
-  );
+      .filter((l) => !filterEmployee || l.employeeId === filterEmployee)
+      .sort((a, b) => compareDates(a.startDate, b.startDate));
+  });
 
   let calendarTitle = $derived(monthLabel(calendarMonth));
   // Shared month grid (domain/rules/calendar.ts), same as Travel/Telework.
@@ -185,6 +188,10 @@
     <span class="muted">{rows.length} shown</span>
   </div>
   <div class="toolbar leave-toolbar">
+    <select bind:value={filterEmployee} aria-label="Filter by employee">
+      <option value="">All employees</option>
+      {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+    </select>
     <label class="inline-toggle">
       <input type="checkbox" bind:checked={showPast} /> Show past leave
     </label>
@@ -198,7 +205,10 @@
 
   {#if view === "list"}
     {#if rows.length === 0}
-      <EmptyState message="No leave records." hint="Track upcoming absences for workload awareness. Details stay broad — no reasons required." />
+      <EmptyState
+        message={filterEmployee ? "No leave records for this employee." : "No leave records."}
+        hint={filterEmployee ? "Choose All employees or include past leave." : "Track upcoming absences for workload awareness. Details stay broad — no reasons required."}
+      />
     {:else}
       <table class="data leave-table">
         <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th></tr></thead>
@@ -365,6 +375,9 @@
   }
   .leave-toolbar {
     align-items: center;
+  }
+  .leave-toolbar select {
+    min-width: 10rem;
   }
   .inline-toggle {
     display: flex;

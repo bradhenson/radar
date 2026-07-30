@@ -43,6 +43,7 @@ import { orderForAppend } from "../domain/rules/boardOrder";
 import { laneForStatus, statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 import { expiredActivityEntryIds } from "../domain/rules/activityRetention";
+import { activeEmployeesByDisplayName } from "../domain/rules/employees";
 import { requirementAppliesTo, rollingExpiration, trainingStatus, type TrainingStatus } from "../domain/rules/training";
 
 export type SaveStatus = "saved" | "saving" | "error";
@@ -144,7 +145,7 @@ export class AppStore {
     })
   );
 
-  activeEmployees = $derived(this.employees.filter((e) => e.activeStatus === "active" && !e.isArchived));
+  activeEmployees = $derived(activeEmployeesByDisplayName(this.employees));
   hasOperatorData = $derived(
     this.competencies.length > 0 ||
       this.employees.length > 0 ||

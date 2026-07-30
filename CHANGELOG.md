@@ -4,6 +4,14 @@
 
 ### Changed
 
+- Employee overview summary cards now act as quick filters for overdue tasks, training due, stale performance input, and employees currently on leave. Selecting an active card again clears the filter.
+
+- The employee overview table is now focused on operational awareness: Name, Competency, IPT, Training, Leave, and Travel. Title, employee status, task counts, and last performance input no longer crowd the table.
+
+- Employee dropdowns across RADAR are now consistently ordered alphabetically by the displayed employee name.
+
+- Leave and Availability now has the same employee dropdown filter as Telework. It filters both the list and calendar views and works alongside Show past leave.
+
 - Board cards now show only the Done action on hover or keyboard focus. The redundant left and right movement buttons are removed; drag-and-drop and the existing `[` / `]` keyboard shortcuts still move cards between columns.
 
 - Notes is now a deliberately simple scratchpad: write with the rich-text editor directly at the top of the page, scan notes in a responsive three-column card grid, and edit existing notes in that same composer without opening a modal. Purpose types, review queues, pinning, contextual links, and note-to-task/performance actions no longer appear in the workflow. Existing note content remains intact and continues to participate in search, backups, activity history, and Archive.
