@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Board cards now show only the Done action on hover or keyboard focus. The redundant left and right movement buttons are removed; drag-and-drop and the existing `[` / `]` keyboard shortcuts still move cards between columns.
+
 - Notes is now a deliberately simple scratchpad: write with the rich-text editor directly at the top of the page, scan notes in a responsive three-column card grid, and edit existing notes in that same composer without opening a modal. Purpose types, review queues, pinning, contextual links, and note-to-task/performance actions no longer appear in the workflow. Existing note content remains intact and continues to participate in search, backups, activity history, and Archive.
 
 ### Added

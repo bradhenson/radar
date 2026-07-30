@@ -588,24 +588,6 @@
                   <div class="card-actions">
                     <button
                       type="button"
-                      title="Move left"
-                      aria-label="Move to previous column"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        void moveByOffset(task, -1);
-                      }}>&lt;</button
-                    >
-                    <button
-                      type="button"
-                      title="Move right"
-                      aria-label="Move to next column"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        void moveByOffset(task, 1);
-                      }}>&gt;</button
-                    >
-                    <button
-                      type="button"
                       title="Complete"
                       aria-label="Complete task"
                       onclick={(e) => {
