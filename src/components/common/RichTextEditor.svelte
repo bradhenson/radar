@@ -8,7 +8,8 @@
     rows = 5,
     maxlength = 10000,
     placeholder = "",
-    ariaLabel
+    ariaLabel,
+    onSaveShortcut
   }: {
     id: string;
     value?: string;
@@ -16,6 +17,7 @@
     maxlength?: number;
     placeholder?: string;
     ariaLabel: string;
+    onSaveShortcut?: () => void;
   } = $props();
 
   let editor: HTMLDivElement | undefined = $state();
@@ -589,6 +591,11 @@
     // While an IME is composing, keys belong to the candidate window, not to
     // us: a space is selecting a candidate, not ending a line for autoformat.
     if (composing || e.isComposing) return;
+    if ((e.ctrlKey || e.metaKey) && e.key === "Enter" && onSaveShortcut) {
+      e.preventDefault();
+      onSaveShortcut();
+      return;
+    }
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
       e.preventDefault();
       exec("bold");

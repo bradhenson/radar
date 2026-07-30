@@ -50,7 +50,7 @@ try {
   await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
 
   const navCount = await page.locator("nav a").count();
-  if (navCount !== 14) throw new Error(`Expected 14 navigation destinations, found ${navCount}.`);
+  if (navCount !== 16) throw new Error(`Expected 16 navigation destinations, found ${navCount}.`);
 
   const title = `File smoke task ${Date.now()}`;
   await page.getByRole("button", { name: /new task/i }).click();
@@ -79,7 +79,7 @@ try {
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await page.getByRole("heading", { name: "Performance", exact: true }).waitFor();
   await page.getByRole("searchbox", { name: "Search performance" }).fill(performanceAction);
-  await page.getByText(performanceAction, { exact: true }).first().waitFor();
+  await page.getByText(performanceAction, { exact: true }).first().click();
   await page.getByRole("button", { name: "Edit input" }).click();
   await page.locator('.form-page[aria-label="Edit Performance Input"]').waitFor();
   await page.getByRole("button", { name: "Close" }).click();

@@ -2,11 +2,15 @@
 
 ## Unreleased
 
+### Changed
+
+- Notes is now a deliberately simple scratchpad: write with the rich-text editor directly at the top of the page, scan notes in a responsive three-column card grid, and edit existing notes in that same composer without opening a modal. Purpose types, review queues, pinning, contextual links, and note-to-task/performance actions no longer appear in the workflow. Existing note content remains intact and continues to participate in search, backups, activity history, and Archive.
+
 ### Added
 
 - Leave and Availability now includes Travel Comp, Scheduled Overtime, and Non-Scheduled Overtime in the Type menu. The leave form's broader “Workload impact note” label is shortened to “Notes,” Approved is the default status for new records, and an optional positive Hours value appears in the form, leave list, employee profile, and backups.
 
-- Notes Workbench: a writing-first notebook for thoughts that do not have a structured home yet. Capture from the workbench, the top bar, Today, or the J shortcut; classify a note as scratch, decision, reference, idea, follow-up, or observation; link it to an employee, project, or task; pin durable material to a reference shelf; and review or archive it without turning every thought into an overdue item. The Quick Note and edit dialogs use the shared rich-text editor. Notes can prefill tasks and employee performance inputs, participate in global search and backups, survive in both browser and desktop storage, and restore from Archive.
+- Notes: rich-text capture and inline editing on the Notes page, plus capture from the top bar, Today, or the J shortcut; a responsive card grid, search, backup/restore, browser and desktop persistence, activity history, and Archive recovery.
 
 - Two new Glass looks in Settings → Appearance: panels render as translucent, frosted layers over a soft ambient backdrop tinted by the selected color theme, in both light and dark mode. Glass keeps content panels calm and frosts only the chrome; Glass+ turns the translucency and ambient color up and frosts cards, tables, and board columns too. The standard solid look remains the default; the choice is per-database, travels with backups, and combines with every existing theme and palette. Frosting is presentation only — anyone whose system asks for reduced transparency automatically gets the standard opaque surfaces, printing is unaffected, and status colors stay solid for legibility. Native dropdown lists and date-picker popups now follow the app theme (dark popups in dark mode) everywhere, and stay solid under glass so they never wash out.
 

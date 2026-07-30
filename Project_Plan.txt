@@ -55,7 +55,7 @@ Current implemented application state:
   - Employee directory and 360-degree employee profile with tasks, performance, meetings, training, leave, telework, awards, and activity.
   - Performance input creation, editing, import-from-task, completed-task conversion prompt, coverage table, and text export.
   - Meeting notes with linked employees/projects, action items, CSV export, archive/restore, and follow-up task creation.
-  - Notes Workbench with global quick capture, a dated notebook stream, purpose labels, contextual links, a pinned reference shelf, review state, archive/restore, task/performance conversion, and global search.
+  - Simple Notes with an on-page rich-text composer, global quick capture, a responsive card grid, archive/restore, and global search.
   - Training requirements, bulk assignment, matrix view, completions, expiration calculation, and Today warnings.
   - Leave and telework tracking with calendars/lists, CSV export, verification/source fields, and pending-action attention.
   - Awards list, archive, settings, editable competencies, editable board columns, editable task categories, themes, color palettes, sample data, and diagnostic environment test.
@@ -1543,23 +1543,23 @@ Current implementation:
 - Follow-up task creation from a meeting note.
 - Meeting notes appear on employee profiles when linked to an employee.
 
-12.16 Notes Workbench
+12.16 Notes
 
 Purpose:
-Capture work-related thoughts that do not yet have a structured home, then connect or promote
-them without turning the app into an unrestricted diary or a second task board.
+Provide a low-friction place to jot down work-related information the user does not want to
+forget, such as a part number, web address, or a few procedural steps.
 
 Current implementation:
 
 - Quick Note is available globally from the top bar, Today, and the J keyboard shortcut.
-- The Notes page opens with a writing-first capture surface rather than a table.
-- Notes appear in a dated stream with purpose labels: Scratch note, Decision, Reference, Idea,
-  Follow-up, and Observation.
-- Optional employee, project, and task links provide context without duplicating the linked record.
-- Pinned notes live on a visible reference shelf.
-- Unreviewed notes are visible as a review queue, but do not enter the Attention engine unless a
-  later design adds an explicit reminder date.
-- Notes can prefill a task or, when linked to an employee, a performance input.
+- The Notes page opens with a rich-text composer rather than a table or modal; editing an existing
+  note loads it into the same composer.
+- Saving a quick note requires only its text; notes do not need a type, review state, or other
+  classification.
+- Notes appear newest-first in a searchable three-column card grid that collapses to two columns
+  at medium widths and one column on narrow screens.
+- The composer supports optional formatting, headings, lists, and checklists when more detail is
+  useful.
 - Notes participate in global search, JSON backup/restore, browser IndexedDB, desktop SQLite,
   activity history, and Archive restore/permanent-delete workflows.
 

@@ -125,9 +125,8 @@ Plan phases 0–6, plus calendar planning, meetings, color themes, and a simple 
   completion-to-input conversion prompt, coverage table, text export for evaluation preparation.
 - **Meetings**: product-team meeting note capture with linked employees/projects, discussion
   notes, action items, CSV export, archive/restore, and follow-up task creation.
-- **Notes Workbench**: quick capture from anywhere, a dated notebook stream, purpose labels,
-  employee/project/task links, a pinned reference shelf, review state, archive/restore, global
-  search, and task/performance-input conversion.
+- **Notes**: a rich-text composer for capture and inline editing, a responsive card grid, global
+  quick capture, search, and archive/restore.
 - **Training**: requirements, employee × requirement matrix, completion with expiration
   calculation, and due warnings.
 - **Leave / Telework / Travel / Awards**: calendar/list tracking, CSV export, direct links from

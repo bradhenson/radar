@@ -6,7 +6,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import type { Employee, MeetingNote, QuickNote } from "../domain/models";
-  import { quickNotePurposeLabel, quickNoteTitle } from "../domain/rules/quickNotes";
+  import { quickNoteTitle } from "../domain/rules/quickNotes";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { statusLabel } from "../domain/models";
 
@@ -177,17 +177,16 @@
     </table>
   {/if}
 
-  <h2>Archived workbench notes</h2>
+  <h2>Archived notes</h2>
   {#if archivedQuickNotes.length === 0}
-    <p class="muted">No archived workbench notes.</p>
+    <p class="muted">No archived notes.</p>
   {:else}
     <table class="data" style="margin-bottom:1.2rem">
-      <thead><tr><th>Note</th><th>Purpose</th><th>Captured</th><th></th></tr></thead>
+      <thead><tr><th>Note</th><th>Captured</th><th></th></tr></thead>
       <tbody>
         {#each archivedQuickNotes as note (note.id)}
           <tr>
             <td>{quickNoteTitle(note.body)}</td>
-            <td>{quickNotePurposeLabel(note.purpose)}</td>
             <td>{formatDate(note.createdAt.slice(0, 10))}</td>
             <td>
               <div class="row-actions">

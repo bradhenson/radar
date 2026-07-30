@@ -87,7 +87,7 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
     if (note.isArchived) continue;
     const plain = richTextToPlainText(note.body).replace(/\s*\n\s*/g, " ");
     const title = truncate(plain, 80);
-    const subtitle = [note.purpose.replace("_", " "), src.employeeName(note.employeeId) || undefined, src.projectName(note.projectId) || undefined]
+    const subtitle = [src.employeeName(note.employeeId) || undefined, src.projectName(note.projectId) || undefined]
       .filter(Boolean)
       .join(" · ");
     entries.push(entry("note", note.id, title, subtitle, plain));
