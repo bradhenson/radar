@@ -18,6 +18,7 @@
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
+  import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
 
   let { employeeId }: { employeeId: string } = $props();
 
@@ -33,9 +34,9 @@
   let checkInSummary = $state("");
   let checkInFollowUp = $state(false);
   let noteFormOpen = $state(false);
-  let noteDraft = $state("");
+  let noteDraft = $state(emptyRichText());
   let editingNoteId = $state<string | undefined>(undefined);
-  let editNoteDraft = $state("");
+  let editNoteDraft = $state(emptyRichText());
 
   let tasks = $derived(app.tasks.filter((t) => t.employeeId === employeeId && !t.isArchived));
   let openTasks = $derived(tasks.filter((t) => t.status !== "complete" && t.status !== "cancelled"));
@@ -129,26 +130,26 @@
   }
 
   async function addEmployeeNote() {
-    const noteText = noteDraft.trim();
-    if (!employee || !noteText) return;
+    if (!employee || isRichTextEmpty(noteDraft)) return;
+    const noteText = noteDraft;
     const now = nowTimestamp();
     await app.putRecord(
       "employeeNotes",
       { id: newId(), employeeId, noteText, createdAt: now, updatedAt: now, isArchived: false },
       { actionType: "created", summary: `Added note for ${employee.displayName}` }
     );
-    noteDraft = "";
+    noteDraft = emptyRichText();
     noteFormOpen = false;
   }
 
   function startNoteEdit(note: EmployeeNote) {
     editingNoteId = note.id;
-    editNoteDraft = note.noteText;
+    editNoteDraft = normalizeRichText(note.noteText);
   }
 
   async function saveNoteEdit(note: EmployeeNote) {
-    const noteText = editNoteDraft.trim();
-    if (!employee || !noteText) return;
+    if (!employee || isRichTextEmpty(editNoteDraft)) return;
+    const noteText = editNoteDraft;
     await app.putRecord(
       "employeeNotes",
       { ...note, noteText, updatedAt: nowTimestamp() },
@@ -303,7 +304,7 @@
             <RichTextEditor id={`employee-note-edit-${note.id}`} bind:value={editNoteDraft} rows={3} maxlength={10000} ariaLabel="Edit note" />
             <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
               <button type="button" onclick={() => (editingNoteId = undefined)}>Cancel</button>
-              <button type="button" class="primary" disabled={!editNoteDraft.trim()} onclick={() => void saveNoteEdit(note)}>Save</button>
+              <button type="button" class="primary" disabled={isRichTextEmpty(editNoteDraft)} onclick={() => void saveNoteEdit(note)}>Save</button>
             </div>
           {:else}
             <div style="display:flex; gap:.5rem; align-items:flex-start">
@@ -321,8 +322,8 @@
         <div class="card" style="margin-bottom:.5rem">
           <RichTextEditor id="employee-note-new" bind:value={noteDraft} rows={3} maxlength={10000} ariaLabel="New note" placeholder={`Something to remember about ${employee.displayName}`} />
           <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:.4rem">
-            <button type="button" onclick={() => { noteFormOpen = false; noteDraft = ""; }}>Cancel</button>
-            <button type="button" class="primary" disabled={!noteDraft.trim()} onclick={() => void addEmployeeNote()}>Add note</button>
+            <button type="button" onclick={() => { noteFormOpen = false; noteDraft = emptyRichText(); }}>Cancel</button>
+            <button type="button" class="primary" disabled={isRichTextEmpty(noteDraft)} onclick={() => void addEmployeeNote()}>Add note</button>
           </div>
         </div>
       {/if}

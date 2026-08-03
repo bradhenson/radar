@@ -13,7 +13,10 @@ const ALLOWED = [
   "http://www.w3.org/2000/svg",
   "http://www.w3.org/1999/xhtml",
   "http://www.w3.org/1998/Math/MathML",
-  "https://svelte.dev" // error-message help links embedded in dev warnings
+  "https://svelte.dev", // error-message help links embedded in dev warnings
+  // Same category: ProseMirror points at its schema guide inside the text of a
+  // thrown error. It is a string in an exception message, never fetched.
+  "https://prosemirror.net"
 ];
 
 function* walk(dir) {

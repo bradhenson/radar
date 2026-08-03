@@ -14,6 +14,7 @@
     performanceInputPrefillFromTask,
     shouldOfferTaskArchive
   } from "../../domain/rules/performanceImport";
+  import { isRichTextEmpty, normalizeRichText } from "../../utils/richTextDoc";
   import { ui } from "../../stores/ui.svelte";
   import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
   import { newId } from "../../utils/ids";
@@ -36,9 +37,9 @@
   // Distinguish the untouched default date from a chosen one, so a task import
   // can supply the completion date without discarding a user-picked date.
   let dateTouched = $state(Boolean(base.inputDate));
-  let situationOrContext = $state(base.situationOrContext ?? "");
-  let actionOrAccomplishment = $state(base.actionOrAccomplishment ?? "");
-  let result = $state(base.result ?? "");
+  let situationOrContext = $state(normalizeRichText(base.situationOrContext));
+  let actionOrAccomplishment = $state(normalizeRichText(base.actionOrAccomplishment));
+  let result = $state(normalizeRichText(base.result));
   let projectId = $state(base.projectId ?? "");
   let performanceElementId = $state(base.performanceElementId ?? "");
   let recognitionPotential = $state(base.recognitionPotential ?? false);
@@ -67,9 +68,9 @@
   const openedSnapshot = JSON.stringify([
     base.employeeId ?? "",
     base.inputDate ?? todayIso(),
-    base.situationOrContext ?? "",
-    base.actionOrAccomplishment ?? "",
-    base.result ?? "",
+    normalizeRichText(base.situationOrContext),
+    normalizeRichText(base.actionOrAccomplishment),
+    normalizeRichText(base.result),
     base.projectId ?? "",
     base.performanceElementId ?? "",
     base.recognitionPotential ?? false
@@ -138,7 +139,7 @@
       error = "Employee is required.";
       return;
     }
-    if (!actionOrAccomplishment.trim()) {
+    if (isRichTextEmpty(actionOrAccomplishment)) {
       error = "Action or accomplishment is required.";
       return;
     }
@@ -150,9 +151,9 @@
     const fields = {
       employeeId,
       inputDate,
-      situationOrContext: situationOrContext.trim() || undefined,
-      actionOrAccomplishment: actionOrAccomplishment.trim(),
-      result: result.trim() || undefined,
+      situationOrContext: isRichTextEmpty(situationOrContext) ? undefined : situationOrContext,
+      actionOrAccomplishment,
+      result: isRichTextEmpty(result) ? undefined : result,
       projectId: projectId || undefined,
       performanceElementId: performanceElementId || undefined,
       relatedTaskId,
@@ -208,7 +209,7 @@
   $effect(() => {
     return () => {
       if (closedExplicitly || saving || formSnapshot() === openedSnapshot) return;
-      if (!employeeId || !actionOrAccomplishment.trim() || !isValidIsoDate(inputDate)) return;
+      if (!employeeId || isRichTextEmpty(actionOrAccomplishment) || !isValidIsoDate(inputDate)) return;
       void save();
     };
   });

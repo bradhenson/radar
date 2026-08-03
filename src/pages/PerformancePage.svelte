@@ -5,10 +5,10 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
-  import type { PerformanceInput } from "../domain/models";
+  import type { PerformanceInput, RichTextField } from "../domain/models";
   import { daysBetween, formatDate } from "../utils/dates";
   import { downloadText, backupFilename } from "../utils/download";
-  import { richTextToPlainText } from "../utils/richText";
+  import { richTextDocToPlainText } from "../utils/richTextDoc";
 
   type ViewMode = "inputs" | "employees" | "coverage";
   type SortMode = "newest" | "oldest" | "employee";
@@ -34,8 +34,8 @@
   // Table rows are short summaries, so flatten any rich-text formatting to
   // plain text rather than showing raw markers. The expanded detail renders
   // the full formatting via RichTextView.
-  function summaryText(value: string | undefined): string {
-    return richTextToPlainText(value).replace(/\s*\n\s*/g, " ");
+  function summaryText(value: RichTextField | undefined): string {
+    return richTextDocToPlainText(value).replace(/\s*\n\s*/g, " ");
   }
 
   let inputs = $derived.by(() => {
@@ -50,9 +50,9 @@
         return (
           includes(app.employeeName(p.employeeId), needle) ||
           includes(app.projectName(p.projectId), needle) ||
-          includes(richTextToPlainText(p.situationOrContext), needle) ||
-          includes(richTextToPlainText(p.actionOrAccomplishment), needle) ||
-          includes(richTextToPlainText(p.result), needle)
+          includes(richTextDocToPlainText(p.situationOrContext), needle) ||
+          includes(richTextDocToPlainText(p.actionOrAccomplishment), needle) ||
+          includes(richTextDocToPlainText(p.result), needle)
         );
       })
       .sort((a, b) => {
@@ -131,9 +131,9 @@
       for (const p of group.list) {
         lines.push(`Date: ${formatDate(p.inputDate)}`);
         if (p.projectId) lines.push(`Project: ${app.projectName(p.projectId)}`);
-        if (p.situationOrContext) lines.push(`Context: ${richTextToPlainText(p.situationOrContext)}`);
-        lines.push(`Action: ${richTextToPlainText(p.actionOrAccomplishment)}`);
-        if (p.result) lines.push(`Result / Impact: ${richTextToPlainText(p.result)}`);
+        if (p.situationOrContext) lines.push(`Context: ${richTextDocToPlainText(p.situationOrContext)}`);
+        lines.push(`Action: ${richTextDocToPlainText(p.actionOrAccomplishment)}`);
+        if (p.result) lines.push(`Result / Impact: ${richTextDocToPlainText(p.result)}`);
         lines.push(`Status: ${p.inputStatus}`, "");
       }
     }

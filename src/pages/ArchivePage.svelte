@@ -8,6 +8,7 @@
   import type { Employee, MeetingNote, QuickNote } from "../domain/models";
   import { quickNoteTitle } from "../domain/rules/quickNotes";
   import { formatDate, nowTimestamp } from "../utils/dates";
+  import { richTextDocToPlainText } from "../utils/richTextDoc";
   import { statusLabel } from "../domain/models";
 
   let search = $state("");
@@ -27,7 +28,11 @@
   );
   let archivedQuickNotes = $derived(
     app.quickNotes
-      .filter((note) => note.isArchived && (!search || note.body.toLowerCase().includes(search.toLowerCase())))
+      .filter(
+        (note) =>
+          note.isArchived &&
+          (!search || richTextDocToPlainText(note.body).toLowerCase().includes(search.toLowerCase()))
+      )
       .sort((a, b) => (a.updatedAt < b.updatedAt ? 1 : -1))
   );
   let inactiveEmployees = $derived(app.employees.filter((e) => e.activeStatus !== "active" || e.isArchived));

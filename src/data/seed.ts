@@ -2,6 +2,7 @@
 
 import type { DatabaseSnapshot } from "./DataStore";
 import { emptyCollections } from "./DataStore";
+import { migrateCollectionsRichText } from "./richTextMigration";
 import {
   DEFAULT_BOARD_COLUMN_SEEDS,
   DEFAULT_SETTINGS,
@@ -694,6 +695,11 @@ export function createSampleSnapshot(): DatabaseSnapshot {
   function empNote(employee: Employee, noteText: string) {
     return { id: newId(), employeeId: employee.id, noteText, isArchived: false, ...stamp };
   }
+
+  // Sample text above is authored in the old notation because it reads well in
+  // source. Converting here means a freshly seeded database is already in the
+  // current format and never prompts for a migration it does not need.
+  migrateCollectionsRichText(c as unknown as Record<string, unknown[]>);
 
   return {
     collections: c,

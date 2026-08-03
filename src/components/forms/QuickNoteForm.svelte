@@ -6,25 +6,27 @@
   import { quickNoteTitle } from "../../domain/rules/quickNotes";
   import { nowTimestamp } from "../../utils/dates";
   import { newId } from "../../utils/ids";
+  import { isRichTextEmpty, normalizeRichText, serializeRichText, type RichTextValue } from "../../utils/richTextDoc";
 
   let {
     note,
     onclose
   }: { note?: QuickNote; onclose: () => void } = $props();
 
-  function initialNoteBody(): string {
-    return note?.body ?? "";
+  /** Read once, in a function, so this does not subscribe to the prop. */
+  function initialNoteBody(): RichTextValue {
+    return normalizeRichText(note?.body);
   }
 
   const initialBody = initialNoteBody();
+  const initialSerialized = serializeRichText(initialBody);
   let body = $state(initialBody);
   let saving = $state(false);
   let error = $state("");
-  let isDirty = $derived(body !== initialBody);
+  let isDirty = $derived(serializeRichText(body) !== initialSerialized);
 
   async function save() {
-    const trimmed = body.trim();
-    if (!trimmed) {
+    if (isRichTextEmpty(body)) {
       error = "Write something before saving the note.";
       return;
     }
@@ -33,7 +35,7 @@
     const now = nowTimestamp();
     const record: QuickNote = {
       id: note?.id ?? newId(),
-      body: trimmed,
+      body,
       // Preserve legacy metadata when editing so simplifying the interface
       // never discards information stored by earlier RADAR versions.
       purpose: note?.purpose ?? "scratch",
@@ -72,7 +74,7 @@
       placeholder="Part number, web address, a few steps, or anything else…"
       ariaLabel="Note"
     />
-    <div class="field-hint">Use the toolbar for headings, lists, or a checklist when useful.</div>
+    <div class="field-hint">Use the toolbar for headings or lists when useful.</div>
     {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <div class="actions">

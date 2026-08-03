@@ -27,7 +27,7 @@ import {
 import { computeAttention } from "../../src/domain/rules/attention";
 import { orderForAppend } from "../../src/domain/rules/boardOrder";
 import { laneForStatus, statusChangeForLaneMove } from "../../src/domain/rules/laneStatus";
-import { richTextToPlainText } from "../../src/utils/richText";
+import { richTextDocToPlainText, richTextFromPlainText } from "../../src/utils/richTextDoc";
 import { isValidIsoDate, nowTimestamp, todayIso } from "../../src/utils/dates";
 import { newId } from "../../src/utils/ids";
 
@@ -131,7 +131,7 @@ export function getEmployee(db: RadarDb, args: { employee: string }) {
     openTasks: tasks.map((t) =>
       taskView(t, employees, columns, projects.find((p) => p.id === t.projectId)?.name)
     ),
-    recentNotes: notes.map((n) => ({ createdAt: n.createdAt, text: richTextToPlainText(n.noteText) })),
+    recentNotes: notes.map((n) => ({ createdAt: n.createdAt, text: richTextDocToPlainText(n.noteText) })),
     recentCheckIns: interactions.map((i) => ({
       date: i.interactionDate,
       type: i.interactionType,
@@ -175,7 +175,7 @@ export function searchTasks(
   if (args.text) {
     const needle = args.text.toLowerCase();
     tasks = tasks.filter(
-      (t) => t.title.toLowerCase().includes(needle) || richTextToPlainText(t.description).toLowerCase().includes(needle)
+      (t) => t.title.toLowerCase().includes(needle) || richTextDocToPlainText(t.description).toLowerCase().includes(needle)
     );
   }
   if (args.overdueOnly) {
@@ -283,7 +283,9 @@ function createTaskInTx(db: RadarDb, args: Parameters<typeof createTask>[1]) {
   const task: Task = {
     id: newId(),
     title,
-    description: args.description?.trim() || undefined,
+    // Converted at the boundary: this server is a second writer, so it must not
+    // be able to leave a record in the pre-Tiptap string format.
+    description: args.description?.trim() ? richTextFromPlainText(args.description.trim()) : undefined,
     status: column.mapsToStatus ?? "open",
     boardColumnId: column.id,
     priority: args.priority ?? "normal",
@@ -341,7 +343,9 @@ function updateTaskInTx(db: RadarDb, args: Parameters<typeof updateTask>[1]) {
     if (!title) throw new Error("title cannot be empty");
     next.title = title;
   }
-  if (args.description !== undefined) next.description = args.description.trim() || undefined;
+  if (args.description !== undefined) {
+    next.description = args.description.trim() ? richTextFromPlainText(args.description.trim()) : undefined;
+  }
   if (args.priority !== undefined) next.priority = args.priority;
   // null clears the due date; undefined leaves it alone.
   if (args.dueDate !== undefined) next.dueDate = args.dueDate ?? undefined;
@@ -397,7 +401,7 @@ export function addEmployeeNote(db: RadarDb, args: { employee: string; note: str
   const note: EmployeeNote = {
     id: newId(),
     employeeId: employee.id,
-    noteText: text,
+    noteText: richTextFromPlainText(text),
     createdAt: now,
     updatedAt: now,
     isArchived: false

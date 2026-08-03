@@ -3,7 +3,15 @@
 // "Import from task" action. Pure — no store or DOM imports.
 
 import type { ChecklistItem, IsoDate, PerformanceInput, Task, TaskNote } from "../models";
-import { richTextToPlainText } from "../../utils/richText";
+import {
+  concatRichText,
+  isRichTextEmpty,
+  normalizeRichText,
+  richTextBulletList,
+  richTextDocToPlainText,
+  richTextFromPlainText,
+  type RichTextValue
+} from "../../utils/richTextDoc";
 
 export interface TaskImportContext {
   today: IsoDate;
@@ -18,20 +26,22 @@ export function performanceInputPrefillFromTask(task: Task, ctx: TaskImportConte
   const completedChecklist = (ctx.checklistItems ?? [])
     .filter((c) => c.taskId === task.id && c.isComplete)
     .sort((a, b) => a.order - b.order)
-    .map((c) => `- ${c.title}`);
-  const action = [task.title, ...completedChecklist].join("\n");
+    .map((c) => c.title);
+  // The title is plain text, so it is wrapped rather than parsed; a task called
+  // "1. Rewrite the SOP" must not become a numbered list.
+  const action = concatRichText(richTextFromPlainText(task.title), richTextBulletList(completedChecklist));
 
   const completionNotes = (ctx.notes ?? [])
     .filter((n) => n.taskId === task.id && n.noteType === "completion")
     .sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1))
-    .map((n) => richTextToPlainText(n.body));
+    .map((n) => normalizeRichText(n.body));
 
   return {
     employeeId: task.employeeId,
     inputDate: task.completedDate ?? ctx.today,
-    situationOrContext: richTextToPlainText(task.description) || undefined,
+    situationOrContext: isRichTextEmpty(task.description) ? undefined : normalizeRichText(task.description),
     actionOrAccomplishment: action,
-    result: completionNotes.length ? completionNotes.join("\n") : undefined,
+    result: completionNotes.length ? concatRichText(...completionNotes) : undefined,
     projectId: task.projectId,
     relatedTaskId: task.id,
     source: task.status === "complete" ? "Completed Task" : "Task"
@@ -51,10 +61,19 @@ export function shouldOfferTaskArchive(task: Task): boolean {
 export interface PerformanceInputDraftFields {
   employeeId: string;
   inputDate: string;
-  situationOrContext: string;
-  actionOrAccomplishment: string;
-  result: string;
+  situationOrContext: RichTextValue;
+  actionOrAccomplishment: RichTextValue;
+  result: RichTextValue;
   projectId: string;
+}
+
+/** The draft fields holding a document rather than a scalar. */
+const RICH_TEXT_DRAFT_FIELDS = ["situationOrContext", "actionOrAccomplishment", "result"] as const;
+
+type RichTextDraftField = (typeof RICH_TEXT_DRAFT_FIELDS)[number];
+
+function isRichTextDraftField(key: keyof PerformanceInputDraftFields): key is RichTextDraftField {
+  return (RICH_TEXT_DRAFT_FIELDS as readonly string[]).includes(key);
 }
 
 export interface TaskImportMergeResult {
@@ -82,18 +101,33 @@ export function mergeTaskImportIntoDraft(
   draft: PerformanceInputDraftFields,
   prefill: Partial<PerformanceInput>
 ): TaskImportMergeResult {
-  const incoming: Partial<Record<keyof PerformanceInputDraftFields, string | undefined>> = {
-    employeeId: prefill.employeeId,
-    inputDate: prefill.inputDate,
-    situationOrContext: prefill.situationOrContext,
-    actionOrAccomplishment: prefill.actionOrAccomplishment,
-    result: prefill.result,
-    projectId: prefill.projectId
-  };
   const merged = { ...draft };
   const skipped: string[] = [];
+
+  const scalars = {
+    employeeId: prefill.employeeId,
+    inputDate: prefill.inputDate,
+    projectId: prefill.projectId
+  } satisfies Partial<Record<keyof PerformanceInputDraftFields, string | undefined>>;
+
   for (const key of Object.keys(FIELD_LABELS) as (keyof PerformanceInputDraftFields)[]) {
-    const value = incoming[key];
+    if (isRichTextDraftField(key)) {
+      const value = prefill[key];
+      if (value === undefined || isRichTextEmpty(value)) continue;
+      if (!isRichTextEmpty(draft[key])) {
+        if (
+          richTextDocToPlainText(draft[key]).trim() !== richTextDocToPlainText(value).trim() &&
+          !skipped.includes(FIELD_LABELS[key])
+        ) {
+          skipped.push(FIELD_LABELS[key]);
+        }
+        continue;
+      }
+      merged[key] = normalizeRichText(value);
+      continue;
+    }
+
+    const value = scalars[key];
     if (!value) continue;
     if (draft[key].trim()) {
       if (draft[key].trim() !== value.trim() && !skipped.includes(FIELD_LABELS[key])) skipped.push(FIELD_LABELS[key]);

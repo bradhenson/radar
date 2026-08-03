@@ -16,6 +16,8 @@
     "mcp": "tsx mcp/src/server.ts",
     "verify": "npm run check && npm test && npm run build",
     "smoke:file": "node scripts/smoke-file.mjs",
+    "smoke:richtext": "node scripts/smoke-richtext.mjs",
+    "smoke:migration": "node scripts/smoke-migration.mjs",
     "smoke:desktop": "node scripts/smoke-desktop.mjs"
   },
   "engines": {
@@ -33,5 +35,13 @@
     "vite": "^7.0.0",
     "vitest": "^3.0.0",
     "zod": "4.4.3"
+  },
+  "dependencies": {
+    "@tiptap/core": "3.29.2",
+    "@tiptap/extension-character-count": "3.29.2",
+    "@tiptap/extension-placeholder": "3.29.2",
+    "@tiptap/extension-underline": "3.29.2",
+    "@tiptap/pm": "3.29.2",
+    "@tiptap/starter-kit": "3.29.2"
   }
 }

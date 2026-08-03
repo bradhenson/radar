@@ -7,6 +7,7 @@
   import { MEETING_TYPES, type MeetingNote } from "../../domain/models";
   import { formatDate, isValidIsoDate, nowTimestamp, todayIso } from "../../utils/dates";
   import { newId } from "../../utils/ids";
+  import { isRichTextEmpty, normalizeRichText, serializeRichText } from "../../utils/richTextDoc";
 
   let {
     note,
@@ -28,8 +29,8 @@
     meetingType: initialSource().meetingType ?? "Product team",
     projectId: initialSource().projectId ?? "",
     attendeeEmployeeIds: [...(initialSource().attendeeEmployeeIds ?? [])],
-    notes: initialSource().notes ?? "",
-    actionItems: initialSource().actionItems ?? ""
+    notes: normalizeRichText(initialSource().notes),
+    actionItems: normalizeRichText(initialSource().actionItems)
   };
 
   let title = $state(initial.title);
@@ -50,8 +51,8 @@
       meetingDate !== initial.meetingDate ||
       meetingType !== initial.meetingType ||
       projectId !== initial.projectId ||
-      notes !== initial.notes ||
-      actionItems !== initial.actionItems ||
+      serializeRichText(notes) !== serializeRichText(initial.notes) ||
+      serializeRichText(actionItems) !== serializeRichText(initial.actionItems) ||
       attendeeEmployeeIds.length !== initial.attendeeEmployeeIds.length ||
       attendeeEmployeeIds.some((id) => !initial.attendeeEmployeeIds.includes(id))
   );
@@ -99,8 +100,8 @@
       meetingType,
       projectId: projectId || undefined,
       attendeeEmployeeIds,
-      notes: notes.trim() || undefined,
-      actionItems: actionItems.trim() || undefined,
+      notes: isRichTextEmpty(notes) ? undefined : notes,
+      actionItems: isRichTextEmpty(actionItems) ? undefined : actionItems,
       createdAt: note?.createdAt ?? now,
       updatedAt: now,
       isArchived: note?.isArchived ?? false
