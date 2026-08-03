@@ -2,6 +2,7 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import { router } from "./router.svelte";
+  import RichTextMigrationDialog from "../components/common/RichTextMigrationDialog.svelte";
   import Toasts from "../components/common/Toasts.svelte";
   import TaskDetail from "../components/forms/TaskDetail.svelte";
   import QuickAddTask from "../components/forms/QuickAddTask.svelte";
@@ -533,6 +534,7 @@
       oncancel={() => (ui.archivePromptTaskId = undefined)}
     />
   {/if}
+  <RichTextMigrationDialog />
   <Toasts />
 {/if}
 

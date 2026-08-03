@@ -6,6 +6,10 @@ import {
   type PerformanceInputDraftFields
 } from "../../src/domain/rules/performanceImport";
 import type { ChecklistItem, Task, TaskNote } from "../../src/domain/models";
+import { emptyRichText, richTextDocToPlainText, richTextFromPlainText } from "../../src/utils/richTextDoc";
+
+/** Assertions read the visible text, not the document shape. */
+const plain = richTextDocToPlainText;
 
 const TODAY = "2026-07-05";
 const TS = "2026-07-01T12:00:00.000Z";
@@ -53,9 +57,9 @@ function emptyDraft(overrides: Partial<PerformanceInputDraftFields> = {}): Perfo
   return {
     employeeId: "",
     inputDate: "",
-    situationOrContext: "",
-    actionOrAccomplishment: "",
-    result: "",
+    situationOrContext: emptyRichText(),
+    actionOrAccomplishment: emptyRichText(),
+    result: emptyRichText(),
     projectId: "",
     ...overrides
   };
@@ -74,8 +78,8 @@ describe("performanceInputPrefillFromTask", () => {
     expect(prefill.employeeId).toBe("e1");
     expect(prefill.projectId).toBe("p1");
     expect(prefill.inputDate).toBe("2026-06-30");
-    expect(prefill.situationOrContext).toBe("Legacy switch stack was failing.");
-    expect(prefill.actionOrAccomplishment).toBe("Migrate lab network");
+    expect(plain(prefill.situationOrContext)).toBe("Legacy switch stack was failing.");
+    expect(plain(prefill.actionOrAccomplishment)).toBe("Migrate lab network");
     expect(prefill.relatedTaskId).toBe("t1");
     expect(prefill.source).toBe("Completed Task");
   });
@@ -98,8 +102,8 @@ describe("performanceInputPrefillFromTask", () => {
         makeChecklist({ id: "c4", taskId: "other", title: "Unrelated", isComplete: true, order: 1 })
       ]
     });
-    expect(prefill.actionOrAccomplishment).toBe(
-      "Migrate lab network\n- Stage new switches\n- Cut over VLANs"
+    expect(plain(prefill.actionOrAccomplishment)).toBe(
+      "Migrate lab network\n\n• Stage new switches\n• Cut over VLANs"
     );
   });
 
@@ -113,7 +117,7 @@ describe("performanceInputPrefillFromTask", () => {
         makeNote({ id: "n4", taskId: "other", noteType: "completion", body: "Unrelated." })
       ]
     });
-    expect(prefill.result).toBe("Cutover done.\nZero downtime.");
+    expect(plain(prefill.result)).toBe("Cutover done.\n\nZero downtime.");
   });
 
   it("converts rich task text to readable plain text", () => {
@@ -124,8 +128,9 @@ describe("performanceInputPrefillFromTask", () => {
         notes: [makeNote({ noteType: "completion", body: "- [x] Cutover complete\n- [ ] Monitor" })]
       }
     );
-    expect(prefill.situationOrContext).toBe("Background\n\nThe legacy stack failed.");
-    expect(prefill.result).toBe("☑ Cutover complete\n☐ Monitor");
+    expect(plain(prefill.situationOrContext)).toBe("Background\n\nThe legacy stack failed.");
+    // Checklists left the schema: state survives as a marker on a plain bullet.
+    expect(plain(prefill.result)).toBe("• ✓ Cutover complete\n• ○ Monitor");
   });
 });
 
@@ -141,28 +146,26 @@ describe("mergeTaskImportIntoDraft", () => {
 
   it("fills every empty field and skips nothing", () => {
     const { merged, skipped } = mergeTaskImportIntoDraft(emptyDraft(), prefill);
-    expect(merged).toEqual({
-      employeeId: "e1",
-      inputDate: "2026-06-30",
-      situationOrContext: "Context from task",
-      actionOrAccomplishment: "Action from task",
-      result: "Result from task",
-      projectId: "p1"
-    });
+    expect(merged.employeeId).toBe("e1");
+    expect(merged.inputDate).toBe("2026-06-30");
+    expect(merged.projectId).toBe("p1");
+    expect(plain(merged.situationOrContext)).toBe("Context from task");
+    expect(plain(merged.actionOrAccomplishment)).toBe("Action from task");
+    expect(plain(merged.result)).toBe("Result from task");
     expect(skipped).toEqual([]);
   });
 
   it("never overwrites fields the user already filled, and reports them", () => {
     const draft = emptyDraft({
       employeeId: "e9",
-      actionOrAccomplishment: "My own words",
+      actionOrAccomplishment: richTextFromPlainText("My own words"),
       inputDate: "2026-07-04"
     });
     const { merged, skipped } = mergeTaskImportIntoDraft(draft, prefill);
     expect(merged.employeeId).toBe("e9");
-    expect(merged.actionOrAccomplishment).toBe("My own words");
+    expect(plain(merged.actionOrAccomplishment)).toBe("My own words");
     expect(merged.inputDate).toBe("2026-07-04");
-    expect(merged.situationOrContext).toBe("Context from task");
+    expect(plain(merged.situationOrContext)).toBe("Context from task");
     expect(skipped).toEqual(["Employee", "Date", "Action"]);
   });
 

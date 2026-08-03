@@ -1,7 +1,15 @@
 // Core entity model. See PRODUCT_PLAN.txt section 27.
 // Calendar dates are ISO date strings (YYYY-MM-DD); timestamps are UTC ISO strings.
+import type { RichTextValue } from "../utils/richTextDoc";
 
 export type Id = string;
+
+/**
+ * A rich-text document, or legacy notation on a record the migration has not
+ * converted yet. Always read through `normalizeRichText` /
+ * `richTextDocToPlainText`, never as a bare string.
+ */
+export type RichTextField = string | RichTextValue;
 export type IsoDate = string;
 export type IsoTimestamp = string;
 
@@ -111,7 +119,7 @@ export type VerificationStatus = "not_required" | "unverified" | "verified" | "n
 export interface Task {
   id: Id;
   title: string;
-  description?: string;
+  description?: RichTextField;
   status: TaskStatus;
   boardColumnId?: Id;
   priority: TaskPriority;
@@ -144,7 +152,7 @@ export type NoteType = "general" | "status" | "decision" | "completion" | "verif
 export interface TaskNote {
   id: Id;
   taskId: Id;
-  body: string;
+  body: RichTextField;
   noteType: NoteType;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
@@ -181,9 +189,9 @@ export interface PerformanceInput {
   id: Id;
   employeeId: Id;
   inputDate: IsoDate;
-  situationOrContext?: string;
-  actionOrAccomplishment: string;
-  result?: string;
+  situationOrContext?: RichTextField;
+  actionOrAccomplishment: RichTextField;
+  result?: RichTextField;
   performanceElementId?: Id;
   projectId?: Id;
   relatedTaskId?: Id;
@@ -366,7 +374,7 @@ export interface EmployeeInteraction {
 export interface EmployeeNote {
   id: Id;
   employeeId: Id;
-  noteText: string;
+  noteText: RichTextField;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   isArchived: boolean;
@@ -382,7 +390,7 @@ export type QuickNotePurpose = (typeof QUICK_NOTE_PURPOSES)[number];
  */
 export interface QuickNote {
   id: Id;
-  body: string;
+  body: RichTextField;
   purpose: QuickNotePurpose;
   employeeId?: Id;
   projectId?: Id;
@@ -401,8 +409,8 @@ export interface MeetingNote {
   meetingType: string;
   projectId?: Id;
   attendeeEmployeeIds: Id[];
-  notes?: string;
-  actionItems?: string;
+  notes?: RichTextField;
+  actionItems?: RichTextField;
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   isArchived: boolean;

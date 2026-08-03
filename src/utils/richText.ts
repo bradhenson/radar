@@ -1,3 +1,9 @@
+// Reader for RADAR's pre-Tiptap notation. Nothing writes this format any more:
+// its only job is to convert records saved before the editor changed, which
+// `richTextDoc.ts` does on read and the backup ladder does on import. Checklists
+// still parse here because old notes contain them — see `richTextFromLegacy`
+// for where their state goes now.
+
 export type RichTextInline =
   | { kind: "text"; text: string }
   | { kind: "strong" | "emphasis" | "underline"; children: RichTextInline[] };
@@ -176,62 +182,3 @@ export function parseRichText(value: string | undefined): RichTextBlock[] {
   return blocks;
 }
 
-/**
- * Matches a checklist line, capturing the parts around its state box so a
- * toggle can rewrite one character and leave the rest of the line untouched.
- * Deliberately the same shape as the checklist branch of `parseBlockLine`, so
- * the items this counts are exactly the items `parseRichText` produces — an
- * index from the rendered view always lands on the line it came from.
- */
-const CHECKLIST_LINE = /^(\s*[-*]\s+\[)([ xX])(\]\s+.+)$/;
-
-/**
- * Flip the checked state of the `index`-th checklist item, counting in document
- * order across every list in the value.
- *
- * Works on the stored source rather than on parsed blocks so that everything
- * else survives byte for byte: a reparse-and-reserialize would also normalize
- * spacing, renumber ordered lists, and drop empty items, which is far too much
- * collateral for ticking a box. Out-of-range indexes return the value unchanged
- * rather than throwing, since the view can race a concurrent edit.
- */
-export function toggleChecklistItemAt(value: string | undefined, index: number): string {
-  const source = value ?? "";
-  if (index < 0) return source;
-  const lines = source.split("\n");
-  let seen = -1;
-  for (let i = 0; i < lines.length; i++) {
-    const match = CHECKLIST_LINE.exec(lines[i]!);
-    if (!match) continue;
-    seen += 1;
-    if (seen !== index) continue;
-    const checked = match[2]!.toLowerCase() === "x";
-    lines[i] = `${match[1]}${checked ? " " : "x"}${match[3]}`;
-    return lines.join("\n");
-  }
-  return source;
-}
-
-export function richTextInlineToPlainText(nodes: RichTextInline[]): string {
-  return nodes
-    .map((node) => (node.kind === "text" ? node.text : richTextInlineToPlainText(node.children)))
-    .join("");
-}
-
-/** Plain-text projection for search, CSV, and records derived from rich text. */
-export function richTextToPlainText(value: string | undefined): string {
-  return parseRichText(value)
-    .map((block) => {
-      if (block.kind === "paragraph" || block.kind === "heading") return richTextInlineToPlainText(block.content);
-      return block.items
-        .map((item, index) => {
-          const text = richTextInlineToPlainText(item.content);
-          if (block.kind === "ordered-list") return `${index + 1}. ${text}`;
-          if (block.kind === "checklist") return `${item.checked ? "☑" : "☐"} ${text}`;
-          return `• ${text}`;
-        })
-        .join("\n");
-    })
-    .join("\n\n")
-    .trim();
-}

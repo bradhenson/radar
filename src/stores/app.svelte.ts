@@ -37,6 +37,15 @@ import { WailsDataStore } from "../data/WailsDataStore";
 import { onDesktopDatabaseChanged, wailsAppBindings, wailsStoreBindings } from "../data/wailsBridge";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
+import {
+  describeMigrationReport,
+  emptyMigrationReport,
+  migrateRecordRichText,
+  migrationReportIsEmpty,
+  planRichTextMigration,
+  RICH_TEXT_MIGRATION_FIELDS,
+  type RichTextMigrationReport
+} from "../data/richTextMigration";
 import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
@@ -118,6 +127,14 @@ export class AppStore {
   storageFault = $state<"blocked" | "locked" | ConnectionLossReason | undefined>(undefined);
   initialized = $state(false);
   initError = $state<string | undefined>(undefined);
+  /**
+   * Set when this database still holds pre-Tiptap note text. The conversion is
+   * deliberately not automatic: it is preceded by a backup the user must accept,
+   * so a one-way change to real notes never happens without their say-so.
+   */
+  pendingRichTextMigration = $state<RichTextMigrationReport | undefined>(undefined);
+  /** What the conversion actually did, once it has run. */
+  richTextMigrationResult = $state<RichTextMigrationReport | undefined>(undefined);
   today = $state(todayIso());
   toasts = $state<Toast[]>([]);
 
@@ -326,6 +343,7 @@ export class AppStore {
         this.storageKind = "memory";
       }
       await this.loadAll();
+      this.detectRichTextMigration();
       await this.pruneActivityEntries();
       await this.refreshStoragePersistence();
       await this.refreshDesktopInfo();
@@ -633,6 +651,68 @@ export class AppStore {
       const idx = this.tasks.findIndex((t) => t.id === task.id);
       if (idx >= 0) this.tasks[idx] = task;
     }
+  }
+
+  // --- rich-text migration ----------------------------------------------------
+
+  /** Collections this migration touches, in the order the summary lists them. */
+  private richTextCollections(): CollectionName[] {
+    return COLLECTION_NAMES.filter((name) => name in RICH_TEXT_MIGRATION_FIELDS);
+  }
+
+  /** Note what still needs converting. Pure: nothing is written here. */
+  private detectRichTextMigration(): void {
+    const collections: Record<string, readonly unknown[]> = {};
+    for (const name of this.richTextCollections()) collections[name] = this.stateList(name);
+    const report = planRichTextMigration(collections);
+    this.pendingRichTextMigration = migrationReportIsEmpty(report) ? undefined : report;
+  }
+
+  /**
+   * Convert every remaining legacy value and write it back.
+   *
+   * Callers must have saved a backup first — `RichTextMigrationDialog` will not
+   * reach this without one. Idempotent: records already holding a document are
+   * skipped, so an interrupted run simply resumes.
+   */
+  async runRichTextMigration(): Promise<RichTextMigrationReport> {
+    const report = emptyMigrationReport();
+
+    for (const name of this.richTextCollections()) {
+      const list = this.stateList(name) as unknown as Record<string, unknown>[];
+      const converted: { index: number; record: Record<string, unknown> }[] = [];
+
+      list.forEach((record, index) => {
+        const result = migrateRecordRichText(name, this.plainRecord(record));
+        if (!result) return;
+        converted.push({ index, record: result.record });
+        report.records++;
+        report.values += result.values;
+        report.checklistItems += result.checklistItems;
+        report.byCollection[name] = (report.byCollection[name] ?? 0) + result.values;
+      });
+
+      if (!converted.length) continue;
+      // Persist before touching the in-memory list: if the write throws, the
+      // screen still matches what is on disk and the migration can be retried.
+      await this.store.bulkPut(name, converted.map((c) => c.record) as never);
+      for (const { index, record } of converted) list[index] = record;
+    }
+
+    if (!migrationReportIsEmpty(report)) {
+      const entry = this.buildActivityEntry(
+        "system",
+        "richTextMigration",
+        "updated",
+        describeMigrationReport(report)
+      );
+      await this.store.mutate([putOp("activityEntries", entry)]);
+      this.activityEntries.push(entry);
+    }
+
+    this.pendingRichTextMigration = undefined;
+    this.richTextMigrationResult = report;
+    return report;
   }
 
   /** Remove task fields retired from the product, including data from local pre-change records. */

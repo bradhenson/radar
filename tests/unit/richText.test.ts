@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRichText, parseRichTextInline, richTextToPlainText, toggleChecklistItemAt } from "../../src/utils/richText";
+import { parseRichText, parseRichTextInline } from "../../src/utils/richText";
 
 describe("parseRichTextInline", () => {
   it("parses bold and italic without treating unmatched markers as formatting", () => {
@@ -72,50 +72,5 @@ describe("parseRichText", () => {
   it("keeps HTML-looking imported content as ordinary text", () => {
     expect(parseRichText("<img src=x onerror=alert(1)>"))
       .toEqual([{ kind: "paragraph", content: [{ kind: "text", text: "<img src=x onerror=alert(1)>" }] }]);
-  });
-});
-
-describe("toggleChecklistItemAt", () => {
-  const doc = "# Plan\n\n- [ ] Call the family\n- [x] Send the reading log\n\nNotes here\n\n- [ ] Book the room";
-
-  it("counts items in document order across separate lists", () => {
-    expect(toggleChecklistItemAt(doc, 0)).toContain("- [x] Call the family");
-    expect(toggleChecklistItemAt(doc, 1)).toContain("- [ ] Send the reading log");
-    expect(toggleChecklistItemAt(doc, 2)).toContain("- [x] Book the room");
-  });
-
-  it("changes one character and leaves everything else byte for byte", () => {
-    const before = "##  Odd   spacing\n\n*   [ ]   loose item\n\n1) kept as authored";
-    const after = toggleChecklistItemAt(before, 0);
-    expect(after).toBe("##  Odd   spacing\n\n*   [x]   loose item\n\n1) kept as authored");
-  });
-
-  it("agrees with what parseRichText renders", () => {
-    const items = (value: string) =>
-      parseRichText(value).flatMap((block) => (block.kind === "checklist" ? block.items : []));
-    expect(items(doc).map((item) => item.checked)).toEqual([false, true, false]);
-    expect(items(toggleChecklistItemAt(doc, 1)).map((item) => item.checked)).toEqual([false, false, false]);
-  });
-
-  it("ignores guarded prose that only looks like a checklist", () => {
-    const guarded = "\\- [ ] pasted from somewhere else\n\n- [ ] a real one";
-    expect(toggleChecklistItemAt(guarded, 0)).toBe("\\- [ ] pasted from somewhere else\n\n- [x] a real one");
-  });
-
-  it("returns the value unchanged for an index that is not there", () => {
-    expect(toggleChecklistItemAt(doc, 9)).toBe(doc);
-    expect(toggleChecklistItemAt(doc, -1)).toBe(doc);
-    expect(toggleChecklistItemAt(undefined, 0)).toBe("");
-  });
-});
-
-describe("richTextToPlainText", () => {
-  it("projects formatting into readable plain text for exports and derived records", () => {
-    expect(richTextToPlainText("# Summary\n\n**Ready** to go\n\n- Alpha\n- Beta\n\n- [x] Contacted"))
-      .toBe("Summary\n\nReady to go\n\n• Alpha\n• Beta\n\n☑ Contacted");
-  });
-
-  it("preserves legacy plain text", () => {
-    expect(richTextToPlainText("Legacy note\nwith another line")).toBe("Legacy note\nwith another line");
   });
 });

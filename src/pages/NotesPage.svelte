@@ -9,9 +9,15 @@
   import { quickNoteTitle } from "../domain/rules/quickNotes";
   import { formatTimestamp, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
-  import { richTextToPlainText } from "../utils/richText";
+  import {
+    emptyRichText,
+    isRichTextEmpty,
+    normalizeRichText,
+    richTextDocToPlainText,
+    type RichTextValue
+  } from "../utils/richTextDoc";
 
-  let draft = $state("");
+  let draft = $state<RichTextValue>(emptyRichText());
   let saving = $state(false);
   let search = $state("");
   let editingId = $state<string | undefined>(undefined);
@@ -21,7 +27,7 @@
     activeNotes
       .filter((note) => {
         const needle = search.trim().toLowerCase();
-        return !needle || richTextToPlainText(note.body).toLowerCase().includes(needle);
+        return !needle || richTextDocToPlainText(note.body).toLowerCase().includes(needle);
       })
       .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1))
   );
@@ -40,19 +46,21 @@
 
   function startEditing(note: QuickNote) {
     editingId = note.id;
-    draft = note.body;
+    // Legacy notation is converted here, so opening an old note for editing is
+    // what migrates it; saving writes the document back in the new format.
+    draft = normalizeRichText(note.body);
     focusComposer();
   }
 
   function cancelEditing() {
     editingId = undefined;
-    draft = "";
+    draft = emptyRichText();
     focusComposer();
   }
 
   async function saveComposer() {
-    const body = draft.trim();
-    if (!body || saving) return;
+    if (isRichTextEmpty(draft) || saving) return;
+    const body = draft;
     const now = nowTimestamp();
     const existing = editingId ? app.quickNotes.find((note) => note.id === editingId) : undefined;
     const note: QuickNote = existing
@@ -74,7 +82,7 @@
         actionType: existing ? "updated" : "created",
         summary: `${existing ? "Updated" : "Captured"} note "${quickNoteTitle(body, 60)}"`
       });
-      draft = "";
+      draft = emptyRichText();
       editingId = undefined;
       app.toast(existing ? "Note updated" : "Note saved", "success");
       focusComposer();
@@ -131,7 +139,7 @@
       {#if editingId}
         <button type="button" onclick={cancelEditing} disabled={saving}>Cancel</button>
       {/if}
-      <button type="button" class="primary" onclick={() => void saveComposer()} disabled={!draft.trim() || saving}>
+      <button type="button" class="primary" onclick={() => void saveComposer()} disabled={isRichTextEmpty(draft) || saving}>
         {saving ? "Saving…" : editingId ? "Save changes" : "Save note"}
       </button>
     </div>

@@ -7,14 +7,17 @@
 
 import { DEFAULT_SETTINGS, EMPLOYEE_PROFILE_FIELD_TYPES, normalizeAppSettings, type AppSettings } from "../domain/models";
 import { isValidIsoDate } from "../utils/dates";
+import { isRichTextValue } from "../utils/richTextDoc";
+import { describeMigrationReport, migrateCollectionsRichText, migrationReportIsEmpty } from "./richTextMigration";
 import { COLLECTION_NAMES, emptyCollections, type CollectionName, type DatabaseSnapshot } from "./DataStore";
 
 export const BACKUP_FORMAT = "SupervisorAssistantBackup";
 // v2: integrity checksum; required arrays/booleans/enums validated strictly.
 // v3: retired task follow-up/wait-detail fields are removed on import.
 // v4: quick-note workbench records were added.
+// v5: rich text is a versioned document rather than RADAR's own notation.
 // Older backups are migrated on import.
-export const BACKUP_FORMAT_VERSION = 4;
+export const BACKUP_FORMAT_VERSION = 5;
 export const APPLICATION_VERSION = "0.1.0";
 
 /** Hard ceiling on accepted backup file size (characters of JSON text). */
@@ -99,17 +102,19 @@ export function createBackupPackage(snapshot: DatabaseSnapshot): BackupPackage {
 // Runtime schemas
 
 // Fields that must be non-empty strings on every record of a collection.
+// Rich-text fields are deliberately absent here; they are checked separately
+// below, since a document is an object rather than a string.
 const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employees: ["id", "displayName", "activeStatus"],
   competencies: ["id", "code"],
   projects: ["id", "name", "status"],
   tasks: ["id", "title", "status", "priority"],
   boardColumns: ["id", "label"],
-  taskNotes: ["id", "taskId", "body"],
+  taskNotes: ["id", "taskId"],
   checklistItems: ["id", "taskId", "title"],
   performanceElements: ["id", "name"],
   evaluationCycles: ["id", "name", "startDate", "endDate"],
-  performanceInputs: ["id", "employeeId", "inputDate", "actionOrAccomplishment"],
+  performanceInputs: ["id", "employeeId", "inputDate"],
   trainingRequirements: ["id", "name"],
   employeeTrainingRecords: ["id", "employeeId", "trainingRequirementId", "status"],
   leaveRecords: ["id", "employeeId", "startDate", "endDate", "status"],
@@ -117,11 +122,33 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   travelRecords: ["id", "employeeId", "destination", "startDate", "endDate"],
   awardRecords: ["id", "employeeId", "title", "status"],
   employeeInteractions: ["id", "employeeId", "interactionDate", "interactionType"],
-  employeeNotes: ["id", "employeeId", "noteText"],
-  quickNotes: ["id", "body", "purpose"],
+  employeeNotes: ["id", "employeeId"],
+  quickNotes: ["id", "purpose"],
   meetingNotes: ["id", "meetingDate", "title", "meetingType"],
   activityEntries: ["id", "entityType", "entityId", "actionType", "timestamp"],
   attentionSnoozes: ["id", "snoozedUntil"]
+};
+
+/**
+ * Fields holding a rich-text document. Either a legacy notation string or a
+ * versioned envelope is acceptable; anything else is rejected rather than
+ * coerced. Node-level checks (allowed types, depth, child counts) belong with
+ * the migration that converts every remaining field — until then `RichTextView`
+ * renders only the node types it enumerates, so unrecognised content is
+ * dropped rather than injected.
+ */
+const RICH_TEXT_FIELDS: Partial<Record<CollectionName, string[]>> = {
+  quickNotes: ["body"],
+  taskNotes: ["body"],
+  employeeNotes: ["noteText"],
+  performanceInputs: ["actionOrAccomplishment"]
+};
+
+/** Rich-text fields that may be absent entirely, but must be a document when present. */
+const OPTIONAL_RICH_TEXT_FIELDS: Partial<Record<CollectionName, string[]>> = {
+  tasks: ["description"],
+  performanceInputs: ["situationOrContext", "result"],
+  meetingNotes: ["notes", "actionItems"]
 };
 
 // Arrays of strings that must be present (filled by the v1 migration).
@@ -338,6 +365,14 @@ function migrateV3toV4(data: Record<string, unknown>, warnings: string[]): void 
   }
 }
 
+function migrateV4toV5(data: Record<string, unknown>, warnings: string[]): void {
+  // Parses the old notation rather than wrapping it as literal text: a backup
+  // taken before the editor changed still holds real headings and lists.
+  const report = migrateCollectionsRichText(data as Record<string, unknown[]>);
+  if (migrationReportIsEmpty(report)) return;
+  warnings.push(`${describeMigrationReport(report)} (format v4 migration).`);
+}
+
 /** Upgrade the parsed package in place to the current format version. */
 function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
   let version = pkg.formatVersion as number;
@@ -354,6 +389,11 @@ function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
     migrateV3toV4(pkg.data as Record<string, unknown>, warnings);
     version = 4;
     warnings.push("Backup migrated from format version 3 to 4.");
+  }
+  if (version === 4) {
+    migrateV4toV5(pkg.data as Record<string, unknown>, warnings);
+    version = 5;
+    warnings.push("Backup migrated from format version 4 to 5.");
   }
   pkg.formatVersion = version;
 }
@@ -469,6 +509,21 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
         const v = rec[field];
         if (typeof v !== "string" || v.trim() === "") {
           result.errors.push(`${name}[${i}] is missing required field "${field}".`);
+        }
+      }
+      for (const field of RICH_TEXT_FIELDS[name] ?? []) {
+        const v = rec[field];
+        if (typeof v === "string") {
+          if (v.trim() === "") result.errors.push(`${name}[${i}] is missing required field "${field}".`);
+        } else if (!isRichTextValue(v)) {
+          result.errors.push(`${name}[${i}].${field} is not a rich-text document.`);
+        }
+      }
+      for (const field of OPTIONAL_RICH_TEXT_FIELDS[name] ?? []) {
+        const v = rec[field];
+        if (v === undefined || v === null || typeof v === "string") continue;
+        if (!isRichTextValue(v)) {
+          result.errors.push(`${name}[${i}].${field} is not a rich-text document.`);
         }
       }
       for (const field of REQUIRED_STRING_ARRAY_FIELDS[name] ?? []) {

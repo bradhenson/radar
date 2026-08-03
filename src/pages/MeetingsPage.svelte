@@ -11,7 +11,7 @@
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
-  import { richTextToPlainText } from "../utils/richText";
+  import { isRichTextEmpty, normalizeRichText, richTextDocToPlainText } from "../utils/richTextDoc";
 
   let search = $state("");
   let filterType = $state("");
@@ -38,8 +38,8 @@
         return (
           includesText(note.title, needle) ||
           includesText(note.meetingType, needle) ||
-          includesText(richTextToPlainText(note.notes), needle) ||
-          includesText(richTextToPlainText(note.actionItems), needle) ||
+          includesText(richTextDocToPlainText(note.notes), needle) ||
+          includesText(richTextDocToPlainText(note.actionItems), needle) ||
           note.attendeeEmployeeIds.some((id) => app.employeeName(id).toLowerCase().includes(needle)) ||
           includesText(app.projectName(note.projectId), needle)
         );
@@ -96,8 +96,8 @@
         note.title,
         app.projectName(note.projectId),
         employeeNames(note.attendeeEmployeeIds),
-        richTextToPlainText(note.notes),
-        richTextToPlainText(note.actionItems)
+        richTextDocToPlainText(note.notes),
+        richTextDocToPlainText(note.actionItems)
       ])
     );
     try {
@@ -130,7 +130,7 @@
   function createFollowUpTask(note: MeetingNote) {
     ui.openNewTask({
       title: `Follow up: ${note.title}`,
-      description: richTextToPlainText(note.actionItems || note.notes),
+      description: normalizeRichText(isRichTextEmpty(note.actionItems) ? note.notes : note.actionItems),
       projectId: note.projectId,
       employeeId: note.attendeeEmployeeIds[0]
     });

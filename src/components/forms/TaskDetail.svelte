@@ -14,6 +14,7 @@
   } from "../../domain/models";
   import { formatTimestamp, isValidIsoDate, nowTimestamp } from "../../utils/dates";
   import { newId } from "../../utils/ids";
+  import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../../utils/richTextDoc";
   import { orderForAppend } from "../../domain/rules/boardOrder";
 
   let {
@@ -34,9 +35,13 @@
   const isNewTask = !hasExistingTask();
 
   // Editable copy; persisted on Save.
-  let draft = $state({ ...initialTask, tags: [...initialTask.tags] });
+  let draft = $state({
+    ...initialTask,
+    description: normalizeRichText(initialTask.description),
+    tags: [...initialTask.tags]
+  });
   let tagsText = $state(initialTask.tags.join(", "));
-  let newNote = $state("");
+  let newNote = $state(emptyRichText());
   let newChecklistItem = $state("");
   let error = $state("");
   let saving = $state(false);
@@ -92,7 +97,7 @@
   function editableFieldsFromDraft() {
     return {
       title: draft.title.trim(),
-      description: draft.description?.trim() || undefined,
+      description: isRichTextEmpty(draft.description) ? undefined : draft.description,
       status: draft.status,
       boardColumnId: draft.boardColumnId || app.defaultBoardColumnId(),
       priority: draft.priority,
@@ -109,7 +114,7 @@
   function editableFieldsFromTask(t: Task) {
     return {
       title: t.title.trim(),
-      description: t.description?.trim() || undefined,
+      description: isRichTextEmpty(t.description) ? undefined : normalizeRichText(t.description),
       status: t.status,
       boardColumnId: app.taskBoardColumnId(t),
       priority: t.priority,
@@ -301,15 +306,15 @@
   }
 
   async function addNote() {
-    const body = newNote.trim();
-    if (!body) return;
+    if (isRichTextEmpty(newNote)) return;
+    const body = newNote;
     const now = nowTimestamp();
     await app.putRecord(
       "taskNotes",
       { id: newId(), taskId: initialTask.id, body, noteType: "general", createdAt: now, updatedAt: now },
       { actionType: "updated", summary: `Added note to "${initialTask.title}"`, entityType: "tasks" }
     );
-    newNote = "";
+    newNote = emptyRichText();
   }
 
   async function addChecklistItem() {

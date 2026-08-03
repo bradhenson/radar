@@ -11,7 +11,7 @@
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
-  import { richTextToPlainText } from "../utils/richText";
+  import { richTextDocToPlainText } from "../utils/richTextDoc";
 
   let search = $state("");
   let filterEmployee = $state("");
@@ -41,7 +41,7 @@
       if (filterPriority && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
-        const hay = `${t.title} ${richTextToPlainText(t.description)} ${t.tags.join(" ")} ${app.employeeName(t.employeeId)}`.toLowerCase();
+        const hay = `${t.title} ${richTextDocToPlainText(t.description)} ${t.tags.join(" ")} ${app.employeeName(t.employeeId)}`.toLowerCase();
         if (!hay.includes(q)) return false;
       }
       return true;

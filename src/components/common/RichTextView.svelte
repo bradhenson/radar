@@ -1,101 +1,80 @@
 <script lang="ts">
-  import { parseRichText, richTextInlineToPlainText, type RichTextInline } from "../../utils/richText";
+  // Saved documents render through known Svelte elements. User content is never
+  // injected as HTML, so a stored document can only ever produce the nodes
+  // enumerated below. A legacy string is converted on the way in, which keeps
+  // records the migration has not reached rendering correctly.
+  import {
+    isRichTextEmpty,
+    normalizeRichText,
+    type RichTextNode,
+    type RichTextValue
+  } from "../../utils/richTextDoc";
 
   let {
     value,
     emptyText,
-    compact = false,
-    onToggleItem
+    compact = false
   }: {
-    value?: string;
+    value?: RichTextValue | string | null;
     emptyText?: string;
     compact?: boolean;
-    /**
-     * Supply this to make checklist items tickable here rather than only inside
-     * the editor. The index counts checklist items in document order, matching
-     * `toggleChecklistItemAt`. Left out, markers stay decorative — which is
-     * right wherever there is nothing to save the change to.
-     */
-    onToggleItem?: (index: number) => void;
   } = $props();
 
-  let blocks = $derived(parseRichText(value));
+  let document = $derived(normalizeRichText(value).doc);
+  let empty = $derived(isRichTextEmpty(value));
 
-  /**
-   * Document-order index for every checklist item, keyed by its position in the
-   * block list. Precomputed because a running counter cannot be threaded
-   * through two nested each blocks.
-   */
-  let itemIndex = $derived.by(() => {
-    const map = new Map<string, number>();
-    let next = 0;
-    blocks.forEach((block, b) => {
-      if (block.kind === "checklist") block.items.forEach((_, i) => map.set(`${b}:${i}`, next++));
-    });
-    return map;
-  });
+  const marked = (node: RichTextNode, type: "bold" | "italic" | "underline") =>
+    node.marks?.some((mark) => mark.type === type) === true;
 </script>
 
-{#snippet inline(nodes: RichTextInline[])}
-  {#each nodes as node}
-    {#if node.kind === "text"}
-      {node.text}
-    {:else if node.kind === "strong"}
-      <strong>{@render inline(node.children)}</strong>
-    {:else if node.kind === "emphasis"}
-      <em>{@render inline(node.children)}</em>
-    {:else}
-      <u>{@render inline(node.children)}</u>
-    {/if}
+{#snippet text(node: RichTextNode)}
+  {@const bold = marked(node, "bold")}
+  {@const italic = marked(node, "italic")}
+  {@const underline = marked(node, "underline")}
+  {#if underline}
+    <u>{#if bold}<strong>{#if italic}<em>{node.text}</em>{:else}{node.text}{/if}</strong>{:else if italic}<em>{node.text}</em>{:else}{node.text}{/if}</u>
+  {:else if bold}
+    <strong>{#if italic}<em>{node.text}</em>{:else}{node.text}{/if}</strong>
+  {:else if italic}
+    <em>{node.text}</em>
+  {:else}
+    {node.text}
+  {/if}
+{/snippet}
+
+{#snippet inline(nodes: RichTextNode[] | undefined)}
+  {#each nodes ?? [] as child}
+    {#if child.type === "text"}{@render text(child)}{:else if child.type === "hardBreak"}<br />{/if}
   {/each}
 {/snippet}
 
-<div class="rich-text" class:compact class:empty={blocks.length === 0}>
-  {#if blocks.length === 0}
+{#snippet block(node: RichTextNode)}
+  {#if node.type === "paragraph"}
+    <p>{@render inline(node.content)}</p>
+  {:else if node.type === "heading"}
+    {#if node.attrs?.level === 3}
+      <h3>{@render inline(node.content)}</h3>
+    {:else if node.attrs?.level === 5}
+      <h5>{@render inline(node.content)}</h5>
+    {:else}
+      <h4>{@render inline(node.content)}</h4>
+    {/if}
+  {:else if node.type === "bulletList"}
+    <ul>
+      {#each node.content ?? [] as item}<li>{#each item.content ?? [] as child}{@render block(child)}{/each}</li>{/each}
+    </ul>
+  {:else if node.type === "orderedList"}
+    <ol start={node.attrs?.start ?? 1}>
+      {#each node.content ?? [] as item}<li>{#each item.content ?? [] as child}{@render block(child)}{/each}</li>{/each}
+    </ol>
+  {/if}
+{/snippet}
+
+<div class="rich-text" class:compact class:empty>
+  {#if empty}
     {#if emptyText}<span>{emptyText}</span>{/if}
   {:else}
-    {#each blocks as block, b}
-      {#if block.kind === "paragraph"}
-        <p>{@render inline(block.content)}</p>
-      {:else if block.kind === "heading"}
-        {#if block.level === 1}
-          <h3>{@render inline(block.content)}</h3>
-        {:else if block.level === 2}
-          <h4>{@render inline(block.content)}</h4>
-        {:else}
-          <h5>{@render inline(block.content)}</h5>
-        {/if}
-      {:else if block.kind === "ordered-list"}
-        <ol>
-          {#each block.items as item}<li>{@render inline(item.content)}</li>{/each}
-        </ol>
-      {:else if block.kind === "unordered-list"}
-        <ul>
-          {#each block.items as item}<li>{@render inline(item.content)}</li>{/each}
-        </ul>
-      {:else}
-        <ul class="checklist">
-          {#each block.items as item, i}
-            <li>
-              {#if onToggleItem}
-                {@const index = itemIndex.get(`${b}:${i}`) ?? -1}
-                <button
-                  type="button"
-                  class="check toggle"
-                  role="checkbox"
-                  aria-checked={item.checked === true}
-                  aria-label={richTextInlineToPlainText(item.content) || "Checklist item"}
-                  onclick={() => onToggleItem(index)}
-                >{item.checked ? "☑" : "☐"}</button>
-              {:else}
-                <span class="check" aria-label={item.checked ? "Completed" : "Not completed"}>{item.checked ? "☑" : "☐"}</span>
-              {/if}
-              <span class:checked={item.checked}>{@render inline(item.content)}</span>
-            </li>
-          {/each}
-        </ul>
-      {/if}
-    {/each}
+    {#each document.content ?? [] as node}{@render block(node)}{/each}
   {/if}
 </div>
 
@@ -119,25 +98,7 @@
   h5 { font-size: .92rem; }
   ul, ol { margin: 0 0 .65rem; padding-left: 1.35rem; }
   li + li { margin-top: .2rem; }
-  .checklist { list-style: none; padding-left: 0; }
-  .checklist li { display: flex; align-items: flex-start; gap: .45rem; }
-  .check { flex: 0 0 auto; color: var(--accent); }
-  /* The interactive marker is a real button, so it keeps keyboard activation
-     and a focus ring; the glyph stays the same size as the static one. */
-  .check.toggle {
-    min-height: 0;
-    padding: 0 .1rem;
-    border: 0;
-    border-radius: var(--radius);
-    background: none;
-    box-shadow: none;
-    color: var(--accent);
-    font: inherit;
-    line-height: inherit;
-    cursor: pointer;
-  }
-  .check.toggle:hover { background: var(--accent-soft); }
-  .checked { color: var(--text-muted); text-decoration: line-through; }
+  li > :global(p:last-child) { margin-bottom: 0; }
   .compact { font-size: inherit; line-height: 1.4; }
   .compact p { margin-bottom: .35rem; }
   .compact h3, .compact h4, .compact h5 { margin: .45rem 0 .2rem; font-size: inherit; }

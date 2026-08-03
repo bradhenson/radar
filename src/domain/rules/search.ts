@@ -3,7 +3,7 @@
 // against pre-flattened text so keystrokes never re-parse rich text.
 
 import type { Employee, MeetingNote, PerformanceInput, Project, QuickNote, Task } from "../models";
-import { richTextToPlainText } from "../../utils/richText";
+import { richTextDocToPlainText } from "../../utils/richTextDoc";
 
 export type SearchResultType = "task" | "employee" | "project" | "note" | "meeting" | "performance" | "page";
 
@@ -80,12 +80,14 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
     ]
       .filter(Boolean)
       .join(" · ");
-    entries.push(entry("task", t.id, t.title, subtitle, [t.description, ...t.tags].filter(Boolean).join(" ")));
+    entries.push(
+      entry("task", t.id, t.title, subtitle, [richTextDocToPlainText(t.description), ...t.tags].filter(Boolean).join(" "))
+    );
   }
 
   for (const note of src.quickNotes) {
     if (note.isArchived) continue;
-    const plain = richTextToPlainText(note.body).replace(/\s*\n\s*/g, " ");
+    const plain = richTextDocToPlainText(note.body).replace(/\s*\n\s*/g, " ");
     const title = truncate(plain, 80);
     const subtitle = [src.employeeName(note.employeeId) || undefined, src.projectName(note.projectId) || undefined]
       .filter(Boolean)
@@ -105,14 +107,14 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
         note.id,
         note.title,
         subtitle,
-        [attendees, richTextToPlainText(note.notes), richTextToPlainText(note.actionItems)].join(" ")
+        [attendees, richTextDocToPlainText(note.notes), richTextDocToPlainText(note.actionItems)].join(" ")
       )
     );
   }
 
   for (const input of src.performanceInputs) {
     if (input.isArchived) continue;
-    const action = richTextToPlainText(input.actionOrAccomplishment).replace(/\s*\n\s*/g, " ");
+    const action = richTextDocToPlainText(input.actionOrAccomplishment).replace(/\s*\n\s*/g, " ");
     const title = `${src.employeeName(input.employeeId)} — ${truncate(action, 80)}`;
     const subtitle = [src.formatDate(input.inputDate), src.projectName(input.projectId) || undefined].filter(Boolean).join(" · ");
     entries.push(
@@ -121,7 +123,7 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
         input.id,
         title,
         subtitle,
-        [richTextToPlainText(input.situationOrContext), richTextToPlainText(input.result)].join(" ")
+        [richTextDocToPlainText(input.situationOrContext), richTextDocToPlainText(input.result)].join(" ")
       )
     );
   }
