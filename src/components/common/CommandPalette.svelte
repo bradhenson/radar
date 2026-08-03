@@ -54,11 +54,9 @@
     })
   );
 
-  let results = $derived(
-    query.trim()
-      ? querySearchIndex(index, query)
-      : index.filter((item) => item.type === "page")
-  );
+  // Blank query shows nothing rather than every page: the left nav already covers
+  // browsing. Pages stay in the index so typing "trav" still jumps to Travel.
+  let results = $derived(query.trim() ? querySearchIndex(index, query) : []);
 
   $effect(() => {
     void query;
@@ -142,10 +140,14 @@
         autocomplete="off"
         spellcheck="false"
       />
-      <kbd>Esc</kbd>
+      <button type="button" class="close-btn" aria-label="Close search" title="Close (Esc)" onclick={onclose}>
+        <Icon name="close" size={15} />
+      </button>
     </div>
     <div class="results" id="palette-results" role="listbox" aria-label="Search results" bind:this={listEl}>
-      {#if results.length === 0}
+      {#if !query.trim()}
+        <p class="no-results">Search tasks, people, projects, notes, meetings, and performance inputs.</p>
+      {:else if results.length === 0}
         <p class="no-results">No matches. Archived records are searchable on the Archive page.</p>
       {:else}
         {#each results as item, i (item.type + item.id)}
@@ -213,16 +215,21 @@
     padding: 0;
   }
   .input-row input:focus { outline: none; box-shadow: none; border: none; }
-  .input-row kbd {
+  .close-btn {
     flex: 0 0 auto;
-    padding: .1rem .4rem;
-    border: 1px solid var(--border);
-    border-radius: 5px;
-    background: var(--surface-2);
+    display: inline-grid;
+    place-items: center;
+    width: 1.8rem;
+    height: 1.8rem;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    box-shadow: none;
     color: var(--text-muted);
-    font-size: .68rem;
-    font-family: inherit;
   }
+  .close-btn:hover { color: var(--text); background: var(--surface-2); }
   .results { overflow-y: auto; padding: .35rem; }
   .no-results { margin: .8rem .6rem 1rem; color: var(--text-muted); font-size: .85rem; }
   .result {

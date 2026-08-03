@@ -8,6 +8,20 @@
 
 - A database holding text saved before that change is converted once, on a prompt that says exactly how many fields and records are affected and how many checklist items will become ✓ / ○ bullets. A backup is written first and the conversion does not run unless that save succeeds, so cancelling it changes nothing. The update can be declined — older text keeps displaying correctly either way — and RADAR offers again next time it opens. When it finishes, a summary reports what changed, and the same conversion is applied to backups exported before the change when they are imported (backup format version 5).
 
+- The note composer on the Notes page no longer has the solid accent bar down its left edge. Its border, tinted background, and heading still mark it as the writing area, whether you are writing a new note or editing an existing one.
+
+- The Notes page header no longer carries a descriptive subtitle under its title.
+
+- The backup control has moved out of the header to the bottom of the left sidebar, where it replaces the plain "Last backup …" line that sat there. It still reads "Backed up today" / "Backup 3d ago" / "No backup yet", still turns amber when a backup is overdue, and still exports a JSON backup when clicked; the exact timestamp and the count of changes since remain in its tooltip. Narrow windows have no sidebar, so it stays in the header there.
+
+- The search palette now has a close button beside its input, so it no longer has to be dismissed from the keyboard. Escape and clicking outside the palette still close it, and the button's tooltip names the Escape shortcut.
+
+- Global search (Ctrl+K) no longer lists every page in the app before you type. The empty palette now shows only what it searches, and pages remain findable by typing their name. Navigation still belongs to the sidebar.
+
+- The topbar search control is now a labelled "Search…" field with a Ctrl+K hint instead of a bare magnifier icon. It opens the same search palette, which is still where you type; on narrow windows it collapses back to the icon.
+
+- The header no longer shows a permanent "Stored locally" chip. That chip now appears only when it has something to report — "Saving…" while a write is in flight, or "Save failed" if one does not complete. The backup chip next to it is unchanged.
+
 - Employee overview summary cards now act as quick filters for overdue tasks, training due, stale performance input, and employees currently on leave. Selecting an active card again clears the filter.
 
 - The employee overview table is now focused on operational awareness: Name, Competency, IPT, Training, Leave, and Travel. Title, employee status, task counts, and last performance input no longer crowd the table.
@@ -75,6 +89,8 @@
 - Rich-text editor: switching a checklist to a bulleted or numbered list no longer strands the field in an undeletable state. The conversion now preserves item text, Backspace on an empty checklist item removes the item cleanly (and works when the checkbox itself has keyboard focus, where it previously did nothing), and degenerate list structures are repaired automatically after every edit.
 
 ### Changed
+
+- Board cards no longer show the "<" and ">" column-move buttons on hover; Done is the only quick action there. Cards still move between columns by dragging, by the `[` and `]` keys when a card is focused, and from the task editor.
 
 - Reports has been removed from the app for now so a different reporting approach can be designed later. It no longer appears in navigation, routing, or global page search.
 

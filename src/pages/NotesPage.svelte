@@ -115,7 +115,6 @@
   <div class="page-header">
     <div>
       <h1>Notes</h1>
-      <p class="muted intro">A simple place to jot down anything you do not want to forget.</p>
     </div>
   </div>
 
@@ -177,10 +176,8 @@
   .notes-page { max-width: 1240px; }
   .page-header { align-items: flex-end; margin-bottom: 1.2rem; }
   .page-header h1 { font-size: 1.9rem; letter-spacing: -.025em; }
-  .intro { margin: .3rem 0 0; }
 
-  .capture-card { position: relative; overflow: hidden; padding: 1.2rem 1.3rem 1.1rem; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: calc(var(--radius-lg) + 2px); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 58%, var(--surface)) 0%, var(--surface) 58%); box-shadow: var(--shadow); }
-  .capture-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: var(--accent); }
+  .capture-card { padding: 1.2rem 1.3rem 1.1rem; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: calc(var(--radius-lg) + 2px); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 58%, var(--surface)) 0%, var(--surface) 58%); box-shadow: var(--shadow); }
   .capture-topline { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: .75rem; }
   .capture-topline h2 { margin: 0; font-size: 1.12rem; }
   .capture-date { margin-left: auto; color: var(--text-muted); font-size: .78rem; }

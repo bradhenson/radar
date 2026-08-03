@@ -232,8 +232,8 @@
     app.meta.lastBackupAt ? `Last backup ${formatTimestamp(app.meta.lastBackupAt)}` : app.hasOperatorData ? "No backup yet" : "No local records"
   );
 
-  // "Stored locally" (IndexedDB write state) and "backed up" (exported file the
-  // user confirmed) are different guarantees, shown as separate chips.
+  // Local save state (IndexedDB write) and "backed up" (exported file the user
+  // confirmed) are different guarantees, tracked by separate chips.
   let backupAgeDays = $derived(
     app.meta.lastBackupAt ? daysSinceTimestamp(app.meta.lastBackupAt, app.today) : undefined
   );
@@ -330,32 +330,44 @@
         </span>
         <span class="spacer"></span>
       </div>
-      <span
-        class="chip save-status"
-        data-status={app.saveStatus}
-        title="Changes are saved to this browser's local storage. That is not an external backup."
-      >
-        <span class="dot" aria-hidden="true"></span>
-        {#if app.saveStatus === "saving"}Saving…{:else if app.saveStatus === "error"}Save failed{:else}Stored locally{/if}
-      </span>
-      <button
-        type="button"
-        class="chip backup-chip"
-        class:stale={backupStale}
-        title={`${backupAgeText} · ${app.meta.changesSinceBackup} change(s) since. Click to export a JSON backup.`}
-        onclick={() => void exportBackup()}
-        disabled={app.saveStatus === "saving"}
-      >
-        <span class="dot" aria-hidden="true"></span>
-        {backupChipText}
-      </button>
+      <!-- The resting "saved" state is silent; the chip only appears while a write is in
+           flight or after one fails, so a failed save is never hidden. -->
+      {#if app.saveStatus !== "saved"}
+        <span
+          class="chip save-status"
+          data-status={app.saveStatus}
+          title="Changes are saved to this browser's local storage. That is not an external backup."
+        >
+          <span class="dot" aria-hidden="true"></span>
+          {#if app.saveStatus === "saving"}Saving…{:else}Save failed{/if}
+        </span>
+      {/if}
+      <!-- The backup control lives in the sidebar footer; the narrow layout has no sidebar,
+           so it stays in the topbar there. -->
+      {#if isNarrow}
+        <button
+          type="button"
+          class="chip backup-chip"
+          class:stale={backupStale}
+          title={`${backupAgeText} · ${app.meta.changesSinceBackup} change(s) since. Click to export a JSON backup.`}
+          onclick={() => void exportBackup()}
+          disabled={app.saveStatus === "saving"}
+        >
+          <span class="dot" aria-hidden="true"></span>
+          {backupChipText}
+        </button>
+      {/if}
       {#if app.storageKind === "memory"}
         <span class="badge overdue" title="IndexedDB is unavailable. Data will be lost when this tab closes unless you export a backup.">
           Memory-only storage
         </span>
       {/if}
-      <button type="button" class="icon-btn" onclick={() => (ui.searchOpen = true)} title="Search everything (Ctrl+K)" aria-label="Search">
-        <Icon name="search" size={17} />
+      <!-- Looks like a search field but is a button: it opens the palette, whose input takes
+           focus. One real input avoids handing focus over mid-keystroke. -->
+      <button type="button" class="search-trigger" onclick={() => (ui.searchOpen = true)} title="Search everything (Ctrl+K)" aria-label="Search">
+        <Icon name="search" size={15} />
+        <span class="search-trigger-text">Search…</span>
+        <kbd>Ctrl K</kbd>
       </button>
       <button type="button" class="icon-btn" onclick={() => (ui.quickNoteOpen = true)} title="Jot a quick note (J)" aria-label="Quick note">
         <Icon name="notes" size={17} />
@@ -420,7 +432,19 @@
               <span>{item.label}</span>
             </a>
           {/each}
-          <div class="sidenav-footer small muted">{backupAgeText}</div>
+          <div class="sidenav-footer">
+            <button
+              type="button"
+              class="chip backup-chip"
+              class:stale={backupStale}
+              title={`${backupAgeText} · ${app.meta.changesSinceBackup} change(s) since. Click to export a JSON backup.`}
+              onclick={() => void exportBackup()}
+              disabled={app.saveStatus === "saving"}
+            >
+              <span class="dot" aria-hidden="true"></span>
+              {backupChipText}
+            </button>
+          </div>
         </nav>
       {/if}
 
@@ -690,6 +714,45 @@
   }
   .icon-btn:hover { color: var(--text); }
 
+  .search-trigger {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    min-width: 11rem;
+    min-height: 1.95rem;
+    padding: .2rem .45rem .2rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    background: var(--surface);
+    box-shadow: none;
+    color: var(--text-muted);
+    font-size: .8rem;
+    font-weight: 500;
+    text-align: left;
+  }
+  .search-trigger:hover {
+    color: var(--text);
+    border-color: color-mix(in srgb, var(--accent) 32%, var(--border));
+  }
+  .search-trigger-text { flex: 1; white-space: nowrap; }
+  .search-trigger kbd {
+    flex: 0 0 auto;
+    padding: .08rem .35rem;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .66rem;
+    font-family: inherit;
+    white-space: nowrap;
+  }
+
+  /* Narrow topbars fall back to the icon-only affordance. */
+  @media (max-width: 900px) {
+    .search-trigger { min-width: 0; padding: .2rem; justify-content: center; width: 2.1rem; height: 2.1rem; }
+    .search-trigger-text, .search-trigger kbd { display: none; }
+  }
+
   .fault-screen {
     max-width: 38rem;
     margin: 3rem auto;
@@ -753,6 +816,7 @@
     padding: 1rem .7rem 0;
     font-size: .72rem;
   }
+  .sidenav-footer .backup-chip { width: 100%; justify-content: flex-start; }
 
   main { flex: 1; min-width: 0; overflow-x: auto; }
   /* Headings receive programmatic focus on route changes; a focus ring there
