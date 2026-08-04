@@ -12,6 +12,7 @@ import { createSampleSnapshot } from "../../src/data/seed";
 import { InMemoryDataStore } from "../../src/data/InMemoryDataStore";
 import { COLLECTION_NAMES } from "../../src/data/DataStore";
 import { DEFAULT_SETTINGS } from "../../src/domain/models";
+import { richTextDocToPlainText } from "../../src/utils/richTextDoc";
 
 /**
  * Re-seal a deliberately mutated package (recompute counts + checksum) so a
@@ -174,6 +175,26 @@ describe("backup format migrations", () => {
     expect(result.package!.data.quickNotes).toEqual([]);
     expect(result.warnings.some((warning) => warning.includes("quickNotes"))).toBe(true);
     expect(result.warnings.some((warning) => warning.includes("version 3 to 4"))).toBe(true);
+  });
+
+  // Project descriptions, award notes, and check-in summaries became documents
+  // after v5. They were always plain textareas, so a leading "- " is a dash the
+  // author typed, not a list they authored.
+  it("converts project, award, and check-in text literally when importing a v5 backup", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.formatVersion = 5;
+    (pkg.data.projects[0] as Record<string, unknown>).description = "- Phase 1\n# not a heading";
+    (pkg.data.awardRecords[0] as Record<string, unknown>).supportingNotes = "**not bold**";
+    (pkg.data.employeeInteractions[0] as Record<string, unknown>).summary = "- [x] not a checkbox";
+
+    const result = parseAndValidateBackup(reseal(pkg));
+
+    expect(result.valid).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("version 5 to 6"))).toBe(true);
+    const restored = snapshotFromBackup(result.package!);
+    expect(richTextDocToPlainText(restored.collections.projects[0]!.description)).toBe("- Phase 1\n# not a heading");
+    expect(richTextDocToPlainText(restored.collections.awardRecords[0]!.supportingNotes)).toBe("**not bold**");
+    expect(richTextDocToPlainText(restored.collections.employeeInteractions[0]!.summary)).toBe("- [x] not a checkbox");
   });
 });
 

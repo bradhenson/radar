@@ -7,11 +7,13 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
   import { mergeAwardEdit } from "../domain/rules/editMerge";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
+  import { emptyRichText, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
 
   let formOpen = $state(false);
   let editing = $state<AwardRecord | undefined>(undefined);
@@ -20,7 +22,7 @@
   let fType = $state("");
   let fStatus = $state("Idea");
   let fDue = $state("");
-  let fNotes = $state("");
+  let fNotes = $state(emptyRichText());
   let fError = $state("");
   let pendingDelete = $state<AwardRecord | undefined>(undefined);
 
@@ -37,7 +39,7 @@
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fTitle, fType, fStatus, fDue, fNotes]);
+    return JSON.stringify([fEmployee, fTitle, fType, fStatus, fDue, serializeRichText(fNotes)]);
   }
 
   function openForm(a?: AwardRecord) {
@@ -47,7 +49,7 @@
     fType = a?.awardType ?? "";
     fStatus = a?.status ?? "Idea";
     fDue = a?.nominationDueDate ?? "";
-    fNotes = a?.supportingNotes ?? "";
+    fNotes = normalizeRichText(a?.supportingNotes);
     fError = "";
     openedSnapshot = formSnapshot();
     formOpen = true;
@@ -181,7 +183,7 @@
         </div>
       </div>
       <label for="aw-notes">Supporting notes</label>
-      <textarea id="aw-notes" bind:value={fNotes} rows="3" maxlength="10000" style="width:100%"></textarea>
+      <RichTextEditor id="aw-notes" bind:value={fNotes} rows={3} maxlength={10000} ariaLabel="Supporting notes" />
       <div class="dialog-actions">
         {#if editing}
           <button type="button" class="icon-btn danger delete-action" aria-label="Delete award" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>

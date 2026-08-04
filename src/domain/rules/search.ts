@@ -66,7 +66,13 @@ export function buildSearchIndex(src: SearchIndexSource): SearchEntry[] {
   for (const p of src.projects) {
     if (p.isArchived) continue;
     entries.push(
-      entry("project", p.id, p.name, p.status.replace("_", " "), [p.shortName, p.description, ...p.tags].filter(Boolean).join(" "))
+      entry(
+        "project",
+        p.id,
+        p.name,
+        p.status.replace("_", " "),
+        [p.shortName, richTextDocToPlainText(p.description), ...p.tags].filter(Boolean).join(" ")
+      )
     );
   }
 

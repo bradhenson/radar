@@ -13,26 +13,34 @@
   import Icon from "../components/common/Icon.svelte";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
-  import { INTERACTION_TYPES, statusLabel, type EmployeeNote, type EmployeeProfileField, type MeetingNote } from "../domain/models";
+  import { INTERACTION_TYPES, statusLabel, type EmployeeInteraction, type EmployeeNote, type EmployeeProfileField, type MeetingNote } from "../domain/models";
   import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
-  import { compareDates, daysBetween, formatDate, formatTimestamp, nowTimestamp, todayIso } from "../utils/dates";
+  import { compareDates, daysBetween, formatDate, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
 
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"profile" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("profile");
+  let tab = $state<"profile" | "checkins" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("profile");
   let editOpen = $state(false);
   let confirmDeleteOpen = $state(false);
   let profileOpen = $state(false);
   let checkInOpen = $state(false);
   let meetingNoteOpen = $state(false);
   let editingMeetingNote = $state<MeetingNote | undefined>(undefined);
+  let checkInEditing = $state<EmployeeInteraction | undefined>(undefined);
   let checkInType = $state(INTERACTION_TYPES[1] ?? "Informal check-in");
-  let checkInSummary = $state("");
+  let checkInDate = $state(todayIso());
+  let checkInSummary = $state(emptyRichText());
   let checkInFollowUp = $state(false);
+  let checkInError = $state("");
+  // A check-in recorded through the MCP server may carry a type this list does
+  // not offer; keep it selectable so editing one cannot silently replace it.
+  let checkInTypeOptions = $derived(
+    INTERACTION_TYPES.includes(checkInType) ? [...INTERACTION_TYPES] : [checkInType, ...INTERACTION_TYPES]
+  );
   let noteFormOpen = $state(false);
   let noteDraft = $state(emptyRichText());
   let editingNoteId = $state<string | undefined>(undefined);
@@ -69,6 +77,11 @@
       .sort((a, b) => (a.startDate < b.startDate ? 1 : -1))
   );
   let awards = $derived(app.awardRecords.filter((a) => a.employeeId === employeeId));
+  let checkIns = $derived(
+    app.employeeInteractions
+      .filter((i) => i.employeeId === employeeId)
+      .sort((a, b) => (a.interactionDate < b.interactionDate ? 1 : -1))
+  );
   let meetingNotes = $derived(
     app.meetingNotes
       .filter((note) => !note.isArchived && note.attendeeEmployeeIds.includes(employeeId))
@@ -105,28 +118,50 @@
     return profileFields.filter((field) => field.sectionId === sectionId);
   }
 
+  /** Opens the composer for a new check-in, or the same dialog over an existing one. */
+  function openCheckIn(record?: EmployeeInteraction) {
+    checkInEditing = record;
+    checkInType = record?.interactionType ?? INTERACTION_TYPES[1] ?? "Informal check-in";
+    checkInDate = record?.interactionDate ?? todayIso();
+    checkInSummary = normalizeRichText(record?.summary);
+    checkInFollowUp = record?.followUpRequired ?? false;
+    checkInError = "";
+    checkInOpen = true;
+  }
+
   async function saveCheckIn() {
     if (!employee) return;
+    if (!isValidIsoDate(checkInDate)) {
+      checkInError = "Check-in date is not valid.";
+      return;
+    }
+    const editing = checkInEditing;
     const now = nowTimestamp();
     await app.putRecord(
       "employeeInteractions",
       {
-        id: newId(),
+        ...editing,
+        id: editing?.id ?? newId(),
         employeeId,
-        interactionDate: todayIso(),
+        interactionDate: checkInDate,
         interactionType: checkInType,
-        summary: checkInSummary.trim() || undefined,
+        summary: isRichTextEmpty(checkInSummary) ? undefined : checkInSummary,
         followUpRequired: checkInFollowUp,
-        createdAt: now,
+        createdAt: editing?.createdAt ?? now,
         updatedAt: now
       },
-      { actionType: "created", summary: `Recorded ${checkInType} with ${employee.displayName}` }
+      {
+        actionType: editing ? "updated" : "created",
+        summary: `${editing ? "Updated" : "Recorded"} ${checkInType} with ${employee.displayName}`
+      }
     );
-    await app.putRecord("employees", { ...employee, lastCheckInDate: todayIso(), updatedAt: now });
+    // The roster's "last check-in" only moves forward. Now that the date is
+    // editable, a backdated or corrected entry must not hide a later one.
+    if (!employee.lastCheckInDate || compareDates(checkInDate, employee.lastCheckInDate) > 0) {
+      await app.putRecord("employees", { ...employee, lastCheckInDate: checkInDate, updatedAt: now });
+    }
     checkInOpen = false;
-    checkInSummary = "";
-    checkInFollowUp = false;
-    app.toast("Check-in recorded", "success");
+    app.toast(editing ? "Check-in updated" : "Check-in recorded", "success");
   }
 
   async function addEmployeeNote() {
@@ -226,6 +261,7 @@
 
   const TABS = [
     ["profile", "Profile"],
+    ["checkins", "Check-ins"],
     ["tasks", "Tasks"],
     ["performance", "Performance"],
     ["meetings", "Meetings"],
@@ -256,7 +292,7 @@
       {#if employee.team}<span class="muted">{employee.team}</span>{/if}
       {#if employee.activeStatus !== "active"}<span class="badge warning">{employee.activeStatus.replace("_", " ")}</span>{/if}
       <span class="spacer"></span>
-      <button type="button" onclick={() => (checkInOpen = true)}>Record check-in</button>
+      <button type="button" onclick={() => openCheckIn()}>Record check-in</button>
       <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
       <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
       <button type="button" onclick={() => (meetingNoteOpen = true)}>Add meeting note</button>
@@ -357,6 +393,27 @@
           {/if}
         {/each}
       </div>
+    {:else if tab === "checkins"}
+      {#if checkIns.length === 0}
+        <EmptyState message="No check-ins recorded." hint="Use Record check-in above to capture what was discussed." />
+      {:else}
+        {#each checkIns as c (c.id)}
+          <div class="card" style="margin-bottom:.6rem">
+            <div style="display:flex; gap:.5rem; align-items:center; flex-wrap:wrap">
+              <button type="button" class="link" onclick={() => openCheckIn(c)}>{formatDate(c.interactionDate)}</button>
+              <span class="muted small">{c.interactionType}</span>
+              {#if c.followUpRequired}<span class="badge warning">Follow-up required</span>{/if}
+              <span class="spacer"></span>
+              <button type="button" class="icon-btn" aria-label={`Edit check-in from ${formatDate(c.interactionDate)}`} title="Edit" onclick={() => openCheckIn(c)}><Icon name="edit" size={16} /></button>
+            </div>
+            {#if isRichTextEmpty(c.summary)}
+              <p class="muted small" style="margin:.2rem 0 0">No summary recorded.</p>
+            {:else}
+              <RichTextView value={c.summary} compact />
+            {/if}
+          </div>
+        {/each}
+      {/if}
     {:else if tab === "tasks"}
       {#if tasks.length === 0}
         <EmptyState message="No tasks for this employee." hint="Use Add task above." />
@@ -529,13 +586,22 @@
     <EmployeeProfileForm {employee} onclose={() => (profileOpen = false)} />
   {/if}
   {#if checkInOpen}
-    <Dialog title="Record check-in" onclose={() => (checkInOpen = false)}>
-      <label for="ci-type">Interaction type</label>
-      <select id="ci-type" bind:value={checkInType} style="width:100%">
-        {#each INTERACTION_TYPES as t (t)}<option value={t}>{t}</option>{/each}
-      </select>
+    <Dialog title={checkInEditing ? "Edit check-in" : "Record check-in"} onclose={() => (checkInOpen = false)}>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+        <div>
+          <label for="ci-date">Date</label>
+          <input id="ci-date" type="date" bind:value={checkInDate} style="width:100%" />
+        </div>
+        <div>
+          <label for="ci-type">Interaction type</label>
+          <select id="ci-type" bind:value={checkInType} style="width:100%">
+            {#each checkInTypeOptions as t (t)}<option value={t}>{t}</option>{/each}
+          </select>
+        </div>
+      </div>
+      {#if checkInError}<div class="field-error" role="alert">{checkInError}</div>{/if}
       <label for="ci-summary">Summary <span class="field-hint">objective, work-related</span></label>
-      <textarea id="ci-summary" bind:value={checkInSummary} rows="3" maxlength="10000" style="width:100%"></textarea>
+      <RichTextEditor id="ci-summary" bind:value={checkInSummary} rows={3} maxlength={10000} ariaLabel="Check-in summary" />
       <label style="display:flex; align-items:center; gap:.4rem; font-weight:400">
         <input type="checkbox" bind:checked={checkInFollowUp} /> Follow-up required
       </label>

@@ -5,16 +5,35 @@
 // database. Conversion parses the old notation rather than wrapping it as
 // literal text, so headings, lists, and emphasis survive the change of engine.
 
-import { countLegacyChecklistItems, isRichTextValue, richTextFromLegacy } from "../utils/richTextDoc";
+import {
+  countLegacyChecklistItems,
+  isRichTextValue,
+  richTextFromLegacy,
+  richTextFromPlainText
+} from "../utils/richTextDoc";
+
+/**
+ * How a field's text is to be read while it is still a string.
+ *
+ * `legacy` parses RADAR's pre-Tiptap notation, so headings, lists, and emphasis
+ * authored in it survive the change of engine. `plainText` takes the characters
+ * literally, which is the only correct reading for a field that has always been
+ * a plain textarea: a project description beginning "- " was typed as a dash,
+ * not authored as a list, and must not silently become one.
+ */
+export type RichTextSource = "legacy" | "plainText";
 
 /** Every field holding rich text, by collection. Kept beside the backup schema. */
-export const RICH_TEXT_MIGRATION_FIELDS: Readonly<Record<string, readonly string[]>> = {
-  tasks: ["description"],
-  taskNotes: ["body"],
-  quickNotes: ["body"],
-  employeeNotes: ["noteText"],
-  meetingNotes: ["notes", "actionItems"],
-  performanceInputs: ["situationOrContext", "actionOrAccomplishment", "result"]
+export const RICH_TEXT_MIGRATION_FIELDS: Readonly<Record<string, Readonly<Record<string, RichTextSource>>>> = {
+  tasks: { description: "legacy" },
+  taskNotes: { body: "legacy" },
+  quickNotes: { body: "legacy" },
+  employeeNotes: { noteText: "legacy" },
+  meetingNotes: { notes: "legacy", actionItems: "legacy" },
+  performanceInputs: { situationOrContext: "legacy", actionOrAccomplishment: "legacy", result: "legacy" },
+  projects: { description: "plainText" },
+  awardRecords: { supportingNotes: "plainText" },
+  employeeInteractions: { summary: "plainText" }
 };
 
 export interface RichTextMigrationReport {
@@ -42,9 +61,10 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 /**
  * True when this value still needs converting. A document is already current,
- * and an absent field has nothing to convert; only a non-empty string is legacy.
+ * and an absent field has nothing to convert; only a non-empty string is text
+ * awaiting conversion.
  */
-function isLegacyValue(value: unknown): value is string {
+function isUnconvertedValue(value: unknown): value is string {
   return typeof value === "string" && value.trim() !== "";
 }
 
@@ -64,10 +84,10 @@ export function migrateRecordRichText(
   let checklistItems = 0;
   let next: Record<string, unknown> | undefined;
 
-  for (const field of fields) {
+  for (const [field, source] of Object.entries(fields)) {
     const value = record[field];
     if (isRichTextValue(value)) continue;
-    if (!isLegacyValue(value)) {
+    if (!isUnconvertedValue(value)) {
       // An empty string is not worth a document, but it must not stay a string
       // either, or the field would keep failing the current schema.
       if (typeof value === "string") {
@@ -78,8 +98,12 @@ export function migrateRecordRichText(
       continue;
     }
     next ??= { ...record };
-    checklistItems += countLegacyChecklistItems(value);
-    next[field] = richTextFromLegacy(value);
+    if (source === "legacy") {
+      checklistItems += countLegacyChecklistItems(value);
+      next[field] = richTextFromLegacy(value);
+    } else {
+      next[field] = richTextFromPlainText(value);
+    }
     values++;
   }
 

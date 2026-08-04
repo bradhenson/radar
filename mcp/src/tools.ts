@@ -135,7 +135,7 @@ export function getEmployee(db: RadarDb, args: { employee: string }) {
     recentCheckIns: interactions.map((i) => ({
       date: i.interactionDate,
       type: i.interactionType,
-      summary: i.summary
+      summary: richTextDocToPlainText(i.summary)
     }))
   };
 }
@@ -532,7 +532,7 @@ function recordCheckInInTx(db: RadarDb, args: Parameters<typeof recordCheckIn>[1
     employeeId: employee.id,
     interactionDate: today,
     interactionType: args.type?.trim() || "Informal check-in",
-    summary: args.summary?.trim() || undefined,
+    summary: args.summary?.trim() ? richTextFromPlainText(args.summary.trim()) : undefined,
     followUpRequired: args.followUpRequired ?? false,
     createdAt: now,
     updatedAt: now

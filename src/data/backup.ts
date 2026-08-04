@@ -17,7 +17,7 @@ export const BACKUP_FORMAT = "SupervisorAssistantBackup";
 // v4: quick-note workbench records were added.
 // v5: rich text is a versioned document rather than RADAR's own notation.
 // Older backups are migrated on import.
-export const BACKUP_FORMAT_VERSION = 5;
+export const BACKUP_FORMAT_VERSION = 6;
 export const APPLICATION_VERSION = "0.1.0";
 
 /** Hard ceiling on accepted backup file size (characters of JSON text). */
@@ -148,7 +148,10 @@ const RICH_TEXT_FIELDS: Partial<Record<CollectionName, string[]>> = {
 const OPTIONAL_RICH_TEXT_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["description"],
   performanceInputs: ["situationOrContext", "result"],
-  meetingNotes: ["notes", "actionItems"]
+  meetingNotes: ["notes", "actionItems"],
+  projects: ["description"],
+  awardRecords: ["supportingNotes"],
+  employeeInteractions: ["summary"]
 };
 
 // Arrays of strings that must be present (filled by the v1 migration).
@@ -373,6 +376,18 @@ function migrateV4toV5(data: Record<string, unknown>, warnings: string[]): void 
   warnings.push(`${describeMigrationReport(report)} (format v4 migration).`);
 }
 
+/**
+ * Project descriptions, award supporting notes, and check-in summaries became
+ * documents after v5. They were always plain textareas, so they convert
+ * literally — see RICH_TEXT_MIGRATION_FIELDS. Shares the same idempotent pass
+ * as v4, which therefore has nothing left to do when both steps run.
+ */
+function migrateV5toV6(data: Record<string, unknown>, warnings: string[]): void {
+  const report = migrateCollectionsRichText(data as Record<string, unknown[]>);
+  if (migrationReportIsEmpty(report)) return;
+  warnings.push(`${describeMigrationReport(report)} (format v5 migration).`);
+}
+
 /** Upgrade the parsed package in place to the current format version. */
 function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
   let version = pkg.formatVersion as number;
@@ -394,6 +409,11 @@ function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
     migrateV4toV5(pkg.data as Record<string, unknown>, warnings);
     version = 5;
     warnings.push("Backup migrated from format version 4 to 5.");
+  }
+  if (version === 5) {
+    migrateV5toV6(pkg.data as Record<string, unknown>, warnings);
+    version = 6;
+    warnings.push("Backup migrated from format version 5 to 6.");
   }
   pkg.formatVersion = version;
 }

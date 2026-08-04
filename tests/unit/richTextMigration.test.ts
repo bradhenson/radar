@@ -65,13 +65,34 @@ describe("migrateRecordRichText", () => {
 
   it("covers every collection the backup schema treats as rich text", () => {
     expect(Object.keys(RICH_TEXT_MIGRATION_FIELDS).sort()).toEqual([
+      "awardRecords",
+      "employeeInteractions",
       "employeeNotes",
       "meetingNotes",
       "performanceInputs",
+      "projects",
       "quickNotes",
       "taskNotes",
       "tasks"
     ]);
+  });
+
+  // Fields that were always plain textareas never held RADAR notation, so the
+  // characters the author typed have to survive as themselves.
+  it("takes a plain-text field literally rather than parsing it as notation", () => {
+    const result = migrateRecordRichText("projects", { id: "p1", description: "# Phase 1\n- not a list" });
+    expect(richTextDocToPlainText(result!.record.description as never)).toBe("# Phase 1\n- not a list");
+  });
+
+  it("reads the same characters as notation in a field that was authored in it", () => {
+    const result = migrateRecordRichText("tasks", { id: "t1", description: "# Phase 1\n- not a list" });
+    expect(richTextDocToPlainText(result!.record.description as never)).toBe("Phase 1\n\n• not a list");
+  });
+
+  it("counts no checklist items for a plain-text field that merely looks like one", () => {
+    const result = migrateRecordRichText("employeeInteractions", { id: "i1", summary: "- [x] done" });
+    expect(result!.checklistItems).toBe(0);
+    expect(richTextDocToPlainText(result!.record.summary as never)).toBe("- [x] done");
   });
 });
 

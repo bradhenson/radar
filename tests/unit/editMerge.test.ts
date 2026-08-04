@@ -8,6 +8,7 @@ import {
   type EditContext
 } from "../../src/domain/rules/editMerge";
 import type { AwardRecord, LeaveRecord, Project, TeleworkRecord, TravelRecord } from "../../src/domain/models";
+import { normalizeRichText, richTextFromPlainText } from "../../src/utils/richTextDoc";
 
 // Round-trip guarantee: opening a fully-populated record in its edit dialog
 // and saving without changes must preserve every field (except updatedAt).
@@ -21,7 +22,7 @@ describe("mergeProjectEdit", () => {
     id: "p1",
     name: "Radar Upgrade",
     shortName: "RU",
-    description: "Long description",
+    description: richTextFromPlainText("Long description"),
     status: "active",
     startDate: "2026-01-05",
     targetEndDate: "2026-12-01",
@@ -40,7 +41,7 @@ describe("mergeProjectEdit", () => {
   const formFields = (p: Project) => ({
     name: p.name,
     shortName: p.shortName ?? "",
-    description: p.description ?? "",
+    description: normalizeRichText(p.description),
     status: p.status,
     startDate: p.startDate ?? "",
     targetEndDate: p.targetEndDate ?? "",
@@ -84,7 +85,7 @@ describe("mergeAwardEdit", () => {
     decisionDate: "2026-07-05",
     status: "Submitted",
     citationDraft: "Citation text",
-    supportingNotes: "Notes",
+    supportingNotes: richTextFromPlainText("Notes"),
     projectId: "p1",
     relatedPerformanceInputIds: ["pi1", "pi2"],
     sourceReference: "SRC-9",
@@ -98,7 +99,7 @@ describe("mergeAwardEdit", () => {
     awardType: a.awardType ?? "",
     status: a.status,
     nominationDueDate: a.nominationDueDate ?? "",
-    supportingNotes: a.supportingNotes ?? ""
+    supportingNotes: normalizeRichText(a.supportingNotes)
   });
 
   it("round-trips a fully populated record without loss", () => {

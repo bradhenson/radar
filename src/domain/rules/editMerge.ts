@@ -4,6 +4,7 @@
 // archive flags, accomplishment details) survive the edit untouched.
 // Round-trip tested in tests/unit/editMerge.test.ts.
 
+import { isRichTextEmpty, type RichTextValue } from "../../utils/richTextDoc";
 import type {
   AwardRecord,
   IsoTimestamp,
@@ -28,7 +29,7 @@ export interface EditContext {
 export interface ProjectEditFields {
   name: string;
   shortName: string;
-  description: string;
+  description: RichTextValue;
   status: ProjectStatus;
   startDate: string;
   targetEndDate: string;
@@ -41,7 +42,7 @@ export function mergeProjectEdit(existing: Project | undefined, f: ProjectEditFi
     id: existing?.id ?? ctx.id,
     name: f.name.trim(),
     shortName: f.shortName.trim() || undefined,
-    description: f.description.trim() || undefined,
+    description: isRichTextEmpty(f.description) ? undefined : f.description,
     status: f.status,
     startDate: f.startDate || undefined,
     targetEndDate: f.targetEndDate || undefined,
@@ -59,7 +60,7 @@ export interface AwardEditFields {
   awardType: string;
   status: string;
   nominationDueDate: string;
-  supportingNotes: string;
+  supportingNotes: RichTextValue;
 }
 
 export function mergeAwardEdit(existing: AwardRecord | undefined, f: AwardEditFields, ctx: EditContext): AwardRecord {
@@ -71,7 +72,7 @@ export function mergeAwardEdit(existing: AwardRecord | undefined, f: AwardEditFi
     awardType: f.awardType.trim() || undefined,
     status: f.status,
     nominationDueDate: f.nominationDueDate || undefined,
-    supportingNotes: f.supportingNotes.trim() || undefined,
+    supportingNotes: isRichTextEmpty(f.supportingNotes) ? undefined : f.supportingNotes,
     relatedPerformanceInputIds: existing?.relatedPerformanceInputIds ?? [],
     createdAt: existing?.createdAt ?? ctx.now,
     updatedAt: ctx.now

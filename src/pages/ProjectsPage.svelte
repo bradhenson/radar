@@ -7,9 +7,12 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import RichTextEditor from "../components/common/RichTextEditor.svelte";
+  import RichTextView from "../components/common/RichTextView.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { mergeProjectEdit } from "../domain/rules/editMerge";
+  import { emptyRichText, isRichTextEmpty, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
   import type { Project, ProjectStatus } from "../domain/models";
 
   let showClosed = $state(false);
@@ -21,7 +24,7 @@
   // form fields
   let fName = $state("");
   let fShort = $state("");
-  let fDesc = $state("");
+  let fDesc = $state(emptyRichText());
   let fStatus = $state<ProjectStatus>("active");
   let fStart = $state("");
   let fEnd = $state("");
@@ -31,14 +34,14 @@
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fName, fShort, fDesc, fStatus, fStart, fEnd, fLead]);
+    return JSON.stringify([fName, fShort, serializeRichText(fDesc), fStatus, fStart, fEnd, fLead]);
   }
 
   function openForm(p?: Project) {
     editing = p;
     fName = p?.name ?? "";
     fShort = p?.shortName ?? "";
-    fDesc = p?.description ?? "";
+    fDesc = normalizeRichText(p?.description);
     fStatus = p?.status ?? "active";
     fStart = p?.startDate ?? "";
     fEnd = p?.targetEndDate ?? "";
@@ -234,7 +237,7 @@
           {#if expandedId === r.p.id}
             <tr class="detail-row">
               <td colspan="8">
-                {#if r.p.description}<p>{r.p.description}</p>{/if}
+                {#if !isRichTextEmpty(r.p.description)}<RichTextView value={r.p.description} compact />{/if}
                 {#if projectTasks(r.p.id).length === 0}
                   <p class="muted">No tasks in this project.</p>
                 {:else}
@@ -316,7 +319,7 @@
         {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
       </select>
       <label for="pf-desc">Description</label>
-      <textarea id="pf-desc" bind:value={fDesc} rows="3" maxlength="10000" style="width:100%"></textarea>
+      <RichTextEditor id="pf-desc" bind:value={fDesc} rows={3} maxlength={10000} ariaLabel="Project description" />
       <div style="display:flex; gap:.5rem; align-items:center; margin-top:1rem;">
         {#if editing}
           <button type="button" class="icon-btn danger" aria-label="Delete project" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>

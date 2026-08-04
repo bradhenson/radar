@@ -15,7 +15,10 @@
     quickNotes: "notes",
     employeeNotes: "employee notes",
     meetingNotes: "meeting notes",
-    performanceInputs: "performance inputs"
+    performanceInputs: "performance inputs",
+    projects: "project descriptions",
+    awardRecords: "award supporting notes",
+    employeeInteractions: "check-in summaries"
   };
 
   let result = $state<RichTextMigrationReport | undefined>(undefined);
