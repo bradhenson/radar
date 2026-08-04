@@ -6,13 +6,18 @@
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
-  import { TASK_PRIORITIES, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
+  import { TASK_PRIORITIES, priorityLabel, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
   import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
+  import { sortTaskListRows, type SortDirection, type TaskListRow, type TaskListSortKey } from "../domain/rules/taskListSort";
   import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
   import { richTextDocToPlainText } from "../utils/richTextDoc";
 
+  // Both views read the same filtered working set below; only the layout of the
+  // last step differs. Deliberately not persisted — see LeavePage, which does
+  // the same for its list/calendar toggle.
+  let view = $state<"board" | "list">("board");
   let search = $state("");
   let filterEmployee = $state("");
   let filterCompetency = $state("");
@@ -60,6 +65,60 @@
       tasks: visibleTasks.filter((t) => app.taskBoardColumnId(t) === column.id).sort((a, b) => a.boardOrder - b.boardOrder)
     }))
   );
+
+  // --- list view -------------------------------------------------------------
+  // Defaults to the board's own order, so switching views never reshuffles work
+  // that was arranged by hand.
+  let sortKey = $state<TaskListSortKey>("column");
+  let sortDirection = $state<SortDirection>("asc");
+
+  const LIST_COLUMNS: { key: TaskListSortKey; label: string; numeric?: boolean }[] = [
+    { key: "title", label: "Task" },
+    { key: "employee", label: "Assignee" },
+    { key: "project", label: "Project" },
+    { key: "column", label: "Column" },
+    { key: "due", label: "Due" },
+    { key: "priority", label: "Priority" },
+    { key: "status", label: "Status" }
+  ];
+
+  let listRows = $derived.by(() => {
+    const columnIndex = new Map(app.activeBoardColumns.map((column, index) => [column.id, index]));
+    const rows: TaskListRow[] = visibleTasks.map((task) => {
+      const id = app.taskBoardColumnId(task);
+      return {
+        task,
+        employeeName: app.employeeName(task.employeeId),
+        projectName: app.projectName(task.projectId),
+        columnLabel: app.activeBoardColumns.find((column) => column.id === id)?.label ?? "",
+        columnIndex: columnIndex.get(id) ?? columnIndex.size
+      };
+    });
+    return sortTaskListRows(rows, sortKey, sortDirection);
+  });
+
+  /** First click sorts ascending; clicking the active column reverses it. */
+  function sortBy(key: TaskListSortKey) {
+    if (sortKey === key) sortDirection = sortDirection === "asc" ? "desc" : "asc";
+    else {
+      sortKey = key;
+      sortDirection = "asc";
+    }
+  }
+
+  function ariaSort(key: TaskListSortKey): "ascending" | "descending" | "none" {
+    if (sortKey !== key) return "none";
+    return sortDirection === "asc" ? "ascending" : "descending";
+  }
+
+  /** Moving a task from the list runs the same rules as dropping it on a lane. */
+  async function changeColumn(task: Task, columnId: string) {
+    if (columnId === app.taskBoardColumnId(task)) return;
+    const col = visibleTasks
+      .filter((t) => app.taskBoardColumnId(t) === columnId)
+      .sort((a, b) => a.boardOrder - b.boardOrder);
+    await moveWithStatusFollowUp(task, columnId, orderBetween(col[col.length - 1]?.boardOrder, undefined));
+  }
 
   let boardStats = $derived({
     total: baseFilteredTasks.length,
@@ -355,11 +414,17 @@
 
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
-<div class="page board-page">
+<div class="page board-page" class:list-mode={view === "list"}>
   <div class="board-header">
     <div>
       <span class="eyebrow">Tasks</span>
-      <h1>Kanban Board</h1>
+      <div class="board-title-row">
+        <h1>{view === "board" ? "Kanban Board" : "Task List"}</h1>
+        <div class="view-toggle" role="group" aria-label="Task view">
+          <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
+          <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        </div>
+      </div>
     </div>
     <div class="board-stats" aria-label="Quick board filters">
       <button
@@ -433,6 +498,96 @@
       message="No tasks match this view."
       hint="Create a task or clear one or more filters."
     />
+  {:else if view === "list"}
+    {#if listRows.length === 0}
+      <EmptyState message="No tasks yet." hint="Use + New task to add the first one." />
+    {:else}
+      <div class="table-wrap">
+      <table class="data task-list">
+        <thead>
+          <tr>
+            {#each LIST_COLUMNS as column (column.key)}
+              <th scope="col" aria-sort={ariaSort(column.key)}>
+                <button type="button" class="sort-header" class:sorted={sortKey === column.key} onclick={() => sortBy(column.key)}>
+                  {column.label}
+                  <span class="sort-arrow" aria-hidden="true">{sortKey === column.key ? (sortDirection === "asc" ? "▲" : "▼") : ""}</span>
+                </button>
+              </th>
+            {/each}
+            <th scope="col"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each listRows as row (row.task.id)}
+            {@const task = row.task}
+            {@const ds = dueState(task, app.today, app.settings.dueSoonDays)}
+            <tr>
+              <td>
+                <button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(task.id)}>{task.title}</button>
+                {#if checklistProgress(task.id)}
+                  <span class="badge checklist-badge">{checklistProgress(task.id)}</span>
+                {/if}
+              </td>
+              <td>
+                {#if task.employeeId}
+                  <span class="assignee">
+                    <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
+                    <span>{row.employeeName}</span>
+                  </span>
+                {:else}
+                  <span class="muted small">Unassigned</span>
+                {/if}
+              </td>
+              <td>{row.projectName || "—"}</td>
+              <td>
+                <!-- The list's replacement for dragging a card between lanes. -->
+                <select
+                  class="column-select"
+                  aria-label={`Board column for ${task.title}`}
+                  value={app.taskBoardColumnId(task)}
+                  onchange={(e) => void changeColumn(task, e.currentTarget.value)}
+                >
+                  {#each app.activeBoardColumns as column (column.id)}
+                    <option value={column.id}>{column.label}</option>
+                  {/each}
+                </select>
+              </td>
+              <td class="date-cell">
+                {#if !task.dueDate}
+                  <span class="muted">—</span>
+                {:else if ds === "overdue" || ds === "due_today" || ds === "due_soon"}
+                  <span class="badge {ds}">{DUE_STATE_LABELS[ds]} {formatDate(task.dueDate)}</span>
+                {:else}
+                  {formatDate(task.dueDate)}
+                {/if}
+              </td>
+              <td>
+                {#if task.priority === "high" || task.priority === "critical"}
+                  <span class="badge priority-{task.priority}">{priorityLabel(task.priority)}</span>
+                {:else}
+                  {priorityLabel(task.priority)}
+                {/if}
+              </td>
+              <td>
+                {#if task.status === "waiting"}
+                  <span class="badge warning">Waiting {daysSinceTimestamp(task.waitingSince ?? task.updatedAt, app.today)}d</span>
+                {:else if task.status === "complete"}
+                  <span class="badge success">Complete</span>
+                {:else}
+                  {statusLabel(task.status)}
+                {/if}
+              </td>
+              <td class="row-action">
+                {#if task.status !== "complete"}
+                  <button type="button" onclick={() => void completeCard(task)}>Done</button>
+                {/if}
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      </div>
+    {/if}
   {:else}
     <div class="columns" aria-label="Task board">
       {#each columns as col (col.column.id)}
@@ -626,7 +781,7 @@
   }
   .board-header {
     display: grid;
-    grid-template-columns: minmax(13rem, 1fr) auto auto;
+    grid-template-columns: minmax(18rem, 1fr) auto auto;
     gap: 1rem;
     align-items: center;
     margin-bottom: .8rem;
@@ -694,8 +849,77 @@
     font-size: .7rem;
     font-weight: 800;
   }
+  /* The board pins itself to the window so lanes scroll internally. The list is
+     an ordinary document that grows with its rows, so it takes normal page flow
+     and lets the window scroll instead. */
+  .board-page.list-mode {
+    height: auto;
+    display: block;
+  }
+  .board-title-row {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .7rem;
+  }
+  /* "Kanban Board" and "Task List" are different widths. Reserving the wider
+     one keeps the toggle still when it is clicked, instead of sliding out from
+     under the pointer that just used it. */
+  .board-title-row h1 {
+    min-width: 9.5rem;
+  }
+  .view-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .view-toggle button {
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    min-height: 2.1rem;
+  }
+  .view-toggle button.active {
+    background: var(--accent-soft);
+    color: var(--accent);
+  }
   .board-new-task {
     white-space: nowrap;
+  }
+  /* Sortable headers: the whole heading is the control, so the hit target
+     matches what the column header looks like. */
+  .sort-header {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    min-height: 0;
+    margin: -.2rem -.35rem;
+    padding: .2rem .35rem;
+    border: 0;
+    border-radius: .3rem;
+    background: transparent;
+    box-shadow: none;
+    color: inherit;
+    font: inherit;
+    letter-spacing: inherit;
+    text-transform: inherit;
+  }
+  .sort-header:hover { background: var(--surface); color: var(--text); }
+  .sort-header.sorted { color: var(--text); }
+  .sort-arrow { font-size: .6rem; }
+  .task-list td { vertical-align: middle; }
+  .column-select {
+    min-height: 1.9rem;
+    padding: .1rem 1.4rem .1rem .4rem;
+    font-size: .82rem;
+  }
+  .task-list .row-action { text-align: right; white-space: nowrap; }
+  .task-list .row-action button {
+    min-height: 1.8rem;
+    padding: .1rem .55rem;
+    font-size: .78rem;
   }
   .board-toolbar {
     display: grid;
