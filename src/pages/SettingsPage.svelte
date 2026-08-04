@@ -10,7 +10,7 @@
     parseAndValidateBackup,
     type BackupValidationResult
   } from "../data/backup";
-  import { APP_LOOKS, COLOR_THEMES, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
+  import { APP_LOOKS, COLOR_THEMES, DEFAULT_SETTINGS, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { payPeriodFor, payPeriodLabel } from "../domain/rules/telework";
   import { formatTimestamp, isValidIsoDate } from "../utils/dates";
@@ -508,13 +508,13 @@
         <button
           type="button"
           class="palette-btn"
-          class:selected={(app.settings.look ?? "standard") === l.value}
-          aria-pressed={(app.settings.look ?? "standard") === l.value}
+          class:selected={(app.settings.look ?? DEFAULT_SETTINGS.look) === l.value}
+          aria-pressed={(app.settings.look ?? DEFAULT_SETTINGS.look) === l.value}
           title={l.hint}
           onclick={() => void updateSetting("look", l.value)}
         >
           {l.label}
-          {#if (app.settings.look ?? "standard") === l.value}<span aria-hidden="true">✓</span>{/if}
+          {#if (app.settings.look ?? DEFAULT_SETTINGS.look) === l.value}<span aria-hidden="true">✓</span>{/if}
         </button>
       {/each}
     </div>

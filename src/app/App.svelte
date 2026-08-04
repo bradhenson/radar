@@ -33,6 +33,7 @@
   import { daysSinceTimestamp, formatTimestamp } from "../utils/dates";
   import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
+  import { DEFAULT_SETTINGS } from "../domain/models";
   import { isWailsHost, toggleMaximiseDesktopWindow } from "../data/wailsBridge";
 
   const desktopHost = isWailsHost();
@@ -50,7 +51,7 @@
         pref === "dark" || (pref === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
       document.documentElement.dataset.theme = dark ? "dark" : "light";
       document.documentElement.dataset.palette = app.settings.colorTheme ?? "default";
-      document.documentElement.dataset.look = app.settings.look ?? "standard";
+      document.documentElement.dataset.look = app.settings.look ?? DEFAULT_SETTINGS.look;
     };
     apply();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

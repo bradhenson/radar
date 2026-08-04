@@ -80,7 +80,7 @@ export interface Project {
   id: Id;
   name: string;
   shortName?: string;
-  description?: string;
+  description?: RichTextField;
   status: ProjectStatus;
   startDate?: IsoDate;
   targetEndDate?: IsoDate;
@@ -346,7 +346,7 @@ export interface AwardRecord {
   decisionDate?: IsoDate;
   status: string;
   citationDraft?: string;
-  supportingNotes?: string;
+  supportingNotes?: RichTextField;
   projectId?: Id;
   relatedPerformanceInputIds: Id[];
   sourceReference?: string;
@@ -359,7 +359,7 @@ export interface EmployeeInteraction {
   employeeId: Id;
   interactionDate: IsoDate;
   interactionType: string;
-  summary?: string;
+  summary?: RichTextField;
   followUpRequired: boolean;
   relatedTaskId?: Id;
   createdAt: IsoTimestamp;
@@ -528,7 +528,7 @@ export const PROVISIONING_STATUS_OPTIONS: EmployeeProfileChoice[] = [
 ];
 
 export const DEFAULT_SETTINGS: AppSettings = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   applicationName: "RADAR",
   dueSoonDays: 7,
   waitingStaleDays: 14,
@@ -550,7 +550,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   payPeriodAnchorDate: "2026-07-12",
   theme: "dark",
   colorTheme: "default",
-  look: "standard",
+  look: "glass_strong",
   enableSingleKeyShortcuts: true,
   employeeProfileSections: [
     { id: "identity", label: "Identity", sortOrder: 0, isArchived: false },
@@ -790,6 +790,14 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
       out.employeeProfileSections,
       PROFILE_FIELDS_ADDED_IN_SCHEMA_5
     );
+  }
+
+  if (priorSchema < 6 && (src.look === undefined || src.look === "standard")) {
+    // Glass+ became the default look in schema 6. A setting still on the old
+    // default was inherited rather than chosen, so move it across; anything
+    // else is the user's pick. Choosing Standard afterwards saves at schema 6
+    // and is never revisited.
+    out.look = DEFAULT_SETTINGS.look;
   }
 
   if (priorSchema < 4 && src.payPeriodAnchorDate === SUPERSEDED_PAY_PERIOD_ANCHOR) {
