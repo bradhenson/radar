@@ -14,6 +14,10 @@
 
 - Note cards carry a Delete button beside Archive. Archive remains the softer option and still offers Undo; Delete asks for confirmation first and is permanent, and deleting the note currently open in the composer clears the composer rather than leaving it editing a record that no longer exists.
 
+### Fixed
+
+- Deleting default board columns (such as Complete) now persists across application restarts. Default columns are only seeded on initial database creation, preserving any column removals made by the user.
+
 - Clicking anywhere on a note card on the Notes page opens that note in the composer for editing. The Edit button stays where it was, as the sign that a card can be edited and as the keyboard path; clicking a link inside a note, the Archive button, or a stretch of text you selected to copy all still do what they say instead.
 
 - Workbench notes are called general notes in the places that name them: the Activity log's record-type filter and the warnings shown before deleting a project or an employee.

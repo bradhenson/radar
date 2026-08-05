@@ -587,26 +587,20 @@ export class AppStore {
 
   private async ensureBoardColumns(): Promise<void> {
     const now = nowTimestamp();
-    const existing = new Map(this.boardColumns.map((c) => [c.id, c]));
-    const additions: BoardColumnDefinition[] = [];
-    for (const seed of DEFAULT_BOARD_COLUMN_SEEDS) {
-      if (!existing.has(seed.id)) {
-        const record: BoardColumnDefinition = {
-          id: seed.id,
-          label: seed.label,
-          sortOrder: seed.sortOrder,
-          mapsToStatus: seed.mapsToStatus,
-          createdAt: now,
-          updatedAt: now
-        };
-        existing.set(record.id, record);
-        additions.push(record);
-      }
-    }
-
-    for (const column of additions) {
-      await this.store.put("boardColumns", column);
-      this.boardColumns.push(column);
+    // Default columns are only seeded when no board columns exist at all (a fresh database).
+    // If board columns exist, user deletions must be preserved across restarts.
+    if (this.boardColumns.length === 0) {
+      const initialColumns: BoardColumnDefinition[] = DEFAULT_BOARD_COLUMN_SEEDS.map((seed) => ({
+        id: seed.id,
+        label: seed.label,
+        sortOrder: seed.sortOrder,
+        mapsToStatus: seed.mapsToStatus,
+        createdAt: now,
+        updatedAt: now
+      }));
+      await this.store.bulkPut("boardColumns", initialColumns);
+      this.boardColumns = initialColumns;
+      return;
     }
 
     // Migration: default columns created before lane→status mappings existed
