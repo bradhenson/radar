@@ -26,7 +26,7 @@ import {
 } from "../../src/domain/employeeProfile";
 import { computeAttention } from "../../src/domain/rules/attention";
 import { orderForAppend } from "../../src/domain/rules/boardOrder";
-import { laneForStatus, statusChangeForLaneMove } from "../../src/domain/rules/laneStatus";
+import { statusChangeForLaneMove } from "../../src/domain/rules/laneStatus";
 import { richTextDocToPlainText, richTextFromPlainText } from "../../src/utils/richTextDoc";
 import { isValidIsoDate, nowTimestamp, todayIso } from "../../src/utils/dates";
 import { newId } from "../../src/utils/ids";
@@ -34,7 +34,7 @@ import { newId } from "../../src/utils/ids";
 export const TASK_PRIORITIES: TaskPriority[] = ["low", "normal", "high", "critical"];
 /** Statuses a caller may set. "cancelled" is deliberately excluded: it is an
  *  explicit human decision the board never overrides (see laneStatus.ts). */
-export const SETTABLE_STATUSES: TaskStatus[] = ["open", "waiting", "complete"];
+export const SETTABLE_STATUSES: TaskStatus[] = ["open", "waiting"];
 
 /** Board columns in display order (mirrors app.svelte.ts boardColumnList). */
 function activeColumns(db: RadarDb): BoardColumnDefinition[] {
@@ -44,7 +44,7 @@ function activeColumns(db: RadarDb): BoardColumnDefinition[] {
 /** Mirrors app.svelte.ts taskBoardColumnId: legacy tasks derive their lane. */
 function taskColumnId(task: Task, columns: BoardColumnDefinition[]): string {
   if (task.boardColumnId && columns.some((c) => c.id === task.boardColumnId)) return task.boardColumnId;
-  return laneForStatus(columns, task.status)?.id ?? columns[0]?.id ?? "inbox";
+  return columns.some((c) => c.id === task.status) ? task.status : columns[0]?.id ?? "inbox";
 }
 
 function resolveColumn(columns: BoardColumnDefinition[], term: string): BoardColumnDefinition {
@@ -286,7 +286,7 @@ function createTaskInTx(db: RadarDb, args: Parameters<typeof createTask>[1]) {
     // Converted at the boundary: this server is a second writer, so it must not
     // be able to leave a record in the pre-Tiptap string format.
     description: args.description?.trim() ? richTextFromPlainText(args.description.trim()) : undefined,
-    status: column.mapsToStatus ?? "open",
+    status: column.mapsToStatus === "waiting" ? "waiting" : "open",
     boardColumnId: column.id,
     priority: args.priority ?? "normal",
     employeeId: employee?.id,
@@ -301,7 +301,6 @@ function createTaskInTx(db: RadarDb, args: Parameters<typeof createTask>[1]) {
     isArchived: false
   };
   if (task.status === "waiting") task.waitingSince = now;
-  if (task.status === "complete") task.completedDate = todayIso();
 
   db.putRecord("tasks", task, { actionType: "created", summary: `Created task "${task.title}"` });
   return taskView(task, employees, columns, project?.name);
@@ -316,7 +315,8 @@ export function updateTask(
     employee?: string;
     project?: string;
     column?: string;
-    status?: TaskStatus;
+    status?: Exclude<TaskStatus, "complete" | "cancelled">;
+    done?: boolean;
     priority?: TaskPriority;
     dueDate?: string | null;
     archived?: boolean;
@@ -356,7 +356,7 @@ function updateTaskInTx(db: RadarDb, args: Parameters<typeof updateTask>[1]) {
   if (args.column !== undefined) {
     const column = resolveColumn(columns, args.column);
     next.boardColumnId = column.id;
-    const change = statusChangeForLaneMove(next, column, today, now);
+    const change = statusChangeForLaneMove(next, column, now);
     if (change) next = { ...next, ...change };
     next.boardOrder = orderForAppend(
       db
@@ -367,26 +367,34 @@ function updateTaskInTx(db: RadarDb, args: Parameters<typeof updateTask>[1]) {
   }
   if (args.status !== undefined && args.status !== next.status) {
     next.status = args.status;
-    if (args.status === "complete") next.completedDate = today;
     if (args.status === "waiting") next.waitingSince = now;
     if (args.status === "open") {
       next.completedDate = undefined;
       next.waitingSince = undefined;
     }
-    // Follow the status into its lane, unless the caller named a lane too.
-    if (args.column === undefined) {
-      const lane = laneForStatus(columns, args.status);
-      if (lane) next.boardColumnId = lane.id;
-    }
   }
 
   let actionType = args.status !== undefined || args.column !== undefined ? "status_changed" : "updated";
   let summary = `Updated task "${next.title}"`;
-  // Archive instead of delete (working rule 7); restore is the inverse.
-  if (args.archived !== undefined && args.archived !== existing.isArchived) {
+  if (args.done) {
+    next.status = "complete";
+    next.completedDate = today;
+    next.waitingSince = undefined;
+    next.isArchived = true;
+    actionType = "completed";
+    summary = `Marked "${next.title}" done and archived it`;
+  } else if (args.archived !== undefined && args.archived !== existing.isArchived) {
+    // Archive instead of delete (working rule 7); restoring finished work
+    // reopens it in the column where Done was selected.
+    const reopening = !args.archived && next.status === "complete";
     next.isArchived = args.archived;
-    actionType = args.archived ? "archived" : "restored";
-    summary = `${args.archived ? "Archived" : "Restored"} task "${next.title}"`;
+    if (reopening) {
+      next.status = "open";
+      next.completedDate = undefined;
+      next.waitingSince = undefined;
+    }
+    actionType = args.archived ? "archived" : reopening ? "reopened" : "restored";
+    summary = `${args.archived ? "Archived" : reopening ? "Reopened" : "Restored"} task "${next.title}"`;
   }
   db.putRecord("tasks", next, { actionType, summary });
   return taskView(next, employees, columns, projects.find((p) => p.id === next.projectId)?.name);

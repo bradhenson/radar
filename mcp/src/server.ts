@@ -146,7 +146,7 @@ server.registerTool(
   {
     title: "Update a task",
     description:
-      "Change a task's title, description, assignee, project, priority, due date, board column, or status. Moving a column keeps status in sync and vice versa, exactly as the board does. Pass dueDate: null to clear it. Find the taskId with search_tasks first.",
+      "Change a task's title, description, assignee, project, priority, due date, board column, or active status. Set done: true to record completion and move it directly to Archive, matching RADAR's Done button. Pass dueDate: null to clear it. Find the taskId with search_tasks first.",
     inputSchema: {
       taskId: z.string().describe("Task id from search_tasks"),
       title: z.string().optional(),
@@ -154,7 +154,8 @@ server.registerTool(
       employee: z.string().optional(),
       project: z.string().optional(),
       column: z.string().optional().describe("Board column label, e.g. 'Waiting'"),
-      status: z.enum(["open", "waiting", "complete"]).optional(),
+      status: z.enum(["open", "waiting"]).optional(),
+      done: z.boolean().optional().describe("true records completion and archives the task in one step"),
       priority: z.enum(["low", "normal", "high", "critical"]).optional(),
       dueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
       archived: z.boolean().optional().describe("true archives the task (RADAR never hard-deletes); false restores it")

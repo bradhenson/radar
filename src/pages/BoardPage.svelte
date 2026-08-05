@@ -1,7 +1,6 @@
 <script lang="ts">
   // Kanban board (plan sections 12.2 and 13): drag-and-drop with a keyboard
-  // alternative, filters, gap-based ordering, completed cards visible for a
-  // configurable number of days.
+  // alternative, filters, gap-based ordering, and direct Done-to-Archive.
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -11,7 +10,7 @@
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { sortTaskListRows, type SortDirection, type TaskListRow, type TaskListSortKey } from "../domain/rules/taskListSort";
-  import { daysBetween, daysSinceTimestamp, formatDate } from "../utils/dates";
+  import { daysSinceTimestamp, formatDate } from "../utils/dates";
   import { richTextDocToPlainText } from "../utils/richTextDoc";
 
   // Both views read the same filtered working set below; only the layout of the
@@ -23,7 +22,6 @@
   let filterCompetency = $state("");
   let filterProject = $state("");
   let filterPriority = $state("");
-  let hideComplete = $state(false);
   let summaryFilter = $state<BoardSummaryFilter>("");
 
   // Dropdown/search filters establish the board's working set. Summary pills
@@ -32,14 +30,6 @@
     app.tasks.filter((t) => {
       if (t.isArchived) return false;
       if (t.status === "cancelled") return false;
-      if (hideComplete && t.status === "complete") return false;
-      if (
-        t.status === "complete" &&
-        t.completedDate &&
-        daysBetween(t.completedDate, app.today) > app.settings.completedVisibleDays
-      ) {
-        return false;
-      }
       if (filterEmployee && t.employeeId !== filterEmployee) return false;
       if (filterCompetency && t.competencyId !== filterCompetency) return false;
       if (filterProject && t.projectId !== filterProject) return false;
@@ -117,7 +107,7 @@
     const col = visibleTasks
       .filter((t) => app.taskBoardColumnId(t) === columnId)
       .sort((a, b) => a.boardOrder - b.boardOrder);
-    await moveWithStatusFollowUp(task, columnId, orderBetween(col[col.length - 1]?.boardOrder, undefined));
+    await moveTask(task, columnId, orderBetween(col[col.length - 1]?.boardOrder, undefined));
   }
 
   let boardStats = $derived({
@@ -191,17 +181,11 @@
     const before = others[target.index - 1]?.boardOrder;
     const after = others[target.index]?.boardOrder;
     const order = orderBetween(before, after);
-    await moveWithStatusFollowUp(task, target.columnId, order);
+    await moveTask(task, target.columnId, order);
   }
 
-  // Lane moves can change status (lane→status mapping). When a drop completes
-  // a task, offer the same performance-input prompt as the Done button.
-  async function moveWithStatusFollowUp(task: Task, columnId: string, order: number) {
-    const prevStatus = task.status;
-    const updated = await app.moveTaskToBoardColumn(task, columnId, order);
-    if (updated.status === "complete" && prevStatus !== "complete" && updated.employeeId && !updated.performanceInputCreated) {
-      ui.performancePromptTask = updated;
-    }
+  async function moveTask(task: Task, columnId: string, order: number) {
+    await app.moveTaskToBoardColumn(task, columnId, order);
   }
 
   function onColumnDragStart(e: DragEvent, columnId: string) {
@@ -310,7 +294,6 @@
     filterCompetency = "";
     filterProject = "";
     filterPriority = "";
-    hideComplete = false;
     summaryFilter = "";
   }
 
@@ -327,11 +310,11 @@
     if (!next) return;
     const col = visibleTasks.filter((t) => app.taskBoardColumnId(t) === next).sort((a, b) => a.boardOrder - b.boardOrder);
     const order = orderBetween(col[col.length - 1]?.boardOrder, undefined);
-    await moveWithStatusFollowUp(task, next, order);
+    await moveTask(task, next, order);
   }
 
-  async function completeCard(task: Task) {
-    const updated = await app.completeTask(task);
+  async function markDone(task: Task) {
+    const updated = await app.markTaskDone(task);
     if (updated.employeeId && !updated.performanceInputCreated) {
       ui.performancePromptTask = updated;
     }
@@ -365,9 +348,9 @@
     } else if ((e.key === "ArrowUp" || e.key === "ArrowDown") && e.altKey) {
       e.preventDefault();
       void reorderWithinColumn(task, e.key === "ArrowUp" ? -1 : 1);
-    } else if (e.key.toLowerCase() === "c" && task.status !== "complete") {
+    } else if (e.key.toLowerCase() === "c") {
       e.preventDefault();
-      void completeCard(task);
+      void markDone(task);
     } else if (e.key === "Escape") {
       cancelDrag();
     }
@@ -408,7 +391,7 @@
   }
 
   let anyFilter = $derived(
-    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || hideComplete || summaryFilter)
+    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter)
   );
 </script>
 
@@ -484,10 +467,6 @@
       <option value="">All priorities</option>
       {#each TASK_PRIORITIES as p (p.value)}<option value={p.value}>{p.label}</option>{/each}
     </select>
-    <label class="pill-toggle" class:active={hideComplete}>
-      <input type="checkbox" bind:checked={hideComplete} />
-      Active only
-    </label>
     {#if anyFilter}
       <button type="button" class="clear-filters" onclick={clearFilters}>Clear filters</button>
     {/if}
@@ -578,9 +557,7 @@
                 {/if}
               </td>
               <td class="row-action">
-                {#if task.status !== "complete"}
-                  <button type="button" onclick={() => void completeCard(task)}>Done</button>
-                {/if}
+                <button type="button" title="Mark done and move to Archive" onclick={() => void markDone(task)}>Done</button>
               </td>
             </tr>
           {/each}
@@ -665,7 +642,7 @@
                 <button
                   type="button"
                   class="card-open"
-                  title="Enter opens · [ ] move between columns · Alt+↑/↓ reorder · C complete"
+                  title="Enter opens · [ ] move between columns · Alt+↑/↓ reorder · C marks done and archives"
                   onclick={() => ui.openTaskDetail(task.id)}
                   onkeydown={(e) => onCardKeydown(e, task)}
                 >
@@ -739,19 +716,17 @@
                     <span class="badge checklist-badge" style="margin-left:auto">{checklistProgress(task.id)}</span>
                   {/if}
                 </div>
-                {#if task.status !== "complete"}
-                  <div class="card-actions">
-                    <button
-                      type="button"
-                      title="Complete"
-                      aria-label="Complete task"
-                      onclick={(e) => {
-                        e.stopPropagation();
-                        void completeCard(task);
-                      }}>Done</button
-                    >
-                  </div>
-                {/if}
+                <div class="card-actions">
+                  <button
+                    type="button"
+                    title="Mark done and move to Archive"
+                    aria-label="Mark task done and move to Archive"
+                    onclick={(e) => {
+                      e.stopPropagation();
+                      void markDone(task);
+                    }}>Done</button
+                  >
+                </div>
               </article>
             {/each}
             {#if dropTarget?.columnId === col.column.id && dropTarget.index >= col.tasks.filter((t) => t.id !== draggingId).length}

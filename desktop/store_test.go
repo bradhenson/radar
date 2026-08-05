@@ -290,6 +290,53 @@ func TestVerbatimJSONFidelity(t *testing.T) {
 	}
 }
 
+// The rich-text migration writes converted records through BulkPut. A document
+// is a nested object where the field previously held a plain string, so this
+// pins that the store carries it across unchanged rather than flattening or
+// re-encoding it on the way to SQLite.
+func TestBulkPutPreservesRichTextDocuments(t *testing.T) {
+	store := openTestStore(t)
+	doc := `{"schemaVersion":1,"doc":{"type":"doc","content":[` +
+		`{"type":"heading","attrs":{"level":4},"content":[{"type":"text","text":"Standup"}]},` +
+		`{"type":"bulletList","content":[{"type":"listItem","content":[{"type":"paragraph","content":[` +
+		`{"type":"text","text":"✓ Shipped"},{"type":"text","text":" it","marks":[{"type":"bold"}]}]}]}]}]}}`
+	records := []string{
+		`{"id":"n1","body":` + doc + `}`,
+		`{"id":"n2","body":` + doc + `}`,
+	}
+	if err := store.BulkPut("quickNotes", "["+records[0]+","+records[1]+"]"); err != nil {
+		t.Fatalf("BulkPut: %v", err)
+	}
+	raw, err := store.GetAll("quickNotes")
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	want := "[" + records[0] + "," + records[1] + "]"
+	if raw != want {
+		t.Fatalf("rich-text documents not returned verbatim:\n got %s\nwant %s", raw, want)
+	}
+}
+
+// Converting is a rewrite of existing rows, not an insert, so the migration
+// depends on BulkPut replacing a legacy string field in place.
+func TestBulkPutReplacesLegacyStringWithDocument(t *testing.T) {
+	store := openTestStore(t)
+	if err := store.Put("quickNotes", `{"id":"n1","body":"- [x] Shipped"}`); err != nil {
+		t.Fatalf("Put legacy: %v", err)
+	}
+	converted := `{"id":"n1","body":{"schemaVersion":1,"doc":{"type":"doc","content":[]}}}`
+	if err := store.BulkPut("quickNotes", "["+converted+"]"); err != nil {
+		t.Fatalf("BulkPut converted: %v", err)
+	}
+	raw, err := store.GetAll("quickNotes")
+	if err != nil {
+		t.Fatalf("GetAll: %v", err)
+	}
+	if raw != "["+converted+"]" {
+		t.Fatalf("legacy row was not replaced:\n got %s\nwant [%s]", raw, converted)
+	}
+}
+
 func TestUnknownCollectionRejectedEverywhere(t *testing.T) {
 	store := openTestStore(t)
 	if _, err := store.GetAll("nope"); err == nil {

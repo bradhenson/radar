@@ -28,9 +28,7 @@ export function createSampleSnapshot(): DatabaseSnapshot {
 
   c.boardColumns.push(
     ...DEFAULT_BOARD_COLUMN_SEEDS.map((column) => ({
-      id: column.id,
-      label: column.label,
-      sortOrder: column.sortOrder,
+      ...column,
       ...stamp
     }))
   );
@@ -257,16 +255,14 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       dueDate: addDays(today, 9)
     }),
     task("Close out completed sprint retrospective", "complete", "normal", {
-      completedDate: addDays(today, -2),
-      performanceInputCreated: true,
+      status: "open",
       projectId: projects.knowledge.id
     }),
     task("Document automation win from reporting project", "complete", "normal", {
+      status: "open",
       employeeId: employees[12]!.id,
       projectId: projects.reporting.id,
-      competencyId: employees[12]!.competencyId,
-      completedDate: addDays(today, -1),
-      performanceInputCreated: false
+      competencyId: employees[12]!.competencyId
     })
   ];
   c.tasks.push(...tasks);

@@ -49,7 +49,7 @@ import {
 import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
-import { laneForStatus, statusChangeForLaneMove } from "../domain/rules/laneStatus";
+import { statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 import { expiredActivityEntryIds } from "../domain/rules/activityRetention";
 import { activeEmployeesByDisplayName } from "../domain/rules/employees";
@@ -610,11 +610,16 @@ export class AppStore {
     }
 
     // Migration: default columns created before lane→status mappings existed
-    // pick up their seed mapping. Custom columns stay unmapped.
+    // pick up their seed mapping. Completion mappings are retired everywhere:
+    // moving a card only organizes active work, while Done archives it.
     const seedStatusById = new Map(DEFAULT_BOARD_COLUMN_SEEDS.map((s) => [s.id, s.mapsToStatus]));
-    const mappingFixes = this.boardColumns
+    const activeMappingFixes = this.boardColumns
       .filter((c) => c.mapsToStatus === undefined && seedStatusById.get(c.id))
       .map((c) => ({ ...c, mapsToStatus: seedStatusById.get(c.id), updatedAt: now }));
+    const retiredCompletionMappings = this.boardColumns
+      .filter((c) => c.mapsToStatus === "complete")
+      .map((c) => ({ ...c, mapsToStatus: undefined, updatedAt: now }));
+    const mappingFixes = [...activeMappingFixes, ...retiredCompletionMappings];
     if (mappingFixes.length) {
       await this.store.bulkPut("boardColumns", this.plainRecords(mappingFixes));
       for (const column of mappingFixes) {
@@ -1077,31 +1082,17 @@ export class AppStore {
     await this.putRecord("tasks", updated, { actionType, summary });
   }
 
-  /**
-   * Move a card to a lane. If the lane maps to a status (Waiting, Complete,
-   * open lanes), the task status follows the card so the board never shows a
-   * state the domain rules disagree with.
-   */
+  /** Move a card to a lane, following only active Open/Waiting mappings. */
   async moveTaskToBoardColumn(task: Task, boardColumnId: string, boardOrder: number): Promise<Task> {
     const prev = this.taskBoardColumnId(task);
-    const before = this.plainRecord(task);
     const column = this.boardColumns.find((c) => c.id === boardColumnId);
-    const statusChange = statusChangeForLaneMove(task, column, this.today, nowTimestamp());
+    const statusChange = statusChangeForLaneMove(task, column, nowTimestamp());
     const updated: Task = { ...task, ...statusChange, boardColumnId, boardOrder, updatedAt: nowTimestamp() };
     const moveText = `Moved "${task.title}" from ${this.boardColumnLabel(prev)} to ${this.boardColumnLabel(boardColumnId)}`;
     await this.putRecord("tasks", updated, {
-      actionType: statusChange?.status === "complete" ? "completed" : statusChange ? "status_changed" : "updated",
+      actionType: statusChange ? "status_changed" : "updated",
       summary: statusChange ? `${moveText} (status: ${statusLabel(updated.status)})` : moveText
     });
-    if (statusChange?.status === "complete") {
-      this.toast(`Completed "${task.title}"`, "success", async () => {
-        await this.putRecord(
-          "tasks",
-          { ...before, updatedAt: nowTimestamp() },
-          { actionType: "reopened", summary: `Reopened "${before.title}"` }
-        );
-      });
-    }
     return updated;
   }
 
@@ -1117,26 +1108,21 @@ export class AppStore {
     });
   }
 
-  async completeTask(task: Task): Promise<Task> {
+  async markTaskDone(task: Task): Promise<Task> {
     const before = $state.snapshot(task) as Task;
-    // Completing a task also moves its card to the complete-mapped lane, so
-    // the board reflects the status change (lane/status stay in step).
-    const currentLane = this.taskBoardColumnId(task);
-    const completeLane = laneForStatus(this.boardColumnList, "complete");
-    const laneMove =
-      completeLane && completeLane.id !== currentLane
-        ? {
-            boardColumnId: completeLane.id,
-            boardOrder: orderForAppend(
-              this.tasks
-                .filter((t) => t.id !== task.id && this.taskBoardColumnId(t) === completeLane.id && !t.isArchived)
-                .map((t) => t.boardOrder)
-            )
-          }
-        : {};
-    const updated: Task = { ...task, ...laneMove, status: "complete", completedDate: this.today, updatedAt: nowTimestamp() };
-    await this.putRecord("tasks", updated, { actionType: "completed", summary: `Completed "${task.title}"` });
-    this.toast(`Completed "${task.title}"`, "success", async () => {
+    const updated: Task = {
+      ...task,
+      status: "complete",
+      completedDate: this.today,
+      waitingSince: undefined,
+      isArchived: true,
+      updatedAt: nowTimestamp()
+    };
+    await this.putRecord("tasks", updated, {
+      actionType: "completed",
+      summary: `Marked "${task.title}" done and archived it`
+    });
+    this.toast(`Moved "${task.title}" to Archive`, "success", async () => {
       await this.putRecord("tasks", { ...before, updatedAt: nowTimestamp() }, { actionType: "reopened", summary: `Reopened "${before.title}"` });
     });
     return updated;

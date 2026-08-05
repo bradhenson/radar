@@ -40,12 +40,19 @@
   async function restoreTask(id: string) {
     const t = app.tasks.find((x) => x.id === id);
     if (!t) return;
-    await app.putRecord(
-      "tasks",
-      { ...t, isArchived: false, updatedAt: nowTimestamp() },
-      { actionType: "restored", summary: `Restored "${t.title}" from archive` }
+    const reopen = t.status === "complete";
+    await app.updateTask(
+      {
+        ...t,
+        isArchived: false,
+        status: reopen ? "open" : t.status,
+        completedDate: reopen ? undefined : t.completedDate,
+        waitingSince: reopen ? undefined : t.waitingSince
+      },
+      reopen ? `Reopened "${t.title}" from archive` : `Restored "${t.title}" from archive`,
+      reopen ? "reopened" : "restored"
     );
-    app.toast("Task restored", "success");
+    app.toast(reopen ? "Task reopened on the board" : "Task restored", "success");
   }
 
   async function deleteTask(id: string) {
@@ -134,7 +141,7 @@
 
   <h2>Archived tasks</h2>
   {#if archivedTasks.length === 0}
-    <EmptyState message="No archived tasks." hint="Completed tasks can be archived from the task detail view." />
+    <EmptyState message="No archived tasks." hint="Tasks move here when you select Done or archive them from task details." />
   {:else}
     <table class="data" style="margin-bottom:1.2rem">
       <thead><tr><th>Title</th><th>Status</th><th>Employee</th><th>Completed</th><th></th></tr></thead>

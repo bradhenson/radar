@@ -7,9 +7,8 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import type { AttentionItem } from "../domain/rules/attention";
   import { AWARD_FINAL_STATUSES } from "../domain/rules/calendar";
-  import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
   import { isTripCancelled, isVoucherSettled } from "../domain/rules/travel";
-  import { addDays, daysBetween, formatDate } from "../utils/dates";
+  import { addDays, formatDate } from "../utils/dates";
 
   let overdueCount = $derived(app.attention.filter((i) => i.reasonCode === "overdue").length);
   let dueTodayCount = $derived(app.attention.filter((i) => i.reasonCode === "due_today").length);
@@ -62,13 +61,6 @@
     { key: "people", title: "Employees", items: peopleItems },
     { key: "other", title: "Training, availability, travel, awards, and system", items: otherItems }
   ]);
-
-  let recentlyCompleted = $derived(
-    app.tasks
-      .filter((t) => t.status === "complete" && !t.isArchived && t.completedDate && daysBetween(t.completedDate, app.today) <= app.settings.completedVisibleDays)
-      .sort((a, b) => (a.completedDate! < b.completedDate! ? 1 : -1))
-      .slice(0, 8)
-  );
 
   // Next-14-day strip: due dates, leave, training expirations, telework dates, meetings.
   let upcoming = $derived.by(() => {
@@ -274,7 +266,7 @@
     {/each}
   {/if}
 
-  <div class="two-col">
+  <div>
     <section>
       <h2 style="margin-top:1.2rem">Next 14 days</h2>
       {#if upcoming.length === 0}
@@ -293,37 +285,6 @@
       {/if}
     </section>
 
-    <section>
-      <h2 style="margin-top:1.2rem">Recently completed</h2>
-      {#if recentlyCompleted.length === 0}
-        <p class="muted">No recently completed tasks.</p>
-      {:else}
-        <table class="data">
-          <tbody>
-            {#each recentlyCompleted as t (t.id)}
-              <tr>
-                <td style="width:7rem; white-space:nowrap">{formatDate(t.completedDate)}</td>
-                <td><button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button></td>
-                <td style="width:12rem">
-                  {#if t.employeeId && !t.performanceInputCreated}
-                    <button
-                      type="button"
-                      onclick={() => (ui.performanceFormPrefill = performanceInputPrefillFromTask(t, {
-                        today: app.today,
-                        notes: app.taskNotes,
-                        checklistItems: app.checklistItems
-                      }))}>→ Performance input</button
-                    >
-                  {:else if t.performanceInputCreated}
-                    <span class="badge success">Input created</span>
-                  {/if}
-                </td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </section>
   </div>
 </div>
 
@@ -430,10 +391,8 @@
   }
   .actions { display: flex; gap: .3rem; flex-wrap: wrap; }
   .actions button { font-size: .78rem; padding: .15rem .5rem; }
-  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
   @media (max-width: 1000px) {
     .today-summary { grid-template-columns: repeat(3, minmax(8.5rem, 1fr)); }
-    .two-col { grid-template-columns: 1fr; }
   }
   @media (max-width: 760px) {
     .today-summary { grid-template-columns: repeat(2, minmax(8.5rem, 1fr)); }

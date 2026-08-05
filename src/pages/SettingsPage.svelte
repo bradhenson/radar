@@ -251,7 +251,7 @@
 
   async function setBoardColumnMapping(id: string, value: string) {
     try {
-      await app.setBoardColumnStatusMapping(id, (value || undefined) as "open" | "waiting" | "complete" | undefined);
+      await app.setBoardColumnStatusMapping(id, (value || undefined) as "open" | "waiting" | undefined);
       boardColumnError = "";
     } catch (e) {
       boardColumnError = e instanceof Error ? e.message : String(e);
@@ -450,8 +450,6 @@
         <input type="number" min="1" value={app.settings.trainingWarningDays} onchange={numberInput("trainingWarningDays")} /></label>
       <label>Leave lookahead (days)
         <input type="number" min="1" value={app.settings.leaveLookaheadDays} onchange={numberInput("leaveLookaheadDays")} /></label>
-      <label>Completed cards visible (days)
-        <input type="number" min="0" value={app.settings.completedVisibleDays} onchange={numberInput("completedVisibleDays")} /></label>
       <label>Backup reminder after changes (days)
         <input type="number" min="1" value={app.settings.backupReminderDays} onchange={numberInput("backupReminderDays")} /></label>
       <label>Backup change threshold
@@ -732,9 +730,9 @@
   <section class="card" style="margin-bottom:1rem">
     <h2>Board columns</h2>
     <p class="small muted">
-      Board columns organize cards visually. A column can also mark tasks with a status when cards are dropped
-      into it (and completed tasks move to the column marked Complete). Columns set to "No status change" only
-      organize cards.
+      Board columns organize cards visually. A column can also mark active tasks Open or Waiting when cards are
+      dropped into it. Columns set to "No status change" only organize cards. Done records completion and moves
+      a task to Archive from whichever column it occupies.
     </p>
     <form
       class="settings-add"
@@ -779,7 +777,6 @@
                 <option value="">No status change</option>
                 <option value="open">Open</option>
                 <option value="waiting">Waiting</option>
-                <option value="complete">Complete</option>
               </select>
             </td>
             <td>{app.boardColumnTaskCount(column.id)}</td>

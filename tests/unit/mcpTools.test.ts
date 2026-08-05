@@ -195,27 +195,40 @@ describe("create_task", () => {
 });
 
 describe("update_task", () => {
-  it("keeps status in sync when the column moves", () => {
+  it("treats Complete as an ordinary column when the card moves", () => {
     updateTask(db, { taskId: "task-1", column: "Complete" });
     const stored = db.readOne("tasks", "task-1")!;
-    expect(stored.status).toBe("complete");
-    expect(stored.completedDate).toBeTruthy();
+    expect(stored.status).toBe("open");
+    expect(stored.completedDate).toBeUndefined();
     expect(stored.boardColumnId).toBe("complete");
   });
 
-  it("moves the card when the status changes", () => {
+  it("changes active status without moving the card", () => {
     updateTask(db, { taskId: "task-1", status: "waiting" });
     const stored = db.readOne("tasks", "task-1")!;
-    expect(stored.boardColumnId).toBe("waiting");
+    expect(stored.boardColumnId).toBe("inbox");
     expect(stored.waitingSince).toBeTruthy();
   });
 
-  it("clears the completion date and waiting clock when reopened", () => {
-    updateTask(db, { taskId: "task-1", status: "complete" });
-    updateTask(db, { taskId: "task-1", status: "open" });
+  it("Done records completion and archives without moving the card", () => {
+    updateTask(db, { taskId: "task-1", done: true });
     const stored = db.readOne("tasks", "task-1")!;
-    expect(stored.completedDate).toBeUndefined();
+    expect(stored.status).toBe("complete");
+    expect(stored.completedDate).toBeTruthy();
     expect(stored.waitingSince).toBeUndefined();
+    expect(stored.boardColumnId).toBe("inbox");
+    expect(stored.isArchived).toBe(true);
+    expect(db.readAll("activityEntries").at(-1)?.actionType).toBe("completed");
+  });
+
+  it("restoring a Done task reopens it in the same column", () => {
+    updateTask(db, { taskId: "task-1", column: "Complete" });
+    updateTask(db, { taskId: "task-1", done: true });
+    updateTask(db, { taskId: "task-1", archived: false });
+    const stored = db.readOne("tasks", "task-1")!;
+    expect(stored).toMatchObject({ status: "open", boardColumnId: "complete", isArchived: false });
+    expect(stored.completedDate).toBeUndefined();
+    expect(db.readAll("activityEntries").at(-1)?.actionType).toBe("reopened");
   });
 
   it("changes only what it is given", () => {

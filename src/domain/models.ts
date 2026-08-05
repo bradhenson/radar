@@ -105,9 +105,10 @@ export interface BoardColumnDefinition {
   sortOrder: number;
   /**
    * Task status this lane implies. Dropping a card here also sets the task's
-   * status, and completing a task moves its card to the complete-mapped lane,
-   * so the board can never silently disagree with the domain rules. Columns
-   * without a mapping (custom lanes) never change status.
+   * status for active workflow states such as Open and Waiting. Finishing a
+   * task is deliberately separate from lane movement: Done archives it from
+   * whichever column it occupies. Columns without a mapping never change
+   * status.
    */
   mapsToStatus?: TaskStatus;
   createdAt: IsoTimestamp;
@@ -550,7 +551,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   payPeriodAnchorDate: "2026-07-12",
   theme: "dark",
   colorTheme: "default",
-  look: "glass_strong",
+  look: "glass",
   enableSingleKeyShortcuts: true,
   employeeProfileSections: [
     { id: "identity", label: "Identity", sortOrder: 0, isArchived: false },
@@ -793,7 +794,7 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
   }
 
   if (priorSchema < 6 && (src.look === undefined || src.look === "standard")) {
-    // Glass+ became the default look in schema 6. A setting still on the old
+    // Glass became the default look in schema 6. A setting still on the old
     // default was inherited rather than chosen, so move it across; anything
     // else is the user's pick. Choosing Standard afterwards saves at schema 6
     // and is never revisited.
@@ -831,7 +832,7 @@ export const DEFAULT_BOARD_COLUMN_SEEDS: { id: Id; label: string; sortOrder: num
   { id: "inbox", label: "Inbox", sortOrder: 10, mapsToStatus: "open" },
   { id: "in_progress", label: "In Progress", sortOrder: 20, mapsToStatus: "open" },
   { id: "waiting", label: "Waiting", sortOrder: 30, mapsToStatus: "waiting" },
-  { id: "complete", label: "Complete", sortOrder: 40, mapsToStatus: "complete" }
+  { id: "complete", label: "Complete", sortOrder: 40 }
 ];
 
 export const TASK_PRIORITIES: { value: TaskPriority; label: string }[] = [

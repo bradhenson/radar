@@ -37,18 +37,18 @@ describe("application settings defaults", () => {
     );
   });
 
-  it("defaults the visual look to Glass+ and preserves a saved choice", () => {
-    expect(DEFAULT_SETTINGS.look).toBe("glass_strong");
+  it("defaults the visual look to Glass and preserves a saved choice", () => {
+    expect(DEFAULT_SETTINGS.look).toBe("glass");
     // Databases saved before the look setting existed open on the new default.
-    expect(normalizeAppSettings({ schemaVersion: 2 }).look).toBe("glass_strong");
-    expect(normalizeAppSettings({} as unknown).look).toBe("glass_strong");
+    expect(normalizeAppSettings({ schemaVersion: 2 }).look).toBe("glass");
+    expect(normalizeAppSettings({} as unknown).look).toBe("glass");
     expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, look: "glass" }).look).toBe("glass");
     expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, look: "glass_strong" }).look).toBe("glass_strong");
   });
 
-  it("moves the inherited standard look to Glass+ once, then leaves a deliberate one", () => {
+  it("moves the inherited standard look to Glass once, then leaves a deliberate one", () => {
     // Standard was the default through schema 5, so it was never chosen.
-    expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, schemaVersion: 5, look: "standard" }).look).toBe("glass_strong");
+    expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, schemaVersion: 5, look: "standard" }).look).toBe("glass");
     // Picking Standard after the migration saves at schema 6 and sticks.
     expect(normalizeAppSettings({ ...DEFAULT_SETTINGS, schemaVersion: 6, look: "standard" }).look).toBe("standard");
     // A glass choice made before the migration is not disturbed.

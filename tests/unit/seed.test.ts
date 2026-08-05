@@ -22,6 +22,8 @@ describe("sample seed data", () => {
     expect(c.employeeNotes.every((note) => c.employees.some((employee) => employee.id === note.employeeId))).toBe(true);
     expect(DEFAULT_BOARD_COLUMN_SEEDS.map((column) => column.id)).toEqual(["inbox", "in_progress", "waiting", "complete"]);
     expect(c.boardColumns.map((column) => column.id)).toEqual(["inbox", "in_progress", "waiting", "complete"]);
+    expect(c.boardColumns.find((column) => column.id === "complete")?.mapsToStatus).toBeUndefined();
+    expect(c.tasks.filter((task) => task.boardColumnId === "complete").every((task) => task.status === "open")).toBe(true);
     expect(c.tasks.every((task) => c.boardColumns.some((column) => column.id === task.boardColumnId))).toBe(true);
 
     const employeeLinkedTasks = c.tasks.filter((task) => task.employeeId).length;

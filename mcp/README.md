@@ -140,16 +140,17 @@ request — but this is what it has to work with. Optional arguments in *italics
 | Tool | Arguments | Example ask |
 | --- | --- | --- |
 | `create_task` | title, *employee*, *project*, *column*, *priority*, *dueDate*, *startDate*, *description* | "Task for Dana: audit evidence by Friday, high priority." |
-| `update_task` | taskId, *title*, *description*, *employee*, *project*, *column*, *status*, *priority*, *dueDate* (null clears), *archived* | "Move the cutover checklist to Waiting." · "Archive that old report task." |
+| `update_task` | taskId, *title*, *description*, *employee*, *project*, *column*, *status*, *priority*, *dueDate* (null clears), *done*, *archived* | "Move the cutover checklist to Waiting." · "Mark that report task done." |
 | `update_employee` | employee, updates (field label → value; null clears) | "Update Dana's cube to C-204 and set Government phone to yes." |
 | `add_employee_note` | employee, note | "Note on Dana: prefers written summaries." |
 | `record_check_in` | employee, *summary*, *type*, *followUpRequired* | "Log that I checked in with Dana about the cutover." |
 
 Defaults match the app's own behavior: a bare `create_task` lands in Inbox at
-normal priority; moving a task's column updates its status and vice versa
-(dropping into Waiting starts the waiting clock; Complete stamps the completion
-date); `update_employee` field names are the labels from Settings → Employee
-profile fields, and an unknown label errors with the full list.
+normal priority; dropping into Waiting starts the waiting clock, while Complete
+is an ordinary organizational column; `done: true` records the completion date
+and archives the task without moving its column. `update_employee` field names
+are the labels from Settings → Employee profile fields, and an unknown label
+errors with the full list.
 
 ## Running RADAR at the same time
 

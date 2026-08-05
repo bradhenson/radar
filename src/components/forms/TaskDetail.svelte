@@ -272,9 +272,9 @@
     close();
   }
 
-  async function completeNow() {
+  async function markDone() {
     if (isNewTask) return;
-    const updated = await app.completeTask(initialTask);
+    const updated = await app.markTaskDone(initialTask);
     if (updated.employeeId && !updated.performanceInputCreated) {
       ui.performancePromptTask = updated;
     }
@@ -367,7 +367,8 @@
       <div>
         <label for="td-status">Status</label>
         <select id="td-status" bind:value={draft.status} style="width:100%">
-          {#each TASK_STATUSES as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
+          {#if draft.status === "complete"}<option value="complete">Complete</option>{/if}
+          {#each TASK_STATUSES.filter((status) => status.value !== "complete") as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
         </select>
       </div>
       <div>
@@ -416,8 +417,8 @@
 
     <div style="display:flex; gap:.5rem; margin-top:1rem; flex-wrap:wrap;">
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : isNewTask ? "Create task" : "Save"}</button>
-      {#if !isNewTask && initialTask.status !== "complete"}
-        <button type="button" onclick={() => void completeNow()}>Complete</button>
+      {#if !isNewTask && !initialTask.isArchived}
+        <button type="button" title="Mark done and move to Archive" onclick={() => void markDone()}>Done</button>
       {/if}
       {#if !isNewTask && !initialTask.isArchived}
         <button type="button" class="icon-btn" aria-label="Archive task" title="Archive" onclick={() => void archive()}><Icon name="archive" size={17} /></button>
