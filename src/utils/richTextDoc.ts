@@ -3,9 +3,69 @@
 // than a silent change of stored shape. Mirrors Teacher Workbench ADR 0004.
 import { parseRichText, type RichTextBlock, type RichTextInline } from "./richText";
 
-export const RICH_TEXT_SCHEMA_VERSION = 1 as const;
+export const RICH_TEXT_SCHEMA_VERSION = 2 as const;
 
-export type RichTextMark = { type: "bold" | "italic" | "underline" };
+/**
+ * Versions this build reads. v2 added the link mark; a v1 document is a valid v2
+ * document that simply has none, so it is read as-is and stamped forward the
+ * next time it is saved. Reading both is what keeps the bump from rewriting
+ * every stored field on upgrade.
+ */
+const READABLE_SCHEMA_VERSIONS = new Set([1, 2]);
+
+export type RichTextSchemaVersion = 1 | 2;
+
+export type RichTextMark =
+  | { type: "bold" | "italic" | "underline" }
+  // Tiptap stores target/rel/class/title alongside href as mark attributes.
+  // Only href is ever read back: the rest are re-decided at render time.
+  | {
+      type: "link";
+      attrs?: {
+        href?: string | null;
+        target?: string | null;
+        rel?: string | null;
+        class?: string | null;
+        title?: string | null;
+      };
+    };
+
+/**
+ * Protocols a stored href may use. Everything else — `javascript:` above all,
+ * but equally `data:`, `blob:`, `file:` — is refused, so a document arriving
+ * from an imported backup cannot turn a click into code execution or a local
+ * file read.
+ */
+const LINK_PROTOCOLS = new Set(["http:", "https:", "mailto:"]);
+
+/**
+ * The href this value may safely become, or `undefined` if it may not become
+ * one at all. Applied twice on purpose: once when the author sets a link, and
+ * again every time a document is rendered — stored text is untrusted (working
+ * rule 6), and only the render-time check protects a document that arrived
+ * through a backup rather than through the editor.
+ *
+ * A scheme is required. Nothing here guesses one: "example.com" is as likely to
+ * be prose as an address, and silently turning prose into a link is worse than
+ * asking the author to paste a full address.
+ */
+export function safeLinkHref(value: unknown): string | undefined {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  try {
+    const url = new URL(trimmed);
+    return LINK_PROTOCOLS.has(url.protocol) ? url.href : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The sanitized href carried by a text node's link mark, if it has a usable one. */
+export function linkHref(node: RichTextNode): string | undefined {
+  const mark = node.marks?.find((m): m is Extract<RichTextMark, { type: "link" }> => m.type === "link");
+  return mark ? safeLinkHref(mark.attrs?.href) : undefined;
+}
 
 export type RichTextNode = {
   type:
@@ -33,7 +93,7 @@ export type RichTextNode = {
  * explicit migration boundary.
  */
 export type RichTextValue = {
-  schemaVersion: typeof RICH_TEXT_SCHEMA_VERSION;
+  schemaVersion: RichTextSchemaVersion;
   doc: RichTextNode;
 };
 
@@ -47,7 +107,7 @@ export function emptyRichText(): RichTextValue {
 export function isRichTextValue(value: unknown): value is RichTextValue {
   if (!value || typeof value !== "object") return false;
   const candidate = value as Partial<RichTextValue>;
-  return candidate.schemaVersion === RICH_TEXT_SCHEMA_VERSION && candidate.doc?.type === "doc";
+  return READABLE_SCHEMA_VERSIONS.has(candidate.schemaVersion as number) && candidate.doc?.type === "doc";
 }
 
 // ---------------------------------------------------------------------------
@@ -226,7 +286,13 @@ function parseStoredDocument(value: string): RichTextValue | null {
  * correctly instead of displaying its own markup as literal text.
  */
 export function normalizeRichText(value: RichTextValue | string | null | undefined): RichTextValue {
-  if (isRichTextValue(value)) return value;
+  if (isRichTextValue(value)) {
+    // Stamp an older document forward. Its shape already satisfies the current
+    // version, so this is a relabel, not a conversion.
+    return value.schemaVersion === RICH_TEXT_SCHEMA_VERSION
+      ? value
+      : { schemaVersion: RICH_TEXT_SCHEMA_VERSION, doc: value.doc };
+  }
   if (typeof value === "string") return parseStoredDocument(value) ?? richTextFromLegacy(value);
   return emptyRichText();
 }

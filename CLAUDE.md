@@ -6,6 +6,14 @@ from plan section 38 and are binding for every change.
 ## Hard constraints
 1. **No runtime network dependency.** No CDN scripts, fonts, icons, analytics, telemetry, remote
    logging, or update checks. `npm run build` runs `scripts/verify-no-network.mjs` and must pass.
+   *Links the user types into rich text are data, not a dependency:* nothing is fetched to store or
+   display one, every page reads identically offline, and the address is opened only on an explicit
+   click. They are confined to `http`/`https`/`mailto` by `safeLinkHref` (`src/utils/richTextDoc.ts`),
+   which is applied both when the author sets a link and again on every render, and the desktop
+   build hands them to the system browser so remote content never loads inside the app window.
+   Nothing that *renders* a remote resource — images, iframes, embeds, fonts — may be added.
+   Never write a literal `http(s)://` string anywhere under `src/`; the build scanner rejects it,
+   so compose or parse URLs instead.
 2. **No backend server.** The browser build must open from `file://` with no server, service
    worker, or Node on the operational machine. The optional Wails desktop build may use in-process
    Go bindings and SQLite, but must not listen on a port or require network access. Keep browser

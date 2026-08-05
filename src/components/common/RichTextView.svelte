@@ -5,10 +5,17 @@
   // records the migration has not reached rendering correctly.
   import {
     isRichTextEmpty,
+    linkHref,
     normalizeRichText,
     type RichTextNode,
     type RichTextValue
   } from "../../utils/richTextDoc";
+  import { openUrlInSystemBrowser } from "../../data/wailsBridge";
+
+  /** Desktop only: keep the page out of the app's own window. No-op in the browser. */
+  function onLinkClick(event: MouseEvent, href: string) {
+    if (openUrlInSystemBrowser(href)) event.preventDefault();
+  }
 
   let {
     value,
@@ -27,7 +34,7 @@
     node.marks?.some((mark) => mark.type === type) === true;
 </script>
 
-{#snippet text(node: RichTextNode)}
+{#snippet styled(node: RichTextNode)}
   {@const bold = marked(node, "bold")}
   {@const italic = marked(node, "italic")}
   {@const underline = marked(node, "underline")}
@@ -39,6 +46,19 @@
     <em>{node.text}</em>
   {:else}
     {node.text}
+  {/if}
+{/snippet}
+
+{#snippet text(node: RichTextNode)}
+  <!-- The href is re-checked here rather than trusted from storage: this
+       document may have arrived in an imported backup. A mark whose address
+       does not survive that check renders as ordinary text, so the words are
+       never lost — only the link is. -->
+  {@const href = linkHref(node)}
+  {#if href}
+    <a {href} target="_blank" rel="noopener noreferrer" onclick={(event) => onLinkClick(event, href)}>{@render styled(node)}</a>
+  {:else}
+    {@render styled(node)}
   {/if}
 {/snippet}
 
@@ -96,6 +116,8 @@
   h3 { font-size: 1.05rem; }
   h4 { font-size: .98rem; }
   h5 { font-size: .92rem; }
+  a { color: var(--accent); text-decoration: underline; text-underline-offset: .15em; }
+  a:hover { text-decoration-thickness: 2px; }
   ul, ol { margin: 0 0 .65rem; padding-left: 1.35rem; }
   li + li { margin-top: .2rem; }
   li > :global(p:last-child) { margin-bottom: 0; }

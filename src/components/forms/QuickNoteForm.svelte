@@ -74,7 +74,6 @@
       placeholder="Part number, web address, a few steps, or anything else…"
       ariaLabel="Note"
     />
-    <div class="field-hint">Use the toolbar for headings or lists when useful.</div>
     {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
     <div class="actions">

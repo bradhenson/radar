@@ -52,6 +52,8 @@ interface WailsWindow {
     WindowMinimise?: () => void;
     WindowToggleMaximise?: () => void;
     Quit?: () => void;
+    /** Hands a URL to the operating system's default browser. */
+    BrowserOpenURL?: (url: string) => void;
     EventsOn?: (event: string, handler: (...data: unknown[]) => void) => () => void;
   };
 }
@@ -95,6 +97,23 @@ export function toggleMaximiseDesktopWindow(): void {
 
 export function closeDesktopWindow(): void {
   wailsRuntime()?.Quit?.();
+}
+
+/**
+ * Opens a link in the operating system's browser, reporting whether it did.
+ *
+ * Only the desktop build needs this. Left to itself, WebView2 answers a
+ * `target="_blank"` link by opening the page in a popup window of this
+ * application — remote content inside the RADAR process, which is exactly what
+ * the offline guarantee is meant to prevent. Handing the URL to the real
+ * browser keeps the page outside the app. The browser build returns false and
+ * lets the anchor behave like an anchor.
+ */
+export function openUrlInSystemBrowser(url: string): boolean {
+  const open = wailsRuntime()?.BrowserOpenURL;
+  if (!open) return false;
+  open(url);
+  return true;
 }
 
 /**

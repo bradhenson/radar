@@ -4,7 +4,10 @@ import {
   emptyRichText,
   isRichTextEmpty,
   isRichTextValue,
+  linkHref,
   normalizeRichText,
+  RICH_TEXT_SCHEMA_VERSION,
+  safeLinkHref,
   richTextCharacterCount,
   richTextDocToPlainText,
   richTextFromLegacy,
@@ -188,9 +191,69 @@ describe("normalizeRichText", () => {
   });
 
   it("rejects envelopes with the wrong version or shape", () => {
-    expect(isRichTextValue({ schemaVersion: 2, doc: { type: "doc" } })).toBe(false);
+    expect(isRichTextValue({ schemaVersion: 3, doc: { type: "doc" } })).toBe(false);
     expect(isRichTextValue({ schemaVersion: 1, doc: { type: "paragraph" } })).toBe(false);
     expect(isRichTextValue(null)).toBe(false);
+  });
+
+  it("reads a version 1 document and stamps it forward without touching content", () => {
+    const v1 = { schemaVersion: 1 as const, doc: { type: "doc" as const, content: [{ type: "paragraph" as const, content: [{ type: "text" as const, text: "kept" }] }] } };
+    expect(isRichTextValue(v1)).toBe(true);
+    const normalized = normalizeRichText(v1);
+    expect(normalized.schemaVersion).toBe(RICH_TEXT_SCHEMA_VERSION);
+    expect(normalized.doc).toEqual(v1.doc);
+  });
+});
+
+describe("link marks", () => {
+  const linked = (href: unknown): RichTextNode => ({
+    type: "text",
+    text: "policy page",
+    marks: [{ type: "link", attrs: { href: href as string } }]
+  });
+
+  it("accepts the protocols a supervisor actually links to", () => {
+    expect(safeLinkHref("https://example.gov/policy")).toBe("https://example.gov/policy");
+    expect(safeLinkHref("http://intranet.example/page")).toBe("http://intranet.example/page");
+    expect(safeLinkHref("mailto:someone@example.gov")).toBe("mailto:someone@example.gov");
+  });
+
+  it("refuses every protocol that could run code or read the disk", () => {
+    expect(safeLinkHref("javascript:alert(1)")).toBeUndefined();
+    expect(safeLinkHref("JavaScript:alert(1)")).toBeUndefined();
+    expect(safeLinkHref("  javascript:alert(1)  ")).toBeUndefined();
+    expect(safeLinkHref("java\nscript:alert(1)")).toBeUndefined();
+    expect(safeLinkHref("data:text/html;base64,PHNjcmlwdD4=")).toBeUndefined();
+    expect(safeLinkHref("vbscript:msgbox(1)")).toBeUndefined();
+    expect(safeLinkHref("file:///C:/Windows/System32")).toBeUndefined();
+    expect(safeLinkHref("blob:something")).toBeUndefined();
+  });
+
+  it("refuses anything that is not a whole address", () => {
+    // No scheme is guessed: prose must not silently become a link.
+    expect(safeLinkHref("example.com")).toBeUndefined();
+    expect(safeLinkHref("/notes/local")).toBeUndefined();
+    expect(safeLinkHref("")).toBeUndefined();
+    expect(safeLinkHref("   ")).toBeUndefined();
+    expect(safeLinkHref(undefined)).toBeUndefined();
+    expect(safeLinkHref(null)).toBeUndefined();
+    expect(safeLinkHref(42)).toBeUndefined();
+    expect(safeLinkHref({ href: "https://example.gov" })).toBeUndefined();
+  });
+
+  it("reads the href off a text node only when it survives sanitizing", () => {
+    expect(linkHref(linked("https://example.gov/policy"))).toBe("https://example.gov/policy");
+    // A hostile href from an imported backup renders as plain text, not a link.
+    expect(linkHref(linked("javascript:alert(1)"))).toBeUndefined();
+    expect(linkHref(linked(undefined))).toBeUndefined();
+    expect(linkHref({ type: "text", text: "plain" })).toBeUndefined();
+    expect(linkHref({ type: "text", text: "bold", marks: [{ type: "bold" }] })).toBeUndefined();
+  });
+
+  it("keeps link text in the plain-text projection used by search and export", () => {
+    const doc = { schemaVersion: RICH_TEXT_SCHEMA_VERSION, doc: { type: "doc" as const, content: [{ type: "paragraph" as const, content: [linked("https://example.gov/policy")] }] } };
+    expect(richTextDocToPlainText(doc)).toBe("policy page");
+    expect(isRichTextEmpty(doc)).toBe(false);
   });
 });
 
