@@ -165,24 +165,24 @@ export class AppStore {
   activeEmployees = $derived(activeEmployeesByDisplayName(this.employees));
   hasOperatorData = $derived(
     this.competencies.length > 0 ||
-      this.employees.length > 0 ||
-      this.projects.length > 0 ||
-      this.tasks.length > 0 ||
-      this.taskNotes.length > 0 ||
-      this.checklistItems.length > 0 ||
-      this.performanceElements.length > 0 ||
-      this.evaluationCycles.length > 0 ||
-      this.performanceInputs.length > 0 ||
-      this.trainingRequirements.length > 0 ||
-      this.employeeTrainingRecords.length > 0 ||
-      this.leaveRecords.length > 0 ||
-      this.teleworkRecords.length > 0 ||
-      this.travelRecords.length > 0 ||
-      this.awardRecords.length > 0 ||
-      this.employeeInteractions.length > 0 ||
-      this.employeeNotes.length > 0 ||
-      this.quickNotes.length > 0 ||
-      this.meetingNotes.length > 0
+    this.employees.length > 0 ||
+    this.projects.length > 0 ||
+    this.tasks.length > 0 ||
+    this.taskNotes.length > 0 ||
+    this.checklistItems.length > 0 ||
+    this.performanceElements.length > 0 ||
+    this.evaluationCycles.length > 0 ||
+    this.performanceInputs.length > 0 ||
+    this.trainingRequirements.length > 0 ||
+    this.employeeTrainingRecords.length > 0 ||
+    this.leaveRecords.length > 0 ||
+    this.teleworkRecords.length > 0 ||
+    this.travelRecords.length > 0 ||
+    this.awardRecords.length > 0 ||
+    this.employeeInteractions.length > 0 ||
+    this.employeeNotes.length > 0 ||
+    this.quickNotes.length > 0 ||
+    this.meetingNotes.length > 0
   );
   competencyList = $derived(
     [...this.competencies].sort((a, b) => a.code.localeCompare(b.code, undefined, { numeric: true }) || a.id.localeCompare(b.id))
@@ -282,7 +282,7 @@ export class AppStore {
   }
 
   boardColumnTaskCount(id: string): number {
-    return this.tasks.filter((t) => this.taskBoardColumnId(t) === id).length;
+    return this.tasks.filter((t) => !t.isArchived && t.status !== "cancelled" && this.taskBoardColumnId(t) === id).length;
   }
 
   defaultBoardColumnId(): string {
@@ -986,7 +986,19 @@ export class AppStore {
     if (!column) throw new Error("Board column not found.");
     if (this.activeBoardColumns.length <= 1) throw new Error("At least one board column is required.");
     const taskCount = this.boardColumnTaskCount(id);
-    if (taskCount > 0) throw new Error("Move all tasks out of this column before deleting it.");
+    if (taskCount > 0) throw new Error("Move all active tasks out of this column before deleting it.");
+
+    const orphanedTasks = this.tasks.filter((t) => (t.isArchived || t.status === "cancelled") && this.taskBoardColumnId(t) === id);
+    if (orphanedTasks.length > 0) {
+      const defaultId = this.defaultBoardColumnId();
+      const updated = orphanedTasks.map((t) => ({ ...t, boardColumnId: defaultId, updatedAt: nowTimestamp() }));
+      await this.store.bulkPut("tasks", this.plainRecords(updated));
+      for (const t of updated) {
+        const idx = this.tasks.findIndex(existing => existing.id === t.id);
+        if (idx >= 0) this.tasks[idx] = t;
+      }
+    }
+
     await this.deleteRecord("boardColumns", id, `Deleted board column "${column.label}"`);
   }
 
