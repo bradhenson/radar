@@ -1,4 +1,5 @@
 <script lang="ts">
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
@@ -21,6 +22,7 @@
   let saving = $state(false);
   let search = $state("");
   let editingId = $state<string | undefined>(undefined);
+  let pendingDelete = $state<QuickNote | undefined>(undefined);
 
   let activeNotes = $derived(app.quickNotes.filter((note) => !note.isArchived));
   let matching = $derived(
@@ -50,6 +52,15 @@
     // what migrates it; saving writes the document back in the new format.
     draft = normalizeRichText(note.body);
     focusComposer();
+  }
+
+  // The whole card is a mouse target for editing. Clicks that mean something
+  // else are left alone: the Edit and Archive buttons, a link inside the note,
+  // and a click that ends a text selection the user made to copy.
+  function editFromCard(note: QuickNote, event: MouseEvent) {
+    if ((event.target as HTMLElement | null)?.closest("a, button")) return;
+    if (window.getSelection()?.toString()) return;
+    startEditing(note);
   }
 
   function cancelEditing() {
@@ -109,6 +120,13 @@
       }
     });
   }
+
+  async function deleteNote(note: QuickNote) {
+    if (editingId === note.id) cancelEditing();
+    await app.deleteRecord("quickNotes", note.id, `Deleted note "${quickNoteTitle(note.body, 60)}"`);
+    pendingDelete = undefined;
+    app.toast("Note deleted", "success");
+  }
 </script>
 
 <div class="page notes-page">
@@ -155,7 +173,14 @@
   {:else}
     <main class="note-grid" aria-label="Notes cards">
       {#each matching as note (note.id)}
-        <article class="note-card" class:editing={editingId === note.id}>
+        <!-- Card click is a mouse convenience; the Edit button is the keyboard path. -->
+        <!-- svelte-ignore a11y_click_events_have_key_events -->
+        <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+        <article
+          class="note-card"
+          class:editing={editingId === note.id}
+          onclick={(ev) => editFromCard(note, ev)}
+        >
           <div class="note-meta">
             <span class="spacer"></span>
             <time datetime={note.createdAt}>{formatTimestamp(note.createdAt)}</time>
@@ -165,12 +190,24 @@
             <button type="button" class="link" aria-pressed={editingId === note.id} onclick={() => startEditing(note)}>Edit</button>
             <span class="spacer"></span>
             <button type="button" class="icon-btn" aria-label="Archive note" title="Archive" onclick={() => void archive(note)}><Icon name="archive" size={15} /></button>
+            <button type="button" class="icon-btn danger" aria-label="Delete note" title="Delete" onclick={() => (pendingDelete = note)}><Icon name="trash" size={15} /></button>
           </div>
         </article>
       {/each}
     </main>
   {/if}
 </div>
+
+{#if pendingDelete}
+  <ConfirmDialog
+    title="Delete note"
+    message={`Permanently delete "${quickNoteTitle(pendingDelete.body, 80)}"?`}
+    confirmLabel="Delete note"
+    danger
+    onconfirm={() => void deleteNote(pendingDelete!)}
+    oncancel={() => (pendingDelete = undefined)}
+  />
+{/if}
 
 <style>
   .notes-page { max-width: 1240px; }
@@ -187,7 +224,7 @@
   .notes-toolbar input { min-width: 13rem; }
   .note-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; align-items: stretch; }
 
-  .note-card { display: flex; flex-direction: column; min-height: 10rem; padding: .8rem .9rem .5rem; border: 1px solid var(--border); border-top: 3px solid color-mix(in srgb, var(--accent) 58%, var(--border)); border-radius: var(--radius-lg); background: linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 22%, var(--surface)) 0%, var(--surface) 46%); box-shadow: var(--shadow-xs); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
+  .note-card { cursor: pointer; display: flex; flex-direction: column; min-height: 10rem; padding: .8rem .9rem .5rem; border: 1px solid var(--border); border-top: 3px solid color-mix(in srgb, var(--accent) 58%, var(--border)); border-radius: var(--radius-lg); background: linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 22%, var(--surface)) 0%, var(--surface) 46%); box-shadow: var(--shadow-xs); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }
   .note-card:hover { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); box-shadow: var(--shadow); }
   .note-card.editing { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
   .note-meta { display: flex; align-items: center; min-height: 1.3rem; }
