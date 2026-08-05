@@ -10,6 +10,8 @@
 
 ### Changed
 
+- The employee overview has an "On travel now" summary card beside "On leave now", counting employees whose travel is under way today and filtering the table to them when selected.
+
 - Note cards carry a Delete button beside Archive. Archive remains the softer option and still offers Undo; Delete asks for confirmation first and is permanent, and deleting the note currently open in the composer clears the composer rather than leaving it editing a record that no longer exists.
 
 - Clicking anywhere on a note card on the Notes page opens that note in the composer for editing. The Edit button stays where it was, as the sign that a card can be edited and as the keyboard path; clicking a link inside a note, the Archive button, or a stretch of text you selected to copy all still do what they say instead.
@@ -44,7 +46,7 @@
 
 - The header no longer shows a permanent "Stored locally" chip. That chip now appears only when it has something to report — "Saving…" while a write is in flight, or "Save failed" if one does not complete. The backup chip next to it is unchanged.
 
-- Employee overview summary cards now act as quick filters for overdue tasks, training due, stale performance input, and employees currently on leave. Selecting an active card again clears the filter.
+- Employee overview summary cards now act as quick filters for overdue tasks, training due, stale performance input, employees currently on leave, and employees currently on travel. Selecting an active card again clears the filter.
 
 - The employee overview table is now focused on operational awareness: Name, Competency, IPT, Training, Leave, and Travel. Title, employee status, task counts, and last performance input no longer crowd the table.
 

@@ -17,7 +17,7 @@
   const STALE_INPUT_DAYS = 30;
 
   type SortKey = "name" | "competency" | "training";
-  type SummaryFilter = "" | "overdue" | "training" | "stale_input" | "on_leave";
+  type SummaryFilter = "" | "overdue" | "training" | "stale_input" | "on_leave" | "on_travel";
 
   let search = $state("");
   let filterCompetency = $state("");
@@ -99,7 +99,8 @@
     overdue: rows.reduce((n, r) => n + r.overdueCount, 0),
     trainingDue: rows.reduce((n, r) => n + r.trainingDueCount, 0),
     staleInput: rows.filter((r) => r.staleInput).length,
-    onLeave: rows.filter((r) => r.onLeaveNow).length
+    onLeave: rows.filter((r) => r.onLeaveNow).length,
+    onTravel: rows.filter((r) => r.onTravelNow).length
   });
 
   let visibleRows = $derived(
@@ -113,6 +114,8 @@
           return r.staleInput;
         case "on_leave":
           return r.onLeaveNow;
+        case "on_travel":
+          return r.onTravelNow;
         default:
           return true;
       }
@@ -296,6 +299,16 @@
     >
       <div class="num">{stats.onLeave}</div>
       <div class="lbl">On leave now</div>
+    </button>
+    <button
+      type="button"
+      class="stat"
+      class:active={summaryFilter === "on_travel"}
+      aria-pressed={summaryFilter === "on_travel"}
+      onclick={() => toggleSummaryFilter("on_travel")}
+    >
+      <div class="num">{stats.onTravel}</div>
+      <div class="lbl">On travel now</div>
     </button>
   </div>
 
