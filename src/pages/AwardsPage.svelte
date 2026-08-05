@@ -10,11 +10,16 @@
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
+  import { awardTypeOptions, filterAwards } from "../domain/rules/awards";
   import { mergeAwardEdit } from "../domain/rules/editMerge";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { emptyRichText, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
 
+  let search = $state("");
+  let filterEmployee = $state("");
+  let filterStatus = $state("");
+  let filterType = $state("");
   let formOpen = $state(false);
   let editing = $state<AwardRecord | undefined>(undefined);
   let fEmployee = $state("");
@@ -100,23 +105,62 @@
     app.toast("Award record deleted", "success");
   }
 
+  let typeOptions = $derived(awardTypeOptions(app.awardRecords));
+
+  let hasFilters = $derived(Boolean(search.trim() || filterEmployee || filterStatus || filterType));
+
+  function clearFilters() {
+    search = "";
+    filterEmployee = "";
+    filterStatus = "";
+    filterType = "";
+  }
+
   let rows = $derived(
-    [...app.awardRecords].sort((a, b) => (a.nominationDueDate ?? "9999").localeCompare(b.nominationDueDate ?? "9999"))
+    filterAwards(
+      app.awardRecords,
+      { search, employeeId: filterEmployee, status: filterStatus, awardType: filterType },
+      (id) => app.employeeName(id)
+    )
   );
 </script>
 
 <div class="page">
   <div class="page-header">
     <h1>Awards</h1>
-  </div>
-  <div class="toolbar">
-    <span class="muted small">Recognition candidates flagged on performance inputs appear on the Performance page.</span>
+    {#if app.awardRecords.length > 0}<span class="muted small">{rows.length} shown</span>{/if}
     <span class="spacer"></span>
     <button type="button" class="primary" onclick={() => openForm()}>Add Award</button>
   </div>
 
+  <div class="toolbar awards-toolbar">
+    <input type="search" bind:value={search} placeholder="Search awards" aria-label="Search awards" />
+    <select bind:value={filterEmployee} aria-label="Filter by employee">
+      <option value="">All employees</option>
+      {#each app.activeEmployees as employee (employee.id)}<option value={employee.id}>{employee.displayName}</option>{/each}
+    </select>
+    <select bind:value={filterStatus} aria-label="Filter by status">
+      <option value="">All statuses</option>
+      {#each AWARD_STATUSES as status (status)}<option value={status}>{status}</option>{/each}
+    </select>
+    {#if typeOptions.length > 0}
+      <select bind:value={filterType} aria-label="Filter by award type">
+        <option value="">All types</option>
+        {#each typeOptions as type (type)}<option value={type}>{type}</option>{/each}
+      </select>
+    {/if}
+    {#if hasFilters}
+      <button type="button" onclick={clearFilters}>Clear</button>
+    {/if}
+  </div>
+
   {#if rows.length === 0}
-    <EmptyState message="No award records." hint="Track nomination ideas, drafts, and submissions here." />
+    <EmptyState
+      message={hasFilters ? "No award records match." : "No award records."}
+      hint={hasFilters
+        ? "Clear the search or filters to see all award records."
+        : "Track nomination ideas, drafts, and submissions here."}
+    />
   {:else}
     <table class="data">
       <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th></tr></thead>

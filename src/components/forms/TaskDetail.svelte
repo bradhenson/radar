@@ -366,9 +366,10 @@
     <div class="grid">
       <div>
         <label for="td-status">Status</label>
+        <!-- Complete stays selectable as a plain label. Done (which also archives)
+             is the button below; picking the status here only labels the task. -->
         <select id="td-status" bind:value={draft.status} style="width:100%">
-          {#if draft.status === "complete"}<option value="complete">Complete</option>{/if}
-          {#each TASK_STATUSES.filter((status) => status.value !== "complete") as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
+          {#each TASK_STATUSES as s (s.value)}<option value={s.value}>{s.label}</option>{/each}
         </select>
       </div>
       <div>

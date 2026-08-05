@@ -2,9 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- Awards opens with a filter row: search across title, employee, award type, and supporting notes, plus dropdowns for employee, status, and award type. The type dropdown appears only once some record carries a type, and lists the types actually in use. A Clear button shows while anything is filtering, the header counts what is on screen, and Add Award has moved up into the page header beside it. An empty result says which it is — nothing recorded yet, or nothing matching the current filters.
+
+- Activity is now grouped by when things happened: Today, Yesterday, Earlier this week, Last week, then one section per calendar month, each with a count and a heading you can collapse. Only the newest group is open when the page loads; searching or filtering opens them all, since the point of a filter is to see every match. Each group reveals 100 entries at a time, so one busy day no longer buries the months behind it. The filter row gains From and To date fields (each bounding the other) and a Clear button.
+
 ### Changed
 
-- Done now finishes a task in one step: from either a board card, the sortable list, or task details, it records the completion date and moves the task directly to Archive, with Undo restoring its exact prior status and column. Complete remains one of the default board columns, but it is now an ordinary organizational lane; moving a card there no longer changes task status, and older Complete status mappings are retired when a database opens. Restoring a finished task from Archive reopens it in the column where it was completed. The obsolete Active only board filter, completed-card visibility setting, and Today-page Recently completed holding area are removed because finished tasks no longer linger on active surfaces. Employee-linked tasks still offer the same optional performance-input capture after Done.
+- Workbench notes are called general notes in the places that name them: the Activity log's record-type filter and the warnings shown before deleting a project or an employee.
+
+- Meeting notes are easier to keep in hand as they pile up. The list opens on a date window — Last 90 days by default, with Last 30 days, Last 12 months, This year, All dates, and a custom From/To range — and the header says how much is hidden ("14 of 132 shown"). Rolling windows never hide a meeting dated in the future, and opening a note from search or the Today page still switches to All dates so the note is always reachable. Each row now carries Archive and Delete buttons, so neither action needs the row expanded; archiving offers Undo, and deleting still asks first. The meeting note editor gained an Archive button beside Delete, which keeps any edits made in that session before moving the note to the Archive page.
+
+- Done now finishes a task in one step: from either a board card, the sortable list, or task details, it records the completion date and moves the task directly to Archive, with Undo restoring its exact prior status and column. Complete remains one of the default board columns, but it is now an ordinary organizational lane; moving a card there no longer changes task status, and older Complete status mappings are retired when a database opens. Complete also remains a selectable status in task details, for anyone who wants it purely as a label: choosing it stamps the completion date and drops the task out of attention and workload counts, but leaves the task on the board in whatever column it is in — Done is still the button that archives. Restoring a finished task from Archive reopens it in the column where it was completed. The obsolete Active only board filter, completed-card visibility setting, and Today-page Recently completed holding area are removed because finished tasks no longer linger on active surfaces. Employee-linked tasks still offer the same optional performance-input capture after Done.
 
 - The New note dialog no longer carries the "Use the toolbar for headings or lists when useful" hint under its editor. The toolbar is visible above the box and says what it does.
 
@@ -81,6 +91,8 @@
 - Rich-text fields now support underlined text through a toolbar button, Ctrl+U, and the readable `++text++` backup syntax. Underline safely combines with bold and italic and remains plain text in search and exports.
 
 ### Fixed
+
+- Performance and Activity no longer paint an opaque background behind their filter rows, which showed as a flat band cutting across the page's ambient theme color around the search box and dropdowns. Both now match Meeting Notes, where the same fix was already made.
 
 - Meeting Notes no longer paints an opaque background behind its filter row, allowing the page's ambient theme color to remain visible around the controls.
 

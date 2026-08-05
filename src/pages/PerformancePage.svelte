@@ -335,7 +335,9 @@
   .view-tabs { display: inline-flex; gap: .25rem; padding: .25rem; margin-bottom: .8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
   .view-tabs button { min-height: 1.9rem; border: 0; background: transparent; color: var(--text-muted); }
   .view-tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
-  .filter-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: var(--bg); }
+  /* Transparent, like the Meetings filter row: a flat --bg fill paints an
+     opaque band over the Look's ambient backdrop instead of blending with it. */
+  .filter-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: transparent; }
   .filter-toolbar input[type="search"] { min-width: 15rem; flex: 1; }
   .employee-cell { white-space: nowrap; }
   .summary-cell { min-width: 16rem; }

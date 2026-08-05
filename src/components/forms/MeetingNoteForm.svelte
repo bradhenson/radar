@@ -80,20 +80,21 @@
     attendeeEmployeeIds = attendeeEmployeeIds.filter((employeeId) => employeeId !== id);
   }
 
-  async function save() {
-    if (saving) return;
+  // Current form values as a record, or undefined when a required field is
+  // missing (the error is surfaced and the form stays open).
+  function buildRecord(): MeetingNote | undefined {
     const trimmedTitle = title.trim();
     if (!trimmedTitle) {
       error = "Title is required.";
-      return;
+      return undefined;
     }
     if (!isValidIsoDate(meetingDate)) {
       error = "Date is not valid.";
-      return;
+      return undefined;
     }
 
     const now = nowTimestamp();
-    const record: MeetingNote = {
+    return {
       id: note?.id ?? newId(),
       meetingDate,
       title: trimmedTitle,
@@ -106,6 +107,12 @@
       updatedAt: now,
       isArchived: note?.isArchived ?? false
     };
+  }
+
+  async function save() {
+    if (saving) return;
+    const record = buildRecord();
+    if (!record) return;
 
     saving = true;
     try {
@@ -156,6 +163,28 @@
       void save();
     };
   });
+
+  // Archiving keeps the note (and any edits made in this session) and drops it
+  // out of the meetings list; the Archive page restores it.
+  async function archiveNote() {
+    if (!note || saving) return;
+    const record = buildRecord();
+    if (!record) return;
+    saving = true;
+    try {
+      await app.putRecord(
+        "meetingNotes",
+        { ...record, isArchived: true },
+        { actionType: "archived", summary: `Archived meeting note "${record.title}"` }
+      );
+      app.toast(`Moved "${record.title}" to Archive`, "success");
+      close();
+    } catch (e) {
+      error = `Archive failed: ${e instanceof Error ? e.message : String(e)}`;
+    } finally {
+      saving = false;
+    }
+  }
 
   async function deleteNote() {
     if (!note || saving) return;
@@ -244,7 +273,10 @@
 
     <div class="form-actions">
       {#if isEditing}
-        <button type="button" class="icon-btn danger delete-action" disabled={saving} aria-label="Delete meeting note" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
+        <div class="record-actions">
+          <button type="button" class="icon-btn" disabled={saving} aria-label="Archive meeting note" title="Archive" onclick={() => void archiveNote()}><Icon name="archive" size={17} /></button>
+          <button type="button" class="icon-btn danger" disabled={saving} aria-label="Delete meeting note" title="Delete" onclick={() => (confirmDelete = true)}><Icon name="trash" size={17} /></button>
+        </div>
       {/if}
       <button type="button" onclick={() => close()} title="Close without saving changes">Cancel</button>
       <button type="submit" class="primary" disabled={saving}>{saving ? "Saving..." : "Save"}</button>
@@ -332,7 +364,10 @@
     justify-content: flex-end;
     margin-top: 1rem;
   }
-  .delete-action {
+  .record-actions {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
     margin-right: auto;
   }
   @media (max-width: 800px) {

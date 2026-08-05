@@ -8,6 +8,12 @@
   import RichTextView from "../components/common/RichTextView.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../domain/models";
+  import {
+    DATE_RANGE_OPTIONS,
+    isWithinDateRange,
+    resolveDateRange,
+    type DateRangePreset
+  } from "../domain/rules/dateRange";
   import { formatDate, nowTimestamp } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
@@ -17,6 +23,11 @@
   let filterType = $state("");
   let filterProject = $state("");
   let filterEmployee = $state("");
+  // Meeting notes accumulate forever, so the list opens on a recent window
+  // rather than the whole history. The header count says how much is hidden.
+  let filterRange = $state<DateRangePreset>("last90");
+  let customFrom = $state("");
+  let customTo = $state("");
   let createOpen = $state(false);
   let editing = $state<MeetingNote | undefined>(undefined);
   let pendingDelete = $state<MeetingNote | undefined>(undefined);
@@ -26,10 +37,15 @@
     return Boolean(value?.toLowerCase().includes(needle));
   }
 
+  let activeCount = $derived(app.meetingNotes.filter((note) => !note.isArchived).length);
+
+  let dateRange = $derived(resolveDateRange(filterRange, app.today, { from: customFrom, to: customTo }));
+
   let notes = $derived(
     app.meetingNotes
       .filter((note) => {
         if (note.isArchived) return false;
+        if (!isWithinDateRange(note.meetingDate, dateRange)) return false;
         if (filterType && note.meetingType !== filterType) return false;
         if (filterProject && note.projectId !== filterProject) return false;
         if (filterEmployee && !note.attendeeEmployeeIds.includes(filterEmployee)) return false;
@@ -66,6 +82,7 @@
     filterType = "";
     filterProject = "";
     filterEmployee = "";
+    filterRange = "all";
     expanded[id] = true;
     router.go("meetings");
     requestAnimationFrame(() => {
@@ -108,12 +125,19 @@
   }
 
   async function archive(note: MeetingNote) {
+    const before = $state.snapshot(note) as MeetingNote;
     await app.putRecord(
       "meetingNotes",
       { ...note, isArchived: true, updatedAt: nowTimestamp() },
       { actionType: "archived", summary: `Archived meeting note "${note.title}"` }
     );
-    app.toast("Meeting note archived", "success");
+    app.toast(`Moved "${note.title}" to Archive`, "success", () => {
+      void app.putRecord(
+        "meetingNotes",
+        { ...before, isArchived: false, updatedAt: nowTimestamp() },
+        { actionType: "restored", summary: `Restored meeting note "${before.title}" from archive` }
+      );
+    });
   }
 
   function requestDelete(note: MeetingNote) {
@@ -145,7 +169,7 @@
 <div class="page">
   <div class="page-header">
     <h1>Meeting Notes</h1>
-    <span class="muted">{notes.length} shown</span>
+    <span class="muted">{notes.length === activeCount ? `${notes.length} shown` : `${notes.length} of ${activeCount} shown`}</span>
     <span class="spacer"></span>
     <button type="button" onclick={exportCsv} disabled={notes.length === 0}>Export CSV</button>
     <button type="button" class="primary" onclick={() => (createOpen = true)}>New Meeting Note</button>
@@ -159,6 +183,19 @@
 
   <div class="toolbar meeting-toolbar">
     <input type="search" bind:value={search} placeholder="Search notes" aria-label="Search meeting notes" />
+    <select bind:value={filterRange} aria-label="Filter by meeting date">
+      {#each DATE_RANGE_OPTIONS as option (option.value)}
+        <option value={option.value}>{option.label}</option>
+      {/each}
+    </select>
+    {#if filterRange === "custom"}
+      <span class="date-range">
+        <label for="mn-range-from">From</label>
+        <input id="mn-range-from" type="date" bind:value={customFrom} />
+        <label for="mn-range-to">To</label>
+        <input id="mn-range-to" type="date" bind:value={customTo} />
+      </span>
+    {/if}
     <select bind:value={filterType} aria-label="Filter by meeting type">
       <option value="">All types</option>
       {#each MEETING_TYPES as type (type)}
@@ -180,12 +217,17 @@
   </div>
 
   {#if notes.length === 0}
-    <EmptyState message="No meeting notes match." hint="Capture product team discussion notes and action items as they happen." />
+    <EmptyState
+      message="No meeting notes match."
+      hint={filterRange !== "all" && activeCount > 0
+        ? "Widen the date range to see older notes."
+        : "Capture product team discussion notes and action items as they happen."}
+    />
   {:else}
     <div class="table-wrap">
       <table class="data meeting-table">
         <thead>
-          <tr><th>Date</th><th>Type</th><th>Title</th><th>Project</th><th>Attendees</th><th>Action items</th></tr>
+          <tr><th>Date</th><th>Type</th><th>Title</th><th>Project</th><th>Attendees</th><th>Action items</th><th></th></tr>
         </thead>
         <tbody>
           {#each notes as note (note.id)}
@@ -212,10 +254,32 @@
               <td>{#if note.projectId}{app.projectName(note.projectId)}{:else}<span class="muted">—</span>{/if}</td>
               <td class="attendees-cell">{#if note.attendeeEmployeeIds.length}{employeeNames(note.attendeeEmployeeIds)}{:else}<span class="muted">—</span>{/if}</td>
               <td>{#if note.actionItems}<span class="action-mark">Yes</span>{:else}<span class="muted">—</span>{/if}</td>
+              <td class="actions-cell">
+                <div class="row-actions">
+                  <button
+                    type="button"
+                    class="icon-btn"
+                    aria-label={`Archive meeting note ${note.title}`}
+                    title="Archive"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      void archive(note);
+                    }}><Icon name="archive" size={16} /></button>
+                  <button
+                    type="button"
+                    class="icon-btn danger"
+                    aria-label={`Delete meeting note ${note.title}`}
+                    title="Delete"
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      requestDelete(note);
+                    }}><Icon name="trash" size={16} /></button>
+                </div>
+              </td>
             </tr>
             {#if open}
               <tr class="detail-row">
-                <td colspan="6">
+                <td colspan="7">
                   <div class="detail" aria-label={`Meeting details for ${note.title}`}>
                     {#if note.attendeeEmployeeIds.length}
                       <div class="detail-attendees">
@@ -267,7 +331,24 @@
 
 <style>
   .meeting-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: transparent; }
+  .date-range {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+  }
+  .date-range label {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
   .title-cell { min-width: 14rem; }
+  .actions-cell { width: 1%; white-space: nowrap; }
+  .row-actions {
+    display: flex;
+    align-items: center;
+    gap: .25rem;
+    justify-content: flex-end;
+  }
   .attendees-cell {
     max-width: 16rem;
     overflow: hidden;

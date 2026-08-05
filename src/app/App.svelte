@@ -60,7 +60,7 @@
   });
 
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
-    { page: "board", label: "Board", icon: "board", section: "Work" },
+    { page: "board", label: "Tasks", icon: "board", section: "Work" },
     { page: "calendar", label: "Calendar", icon: "calendar" },
     { page: "today", label: "Today", icon: "today" },
     { page: "projects", label: "Projects", icon: "projects" },

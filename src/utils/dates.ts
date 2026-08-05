@@ -56,6 +56,13 @@ export function addMonths(date: IsoDate, months: number): IsoDate {
   return `${ny}-${pad(nm)}-${pad(nd)}`;
 }
 
+/** The Sunday on or before `date`. Day-of-week comes from UTC day arithmetic. */
+export function startOfWeek(date: IsoDate): IsoDate {
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return addDays(date, -dow);
+}
+
 /** Saturday or Sunday. Day-of-week comes from UTC day arithmetic, never a local timestamp. */
 export function isWeekend(date: IsoDate): boolean {
   const [y, m, d] = date.split("-").map(Number) as [number, number, number];
@@ -71,11 +78,18 @@ export function daysBetween(a: IsoDate, b: IsoDate): number {
   return Math.round(ms / 86_400_000);
 }
 
+/**
+ * The local calendar date a UTC timestamp fell on. Slicing the ISO string
+ * would give the UTC date instead, which lands evening entries on tomorrow.
+ */
+export function timestampToLocalDate(ts: IsoTimestamp): IsoDate {
+  const then = new Date(ts);
+  return `${then.getFullYear()}-${pad(then.getMonth() + 1)}-${pad(then.getDate())}`;
+}
+
 /** Days since a UTC timestamp, measured against local today. */
 export function daysSinceTimestamp(ts: IsoTimestamp, today: IsoDate): number {
-  const then = new Date(ts);
-  const thenDate = `${then.getFullYear()}-${pad(then.getMonth() + 1)}-${pad(then.getDate())}`;
-  return daysBetween(thenDate, today);
+  return daysBetween(timestampToLocalDate(ts), today);
 }
 
 /** Display formatting, e.g. "Jul 4, 2026". Falls back to raw value if invalid. */

@@ -117,7 +117,7 @@
     }
     const unlinked: [number, string][] = [
       [counts.meetingAttendances, "meeting attendee link(s)"],
-      [counts.quickNoteLinks, "workbench note link(s)"],
+      [counts.quickNoteLinks, "general note link(s)"],
       [counts.projectLeads, "project lead assignment(s)"],
       [counts.trainingAssignments, "training assignment(s)"]
     ];
