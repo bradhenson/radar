@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Workspace design preview
+
+- Refined the shared light/dark surfaces, typography, controls, tables, and navigation. Tasks, Telework, Travel, and Leave lead the daily workspace; existing accent palettes and glass appearances remain available.
+- Introduced consistent headers and action placement on the four daily pages, with searchable availability lists, clear filter reset actions, and tables that scroll within their content area.
+- Added a compact task-card option and retained the Board/List selection, filters, sort, card density, and horizontal board position when returning from another page or task editor during the same session. Existing task editing, status changes, and storage formats are preserved.
+
+
 ### Added
 
 - Awards opens with a filter row: search across title, employee, award type, and supporting notes, plus dropdowns for employee, status, and award type. The type dropdown appears only once some record carries a type, and lists the types actually in use. A Clear button shows while anything is filtering, the header counts what is on screen, and Add Award has moved up into the page header beside it. An empty result says which it is — nothing recorded yet, or nothing matching the current filters.

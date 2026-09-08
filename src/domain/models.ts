@@ -513,7 +513,7 @@ const LEGACY_DEFAULT_APPLICATION_NAMES = new Set(["Supervisor Assistant"]);
 
 /** Selectable accent palettes. Swatches are the light/dark accent colors (for pickers). */
 export const COLOR_THEMES: { value: ColorTheme; label: string; swatch: string; swatchDark: string }[] = [
-  { value: "default", label: "Default", swatch: "#3661e4", swatchDark: "#4daafc" },
+  { value: "default", label: "Default", swatch: "#196f65", swatchDark: "#79caba" },
   { value: "ocean", label: "Ocean", swatch: "#0d7489", swatchDark: "#4cc3dd" },
   { value: "forest", label: "Forest", swatch: "#1f7a44", swatchDark: "#63c992" },
   { value: "violet", label: "Violet", swatch: "#6d3ac4", swatchDark: "#b39cf2" },

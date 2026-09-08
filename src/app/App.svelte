@@ -60,20 +60,20 @@
   });
 
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
-    { page: "board", label: "Tasks", icon: "board", section: "Work" },
+    { page: "board", label: "Tasks", icon: "board", section: "Daily workspace" },
+    { page: "telework", label: "Telework", icon: "telework" },
+    { page: "travel", label: "Travel", icon: "travel" },
+    { page: "leave", label: "Leave", icon: "leave" },
     { page: "calendar", label: "Calendar", icon: "calendar" },
-    { page: "today", label: "Today", icon: "today" },
+    { page: "employees", label: "Employees", icon: "employees", section: "People & records" },
     { page: "projects", label: "Projects", icon: "projects" },
     { page: "meetings", label: "Meetings", icon: "meetings" },
     { page: "notes", label: "Notes", icon: "notes" },
-    { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },
-    { page: "leave", label: "Leave", icon: "leave" },
-    { page: "telework", label: "Telework", icon: "telework" },
-    { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "activity", label: "Activity", icon: "activity", section: "System" },
+    { page: "today", label: "Today", icon: "today", section: "Review & manage" },
+    { page: "activity", label: "Activity", icon: "activity" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
@@ -87,7 +87,7 @@
 
   // Narrow windows get a compact primary nav plus a "More" menu instead of a
   // long horizontal scroll strip.
-  const PRIMARY_NAV = new Set(["board", "calendar", "today", "employees"]);
+  const PRIMARY_NAV = new Set(["board", "telework", "travel", "leave"]);
   let primaryNavItems = $derived(NAV.filter((i) => PRIMARY_NAV.has(i.page)));
   let moreNavItems = $derived(NAV.filter((i) => !PRIMARY_NAV.has(i.page)));
   let isNarrow = $state(false);
@@ -327,7 +327,7 @@
               <circle class="radar-fill" cx="18.2" cy="5.8" r="1.35" />
             </svg>
           </span>
-          <span>{app.settings.applicationName}</span>
+          <span class="brand-wordmark">{app.settings.applicationName}</span>
         </span>
         <span class="spacer"></span>
       </div>
@@ -367,7 +367,7 @@
            focus. One real input avoids handing focus over mid-keystroke. -->
       <button type="button" class="search-trigger" onclick={() => (ui.searchOpen = true)} title="Search everything (Ctrl+K)" aria-label="Search">
         <Icon name="search" size={15} />
-        <span class="search-trigger-text">Search…</span>
+        <span class="search-trigger-text">Find anything…</span>
         <kbd>Ctrl K</kbd>
       </button>
       <button type="button" class="icon-btn" onclick={() => (ui.quickNoteOpen = true)} title="Jot a quick note (J)" aria-label="Quick note">
@@ -568,9 +568,7 @@
     display: flex;
     flex-direction: column;
     min-height: 100vh;
-    background:
-      radial-gradient(80rem 22rem at 18% -6rem, color-mix(in srgb, var(--accent-soft) 55%, transparent), transparent),
-      var(--bg);
+    background: var(--bg);
   }
   .desktop-shell { --topbar-h: 2.75rem; }
   .desktop-shell .topbar { padding-top: .2rem; padding-bottom: .2rem; }
@@ -609,7 +607,7 @@
     position: sticky;
     top: 0;
     z-index: 50;
-    box-shadow: var(--shadow-xs);
+    box-shadow: none;
   }
   .brand {
     display: inline-flex;
@@ -621,20 +619,21 @@
     min-width: 0;
     margin-right: .4rem;
   }
+  .brand-wordmark { letter-spacing: .12em; font-size: .88rem; }
   .brand-mark {
     display: inline-grid;
     place-items: center;
     width: 1.9rem;
     height: 1.9rem;
     border-radius: 9px;
-    background: linear-gradient(135deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
+    background: var(--accent);
     color: #fff;
     flex: 0 0 auto;
     box-shadow: 0 2px 6px color-mix(in srgb, var(--accent) 40%, transparent);
     position: relative;
     overflow: hidden;
   }
-  /* Live radar sweep rotating behind the icon — the app's signature move. */
+  /* Static radar highlight keeps the brand quiet during extended use. */
   .brand-sweep {
     position: absolute;
     inset: -30%;
@@ -644,10 +643,7 @@
       rgba(255, 255, 255, .05) 80%,
       rgba(255, 255, 255, .5) 97%,
       transparent 100%);
-    animation: radar-sweep 4.6s linear infinite;
-  }
-  @keyframes radar-sweep {
-    to { transform: rotate(360deg); }
+    opacity: .25;
   }
   .brand-icon {
     width: 1.28rem;
@@ -719,12 +715,12 @@
     display: inline-flex;
     align-items: center;
     gap: .45rem;
-    min-width: 11rem;
+    min-width: 17rem;
     min-height: 1.95rem;
     padding: .2rem .45rem .2rem .6rem;
     border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
+    border-radius: 6px;
+    background: var(--bg);
     box-shadow: none;
     color: var(--text-muted);
     font-size: .8rem;
@@ -762,11 +758,11 @@
   .body { display: flex; flex: 1; min-height: 0; }
 
   .sidenav {
-    width: 13.5rem;
+    width: 12.75rem;
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    padding: 1rem .7rem 2.6rem;
+    padding: 1.2rem .7rem 1rem;
     border-right: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface) 55%, var(--bg));
     position: sticky;
@@ -781,7 +777,7 @@
     gap: .6rem;
     min-height: 2.15rem;
     padding: .3rem .7rem;
-    border-radius: 9px;
+    border-radius: 6px;
     color: var(--text-muted);
     text-decoration: none;
     margin-bottom: 2px;
@@ -792,7 +788,7 @@
   .sidenav a.active {
     background: var(--accent-soft);
     color: var(--accent);
-    box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent);
+    box-shadow: inset 3px 0 0 var(--accent);
   }
   .nav-icon {
     display: inline-grid;
@@ -828,6 +824,7 @@
      More menu, instead of one horizontally scrolling 14-item strip. */
   .compactnav {
     display: flex;
+    flex-wrap: wrap;
     align-items: center;
     gap: .25rem;
     width: 100%;
@@ -871,7 +868,7 @@
     position: absolute;
     right: 0;
     top: calc(100% + .3rem);
-    min-width: 11rem;
+    min-width: 17rem;
     padding: .3rem;
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -919,5 +916,9 @@
       flex-direction: column;
       margin: .75rem .9rem 0;
     }
+  }
+  @media (max-width: 480px) {
+    .compactnav .nav-icon { display: none; }
+    .compactnav a, .compactnav .more-button { padding-inline: .45rem; font-size: .8rem; }
   }
 </style>

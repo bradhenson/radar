@@ -2,8 +2,21 @@
 // anywhere in the application.
 
 import type { PerformanceInput, Task } from "../domain/models";
+import type { BoardSummaryFilter } from "../domain/rules/boardFilters";
+import type { SortDirection, TaskListSortKey } from "../domain/rules/taskListSort";
 
 class UiState {
+  // Session-only presentation state. Returning from a full-page task editor
+  // restores the working view without adding preferences to operator backups.
+  boardView = {
+    view: "board" as "board" | "list",
+    search: "", employee: "", competency: "", project: "", priority: "",
+    summary: "" as BoardSummaryFilter,
+    sortKey: "column" as TaskListSortKey,
+    sortDirection: "asc" as SortDirection,
+    compact: false,
+    scrollLeft: 0
+  };
   newTaskOpen = $state(false);
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */

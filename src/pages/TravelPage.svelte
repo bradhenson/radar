@@ -1,6 +1,7 @@
 <script lang="ts">
   // Travel awareness: who is on travel, where, when, and the DTS paperwork
   // state around each trip (IPT concurrence, authorization, voucher due).
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
@@ -40,6 +41,8 @@
   let view = $state<"list" | "calendar">("list");
   let showPast = $state(false);
   let filterEmployee = $state("");
+  let search = $state("");
+  let searchTerm = $derived(search.trim().toLowerCase());
   let summaryFilter = $state<TravelSummaryFilter>("");
   let calendarMonth = $state(`${app.today.slice(0, 7)}-01`);
   let formOpen = $state(false);
@@ -72,6 +75,7 @@
     const record = app.travelRecords.find((t) => t.id === id);
     if (!record) return;
     view = "list";
+    search = "";
     if (isPast(record)) showPast = true;
     if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
     if (!matchesTravelSummaryFilter(record, summaryFilter, app.today)) summaryFilter = "";
@@ -230,7 +234,8 @@
 
   // The employee filter sets the working set; the quick-filter pills narrow it
   // without changing their own counts underneath the user (as on the board).
-  let scopedTrips = $derived(app.travelRecords.filter((t) => !filterEmployee || t.employeeId === filterEmployee));
+  let scopedTrips = $derived(app.travelRecords.filter((t) => !filterEmployee || t.employeeId === filterEmployee)
+      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.destination} ${t.startDate} ${t.endDate}`.toLowerCase().includes(searchTerm)));
 
   /** Trips the list would show with no quick filter selected. */
   let inScopeCount = $derived(scopedTrips.filter((t) => showPast || !isPast(t)).length);
@@ -438,10 +443,15 @@
 </script>
 
 <div class="page travel-page" class:wide={view === "calendar"}>
-  <div class="page-header">
-    <h1>Travel</h1>
-    <span class="muted">{rows.length} shown</span>
-  </div>
+  <WorkspaceHeader title="Travel" section="People & availability" description="Follow each trip from planning through the final voucher.">
+    {#snippet actions()}
+      <div class="view-toggle" role="group" aria-label="Travel view">
+        <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
+      </div>
+      <button type="button" class="primary" onclick={() => openForm()}>+ Add Travel</button>
+    {/snippet}
+  </WorkspaceHeader>
 
   <div class="travel-stats" aria-label="Quick travel filters">
     <button
@@ -472,7 +482,8 @@
     >
   </div>
 
-  <div class="toolbar travel-toolbar">
+  <div class="toolbar record-toolbar travel-toolbar">
+    <input type="search" bind:value={search} placeholder="Search travel…" aria-label="Search travel" />
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
       {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
@@ -480,19 +491,22 @@
     <label class="inline-toggle">
       <input type="checkbox" bind:checked={showPast} /> Show past travel
     </label>
-    <div class="view-toggle" role="group" aria-label="Travel view">
-      <button type="button" class:active={view === "list"} onclick={() => (view = "list")}>List</button>
-      <button type="button" class:active={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
-    </div>
     <span class="spacer"></span>
     <button type="button" onclick={exportCsv} disabled={rows.length === 0}>Export CSV</button>
-    <button type="button" class="primary" onclick={() => openForm()}>Add Travel</button>
+
+    <span class="result-count">{rows.length} shown</span>
+    {#if search || filterEmployee || showPast || summaryFilter}
+      <button type="button" class="link small" onclick={() => { search = ""; filterEmployee = ""; showPast = false; summaryFilter = ""; }}>Clear filters</button>
+    {/if}
   </div>
 
   {#if view === "list"}
     {#if rows.length === 0}
-      <EmptyState message="No travel records." hint="Add a trip to track who's away, DTS status, and voucher due dates." />
+      <EmptyState message={search || filterEmployee || summaryFilter ? "No trips match this view." : "No travel records."} hint={search || filterEmployee || summaryFilter ? "Clear filters to see the other trips." : "Add a trip to track who's away, DTS status, and voucher due dates."} />
     {:else}
+      <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="table-scroll" role="region" aria-label="Travel records" tabindex="0">
       <table class="data travel-table">
         <thead>
           <tr>
@@ -531,7 +545,7 @@
                       ev.stopPropagation();
                       toggleRow(t.id);
                     }}><Icon name="chevron" size={13} /></button>
-                  {app.employeeName(t.employeeId)}
+                  <span class="record-person">{app.employeeName(t.employeeId)}</span>
                 </td>
                 <td>
                   {t.destination}
@@ -598,6 +612,7 @@
           {/each}
         </tbody>
       </table>
+      </div>
     {/if}
   {:else}
     <section class="calendar-view" aria-label="Travel calendar">
@@ -859,23 +874,7 @@
     margin: 0;
     white-space: nowrap;
   }
-  .view-toggle {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .view-toggle button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    min-height: 2.1rem;
-  }
-  .view-toggle button.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
+
   /* Keep the full date on one line so Start/End don't wrap. */
   .date-col {
     white-space: nowrap;

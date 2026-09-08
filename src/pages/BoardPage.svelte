@@ -1,6 +1,9 @@
 <script lang="ts">
   // Kanban board (plan sections 12.2 and 13): drag-and-drop with a keyboard
   // alternative, filters, gap-based ordering, and direct Done-to-Archive.
+  import { onDestroy } from "svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -13,16 +16,32 @@
   import { daysSinceTimestamp, formatDate } from "../utils/dates";
   import { richTextDocToPlainText } from "../utils/richTextDoc";
 
-  // Both views read the same filtered working set below; only the layout of the
-  // last step differs. Deliberately not persisted — see LeavePage, which does
-  // the same for its list/calendar toggle.
-  let view = $state<"board" | "list">("board");
-  let search = $state("");
-  let filterEmployee = $state("");
-  let filterCompetency = $state("");
-  let filterProject = $state("");
-  let filterPriority = $state("");
-  let summaryFilter = $state<BoardSummaryFilter>("");
+  // Keep this working set when a full-page editor temporarily unmounts the board.
+  let view = $state(ui.boardView.view);
+  let search = $state(ui.boardView.search);
+  let filterEmployee = $state(ui.boardView.employee);
+  let filterCompetency = $state(ui.boardView.competency);
+  let filterProject = $state(ui.boardView.project);
+  let filterPriority = $state(ui.boardView.priority);
+  let summaryFilter = $state<BoardSummaryFilter>(ui.boardView.summary);
+  let compact = $state(ui.boardView.compact);
+  let columnStrip: HTMLDivElement | undefined = $state();
+  // Capture position while mounted: bindings may already be cleared when the
+  // page's destroy callback runs. Restore again when switching List → Board.
+  let horizontalPosition = ui.boardView.scrollLeft;
+  $effect(() => { if (columnStrip) columnStrip.scrollLeft = horizontalPosition; });
+  onDestroy(() => {
+    ui.boardView = { view, search, employee: filterEmployee, competency: filterCompetency,
+      project: filterProject, priority: filterPriority, summary: summaryFilter,
+      sortKey, sortDirection, compact, scrollLeft: horizontalPosition };
+  });
+
+  function openTask(id: string) {
+    // A focused/clicked card can scroll into view before a scroll event is
+    // delivered. Capture synchronously before the full-page editor opens.
+    if (columnStrip) horizontalPosition = columnStrip.scrollLeft;
+    ui.openTaskDetail(id);
+  }
 
   // Dropdown/search filters establish the board's working set. Summary pills
   // then narrow that set without changing their counts underneath the user.
@@ -59,8 +78,8 @@
   // --- list view -------------------------------------------------------------
   // Defaults to the board's own order, so switching views never reshuffles work
   // that was arranged by hand.
-  let sortKey = $state<TaskListSortKey>("column");
-  let sortDirection = $state<SortDirection>("asc");
+  let sortKey = $state<TaskListSortKey>(ui.boardView.sortKey);
+  let sortDirection = $state<SortDirection>(ui.boardView.sortDirection);
 
   const LIST_COLUMNS: { key: TaskListSortKey; label: string; numeric?: boolean }[] = [
     { key: "title", label: "Task" },
@@ -338,7 +357,7 @@
   function onCardKeydown(e: KeyboardEvent, task: Task) {
     if (e.key === "Enter") {
       e.preventDefault();
-      ui.openTaskDetail(task.id);
+      openTask(task.id);
     } else if (e.key === "[") {
       e.preventDefault();
       void moveByOffset(task, -1);
@@ -398,17 +417,17 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
 <div class="page board-page" class:list-mode={view === "list"}>
-  <div class="board-header">
-    <div>
-      <span class="eyebrow">Tasks</span>
-      <div class="board-title-row">
-        <h1>{view === "board" ? "Kanban Board" : "Task List"}</h1>
-        <div class="view-toggle" role="group" aria-label="Task view">
-          <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
-          <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
-        </div>
+  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} section="Daily workspace"
+    description="A clear view of the work ahead.">
+    {#snippet actions()}
+      <div class="view-toggle" role="group" aria-label="Task view">
+        <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}><Icon name="board" size={14} /> Board</button>
+        <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
       </div>
-    </div>
+      <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New task</button>
+    {/snippet}
+  </WorkspaceHeader>
+  <div class="board-overview">
     <div class="board-stats" aria-label="Quick board filters">
       <button
         type="button"
@@ -444,11 +463,16 @@
         onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button
       >
     </div>
-    <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New task</button>
+    {#if view === "board"}
+      <button class="density-toggle" type="button" aria-pressed={compact} onclick={() => (compact = !compact)} title="Hide descriptions and checklist previews for a denser board">
+        {compact ? "✓ Compact cards" : "Compact cards"}
+      </button>
+    {/if}
   </div>
 
   <div class="board-toolbar" aria-label="Board filters">
     <div class="search-field">
+      <Icon name="search" size={15} />
       <input type="search" placeholder="Search tasks" bind:value={search} aria-label="Search tasks" />
     </div>
     <select bind:value={filterEmployee} aria-label="Filter by employee">
@@ -502,7 +526,7 @@
             {@const ds = dueState(task, app.today, app.settings.dueSoonDays)}
             <tr>
               <td>
-                <button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(task.id)}>{task.title}</button>
+                <button type="button" class="link cell-link" onclick={() => openTask(task.id)}>{task.title}</button>
                 {#if checklistProgress(task.id)}
                   <span class="badge checklist-badge">{checklistProgress(task.id)}</span>
                 {/if}
@@ -566,7 +590,7 @@
       </div>
     {/if}
   {:else}
-    <div class="columns" aria-label="Task board">
+    <div class="columns" aria-label="Task board" bind:this={columnStrip} onscroll={(e) => (horizontalPosition = e.currentTarget.scrollLeft)}>
       {#each columns as col (col.column.id)}
         <section
           class="column bucket-{col.column.id}"
@@ -643,14 +667,14 @@
                   type="button"
                   class="card-open"
                   title="Enter opens · [ ] move between columns · Alt+↑/↓ reorder · C marks done and archives"
-                  onclick={() => ui.openTaskDetail(task.id)}
+                  onclick={() => openTask(task.id)}
                   onkeydown={(e) => onCardKeydown(e, task)}
                 >
                   <span class="card-title">{task.title}</span>
                   {#if task.projectId}
                     <span class="card-context">{app.projectName(task.projectId)}</span>
                   {/if}
-                  {#if task.showOnCard === "description" && task.description}
+                  {#if !compact && task.showOnCard === "description" && task.description}
                     <div class="card-preview"><RichTextView value={task.description} compact /></div>
                   {/if}
                   {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || task.status === "complete" || statusDiverges || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
@@ -680,7 +704,7 @@
                     </span>
                   {/if}
                 </button>
-                {#if task.showOnCard === "checklist"}
+                {#if !compact && task.showOnCard === "checklist"}
                   {@const items = cardChecklist(task.id)}
                   {#if items.length}
                     <ul class="card-checklist">
@@ -749,35 +773,20 @@
      be definite (not min-height) for the columns' max-height to resolve. */
   .board-page {
     max-width: none;
-    padding: 1rem 1.25rem 1.1rem;
+    padding: 1.6rem 1.75rem 1rem;
     display: flex;
     flex-direction: column;
     height: calc(100vh - var(--topbar-h));
   }
-  .board-header {
-    display: grid;
-    grid-template-columns: minmax(18rem, 1fr) auto auto;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: .8rem;
-  }
-  .eyebrow {
-    display: block;
-    color: var(--text-muted);
-    font-size: .75rem;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    margin-bottom: .15rem;
-  }
-  .board-header h1 {
-    font-size: 1.45rem;
-    margin: 0;
-  }
+  .board-overview { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
+  .density-toggle { color: var(--text-muted); background: transparent; border-color: transparent; box-shadow: none; font-size: .78rem; }
+  .density-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
+  .search-field { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); padding-left: .5rem; }
+  .search-field input { min-width: 0; }
   .board-stats {
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: flex-start;
     gap: .45rem;
     flex-wrap: wrap;
   }
@@ -831,35 +840,7 @@
     height: auto;
     display: block;
   }
-  .board-title-row {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: .7rem;
-  }
-  /* "Kanban Board" and "Task List" are different widths. Reserving the wider
-     one keeps the toggle still when it is clicked, instead of sliding out from
-     under the pointer that just used it. */
-  .board-title-row h1 {
-    min-width: 9.5rem;
-  }
-  .view-toggle {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .view-toggle button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    min-height: 2.1rem;
-  }
-  .view-toggle button.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
+
   .board-new-task {
     white-space: nowrap;
   }
@@ -898,7 +879,7 @@
   }
   .board-toolbar {
     display: grid;
-    grid-template-columns: minmax(15rem, 1.35fr) repeat(5, minmax(8rem, .75fr)) auto auto;
+    grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(7rem, 1fr)) auto;
     gap: .45rem;
     align-items: center;
     padding: .65rem;
@@ -957,7 +938,7 @@
     max-height: 100%;
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow);
+    box-shadow: none;
   }
   .column.column-drop-before {
     box-shadow: -4px 0 0 var(--accent), var(--shadow);
@@ -973,8 +954,8 @@
     padding: .7rem .75rem .45rem;
     cursor: grab;
     user-select: none;
-    /* Wash of the column's own status color fading down from the top edge. */
-    background: linear-gradient(180deg, color-mix(in srgb, var(--bucket-color, var(--accent)) 9%, transparent), transparent);
+    /* Lane color stays on the small status marker, keeping the header quiet. */
+    background: transparent;
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
   }
   .bucket-header:active {
@@ -1016,7 +997,7 @@
     border-radius: 999px;
     background: var(--bucket-color, var(--accent));
     flex: 0 0 auto;
-    box-shadow: 0 0 7px color-mix(in srgb, var(--bucket-color, var(--accent)) 60%, transparent);
+    box-shadow: none;
   }
   .column .count {
     background: var(--surface);
@@ -1077,7 +1058,7 @@
     box-shadow:
       inset 0 0 0 1px color-mix(in srgb, var(--accent) 34%, transparent),
       0 4px 12px rgba(16, 24, 40, .13);
-    transform: translateY(-1px);
+    transform: none;
     z-index: 2;
   }
   .task-card.dragging { opacity: .4; }
@@ -1103,8 +1084,8 @@
   .card-title {
     display: block;
     font-weight: 650;
-    line-height: 1.25;
-    margin-bottom: .35rem;
+    line-height: 1.45;
+    margin-bottom: .45rem;
     padding-right: 2.8rem;
     overflow-wrap: anywhere;
   }
@@ -1235,9 +1216,6 @@
     background: var(--accent-soft);
   }
   @media (max-width: 1200px) {
-    .board-header {
-      grid-template-columns: 1fr auto;
-    }
     .board-stats {
       grid-column: 1 / -1;
       justify-content: flex-start;
@@ -1256,10 +1234,6 @@
     .board-page {
       padding-inline: .75rem;
       height: auto;
-    }
-    .board-header {
-      grid-template-columns: 1fr;
-      align-items: stretch;
     }
     .board-stats {
       order: initial;

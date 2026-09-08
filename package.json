@@ -16,6 +16,7 @@
     "mcp": "tsx mcp/src/server.ts",
     "verify": "npm run check && npm test && npm run build",
     "smoke:file": "node scripts/smoke-file.mjs",
+    "smoke:workspace": "node scripts/smoke-workspace.mjs",
     "smoke:richtext": "node scripts/smoke-richtext.mjs",
     "smoke:migration": "node scripts/smoke-migration.mjs",
     "smoke:desktop": "node scripts/smoke-desktop.mjs",

@@ -46,7 +46,7 @@ try {
   // Seed through the real Settings workflow before exercising the board.
   await page.getByRole("button", { name: "Load sample data" }).click();
   await page.getByRole("dialog", { name: "Load sample data" }).getByRole("button", { name: "Load sample data" }).click();
-  await page.getByRole("link", { name: /board/i }).first().click();
+  await page.getByRole("link", { name: "Tasks", exact: true }).first().click();
   await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
 
   const navCount = await page.locator("nav a").count();

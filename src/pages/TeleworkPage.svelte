@@ -1,5 +1,6 @@
 <script lang="ts">
   // Situational telework request tracking (plan 12.9, 20).
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
@@ -52,6 +53,8 @@
   let view = $state<"list" | "calendar">("list");
   let showHistorical = $state(false);
   let filterEmployee = $state("");
+  let search = $state("");
+  let searchTerm = $derived(search.trim().toLowerCase());
   let filterStatus = $state("");
   let calendarMonth = $state(`${app.today.slice(0, 7)}-01`);
   let formOpen = $state(false);
@@ -86,6 +89,7 @@
     const record = app.teleworkRecords.find((t) => t.id === id);
     if (!record) return;
     view = "list";
+    search = "";
     if (isSituationalRequest(record) ? !inRequestWindow(record) : isHistorical(record)) showHistorical = true;
     if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
     if (filterStatus && filterStatus !== record.status) filterStatus = "";
@@ -269,6 +273,7 @@
       .filter(isSituationalRequest)
       .filter((t) => showHistorical || inRequestWindow(t))
       .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
+      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.recordType} ${statusLabel(t.status)} ${t.effectiveDate ?? ""} ${t.requestDate ?? ""}`.toLowerCase().includes(searchTerm))
       .filter((t) => !filterStatus || t.status === filterStatus)
       .sort((a, b) => {
         const aDate = a.effectiveDate ?? a.requestDate ?? "9999-12-31";
@@ -331,6 +336,7 @@
       .filter((t) => !isSituationalRequest(t))
       .filter((t) => showHistorical || !isHistorical(t))
       .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
+      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.recordType} ${statusLabel(t.status)} ${t.effectiveDate ?? ""} ${t.requestDate ?? ""}`.toLowerCase().includes(searchTerm))
       .sort(
         (a, b) =>
           (a.expirationDate ?? "9999-12-31").localeCompare(b.expirationDate ?? "9999-12-31") ||
@@ -432,12 +438,19 @@
 </script>
 
 <div class="page telework-page" class:wide={view === "calendar"}>
-  <div class="page-header">
-    <h1>Telework</h1>
-    <span class="muted">{rows.length + agreementRows.length} shown</span>
-  </div>
+  <WorkspaceHeader title="Telework" section="People & availability" description="Requests, agreements, and pay period usage in one place.">
+    {#snippet actions()}
+      <div class="view-toggle" role="group" aria-label="Telework view">
+        <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
+      </div>
+      <button type="button" onclick={() => openAgreementForm()}>Add Agreement</button>
+      <button type="button" class="primary" onclick={() => openForm()}>+ Add Request</button>
+    {/snippet}
+  </WorkspaceHeader>
 
-  <div class="toolbar telework-toolbar">
+  <div class="toolbar record-toolbar telework-toolbar">
+    <input type="search" bind:value={search} placeholder="Search telework…" aria-label="Search telework" />
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
       {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
@@ -449,14 +462,13 @@
     <label class="inline-toggle">
       <input type="checkbox" bind:checked={showHistorical} /> Show historical
     </label>
-    <div class="view-toggle" role="group" aria-label="Telework view">
-      <button type="button" class:active={view === "list"} onclick={() => (view = "list")}>List</button>
-      <button type="button" class:active={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
-    </div>
     <span class="spacer"></span>
     <button type="button" onclick={exportCsv} disabled={rows.length === 0}>Export CSV</button>
-    <button type="button" onclick={() => openAgreementForm()}>Add Agreement</button>
-    <button type="button" class="primary" onclick={() => openForm()}>Add Request</button>
+
+    <span class="result-count">{rows.length + agreementRows.length} shown</span>
+    {#if search || filterEmployee || showHistorical || filterStatus}
+      <button type="button" class="link small" onclick={() => { search = ""; filterEmployee = ""; showHistorical = false; filterStatus = ""; }}>Clear filters</button>
+    {/if}
   </div>
 
   {#if view === "list"}
@@ -466,8 +478,11 @@
       Each employee may use {teleworkLimit} telework day{teleworkLimit === 1 ? "" : "s"} per pay period.
     </p>
     {#if rows.length === 0}
-      <EmptyState message="No situational telework requests." hint="Add requests as they arrive by email." />
+      <EmptyState message={search || filterEmployee || filterStatus ? "No requests match this view." : "No situational telework requests."} hint={search || filterEmployee || filterStatus ? "Clear filters to see the other requests." : "Add requests as they arrive by email."} />
     {:else}
+      <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="table-scroll" role="region" aria-label="Telework records" tabindex="0">
       <table class="data request-table">
         <thead>
           <tr>
@@ -528,6 +543,7 @@
           {/each}
         </tbody>
       </table>
+      </div>
     {/if}
 
     <h2 class="section-heading">Agreements</h2>
@@ -537,6 +553,9 @@
     {#if agreementRows.length === 0}
       <EmptyState message="No telework agreements." hint="Track agreement effective and expiration dates to get renewal reminders." />
     {:else}
+      <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="table-scroll" role="region" aria-label="Telework records" tabindex="0">
       <table class="data">
         <thead>
           <tr>
@@ -575,6 +594,7 @@
           {/each}
         </tbody>
       </table>
+      </div>
     {/if}
   {:else}
     <section class="calendar-view" aria-label="Situational telework calendar">
@@ -780,23 +800,7 @@
     margin: 0;
     white-space: nowrap;
   }
-  .view-toggle {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .view-toggle button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    min-height: 2.1rem;
-  }
-  .view-toggle button.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
+
   .form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

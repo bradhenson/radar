@@ -1,6 +1,7 @@
 <script lang="ts">
   // Leave awareness (plan 12.8, 19): availability tracking, not official
   // leave accounting. No medical or reason details are collected.
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { app } from "../stores/app.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
@@ -19,6 +20,8 @@
   let view = $state<"list" | "calendar">("list");
   let showPast = $state(false);
   let filterEmployee = $state("");
+  let search = $state("");
+  let searchTerm = $derived(search.trim().toLowerCase());
   let calendarMonth = $state(`${app.today.slice(0, 7)}-01`);
   let formOpen = $state(false);
   let editing = $state<LeaveRecord | undefined>(undefined);
@@ -40,6 +43,7 @@
     const record = app.leaveRecords.find((l) => l.id === id);
     if (!record) return;
     view = "list";
+    search = "";
     if (compareDates(record.endDate, app.today) < 0) showPast = true;
     if (filterEmployee && filterEmployee !== record.employeeId) filterEmployee = "";
     router.go("leave");
@@ -126,6 +130,7 @@
     return app.leaveRecords
       .filter((l) => showPast || compareDates(l.endDate, app.today) >= 0)
       .filter((l) => !filterEmployee || l.employeeId === filterEmployee)
+      .filter((l) => !searchTerm || `${app.employeeName(l.employeeId)} ${l.leaveType ?? ""} ${l.status} ${l.startDate} ${l.endDate}`.toLowerCase().includes(searchTerm))
       .sort((a, b) => compareDates(a.startDate, b.startDate));
   });
 
@@ -183,11 +188,17 @@
 </script>
 
 <div class="page leave-page" class:wide={view === "calendar"}>
-  <div class="page-header">
-    <h1>Leave and Availability</h1>
-    <span class="muted">{rows.length} shown</span>
-  </div>
-  <div class="toolbar leave-toolbar">
+  <WorkspaceHeader title="Leave and Availability" section="People & availability" description="Plan time away and keep upcoming absences in view.">
+    {#snippet actions()}
+      <div class="view-toggle" role="group" aria-label="Leave view">
+        <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
+      </div>
+      <button type="button" class="primary" onclick={() => openForm()}>+ Add Leave</button>
+    {/snippet}
+  </WorkspaceHeader>
+  <div class="toolbar record-toolbar leave-toolbar">
+    <input type="search" bind:value={search} placeholder="Search leave…" aria-label="Search leave" />
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
       {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
@@ -195,21 +206,24 @@
     <label class="inline-toggle">
       <input type="checkbox" bind:checked={showPast} /> Show past leave
     </label>
-    <div class="view-toggle" role="group" aria-label="Leave view">
-      <button type="button" class:active={view === "list"} onclick={() => (view = "list")}>List</button>
-      <button type="button" class:active={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
-    </div>
     <span class="spacer"></span>
-    <button type="button" class="primary" onclick={() => openForm()}>Add Leave</button>
+
+    <span class="result-count">{rows.length} shown</span>
+    {#if search || filterEmployee || showPast}
+      <button type="button" class="link small" onclick={() => { search = ""; filterEmployee = ""; showPast = false; }}>Clear filters</button>
+    {/if}
   </div>
 
   {#if view === "list"}
     {#if rows.length === 0}
       <EmptyState
-        message={filterEmployee ? "No leave records for this employee." : "No leave records."}
-        hint={filterEmployee ? "Choose All employees or include past leave." : "Track upcoming absences for workload awareness. Details stay broad — no reasons required."}
+        message={filterEmployee || searchTerm ? "No leave records match this view." : "No leave records."}
+        hint={filterEmployee || searchTerm ? "Clear filters or include past leave." : "Track upcoming absences for workload awareness. Details stay broad — no reasons required."}
       />
     {:else}
+      <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="table-scroll" role="region" aria-label="Leave records" tabindex="0">
       <table class="data leave-table">
         <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th></tr></thead>
         <tbody>
@@ -231,11 +245,12 @@
               <td class="date-cell">{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
               <td>{l.hours ?? ""}</td>
-              <td><span class="badge">{l.status}</span></td>
+              <td><span class="badge leave-status" class:success={l.status === "approved"} class:warning={l.status === "requested"}>{l.status}</span></td>
             </tr>
           {/each}
         </tbody>
       </table>
+      </div>
     {/if}
   {:else}
     <section class="calendar-view" aria-label="Leave calendar">
@@ -368,6 +383,7 @@
 {/if}
 
 <style>
+  .leave-status { text-transform: capitalize; }
   /* List view uses the default page width (matching Training/Awards); only the
      calendar spans full width. */
   .leave-page.wide {
@@ -387,23 +403,7 @@
     margin: 0;
     white-space: nowrap;
   }
-  .view-toggle {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    background: var(--surface);
-  }
-  .view-toggle button {
-    border: 0;
-    border-radius: 0;
-    background: transparent;
-    min-height: 2.1rem;
-  }
-  .view-toggle button.active {
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
+
   .dialog-actions {
     display: flex;
     align-items: center;

@@ -11,20 +11,20 @@
   color-scheme: light;
 
   /* Neutrals — cool-tinted, low-border, shadow-driven layering */
-  --bg: #f2f4f8;
+  --bg: #f5f6f7;
   --surface: #ffffff;
-  --surface-2: #eef1f6;
+  --surface-2: #eff1f2;
   --surface-elevated: #ffffff;
-  --bucket-bg: #f6f8fb;
-  --border: #e4e8ef;
-  --border-strong: #cfd6e0;
-  --text: #16202e;
-  --text-muted: #5f6b7c;
+  --bucket-bg: #eceff1;
+  --border: #e0e4e6;
+  --border-strong: #cbd2d6;
+  --text: #20292e;
+  --text-muted: #647179;
 
   /* Brand */
-  --accent: #3661e4;
-  --accent-hover: #2b51c7;
-  --accent-soft: #e9eefc;
+  --accent: #196f65;
+  --accent-hover: #12594f;
+  --accent-soft: #e0efeb;
   --accent-text: #ffffff;
 
   /* Semantics */
@@ -38,14 +38,14 @@
   --duesoon-fg: #755c04;
   --success-bg: #dff3e6;
   --success-fg: #0e5c2e;
-  --avatar-bg: #dfe8fb;
-  --avatar-fg: #2b4bad;
+  --avatar-bg: #dfede9;
+  --avatar-fg: #22695f;
 
   /* Shape + depth */
-  --radius: 8px;
-  --radius-lg: 14px;
+  --radius: 6px;
+  --radius-lg: 10px;
   --shadow-xs: 0 1px 2px rgba(18, 26, 43, 0.06);
-  --shadow: 0 1px 2px rgba(18, 26, 43, 0.05), 0 4px 16px rgba(18, 26, 43, 0.06);
+  --shadow: 0 1px 3px rgba(18, 26, 43, 0.04);
   --shadow-lg: 0 4px 12px rgba(18, 26, 43, 0.1), 0 20px 48px rgba(18, 26, 43, 0.14);
 
   /* Motion — compositor-friendly curve shared across components. Everything
@@ -55,23 +55,23 @@
   --topbar-h: 3.4rem;
 }
 
-/* Dark neutrals: flat editor greys (VS Code-like), no blue cast. */
+/* Graphite neutrals keep dense working surfaces distinct in dark mode. */
 [data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1e1e1e;
-  --surface: #252526;
-  --surface-2: #2d2d30;
-  --surface-elevated: #2b2b2e;
-  --bucket-bg: #232324;
-  --border: #333336;
-  --border-strong: #48484c;
-  --text: #d7d7d7;
-  --text-muted: #9b9b9b;
+  --bg: #191c20;
+  --surface: #22262b;
+  --surface-2: #2b3036;
+  --surface-elevated: #262b30;
+  --bucket-bg: #1e2227;
+  --border: #343a40;
+  --border-strong: #4a535c;
+  --text: #e0e5e9;
+  --text-muted: #a1abb4;
 
-  --accent: #4daafc;
-  --accent-hover: #6cbbff;
-  --accent-soft: #1e2f42;
-  --accent-text: #0c1a27;
+  --accent: #79caba;
+  --accent-hover: #96d8cb;
+  --accent-soft: #233d38;
+  --accent-text: #102923;
 
   --danger: #ef7186;
   --warning: #d9b13b;
@@ -82,11 +82,11 @@
   --duesoon-fg: #e8ce7f;
   --success-bg: #1c3d2b;
   --success-fg: #8fe0b2;
-  --avatar-bg: #1c3a55;
-  --avatar-fg: #a8d2fa;
+  --avatar-bg: #29453e;
+  --avatar-fg: #a4dcce;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.35), 0 6px 20px rgba(0, 0, 0, 0.35);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
   --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.55);
 }
 
@@ -241,10 +241,10 @@ textarea:focus-visible, [tabindex]:focus-visible {
 }
 
 button.primary {
-  background: linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, #fff), var(--accent));
+  background: var(--accent);
   color: var(--accent-text);
   border-color: transparent;
-  box-shadow: 0 1px 2px rgba(18, 26, 43, .18), inset 0 1px 0 rgba(255, 255, 255, .12);
+  box-shadow: none;
 }
 button.primary:hover { background: var(--accent-hover); }
 
@@ -351,10 +351,10 @@ table.data th, table.data td {
   vertical-align: top;
 }
 table.data th {
-  font-size: .7rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: .07em;
+  font-size: .75rem;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
   color: var(--text-muted);
   background: color-mix(in srgb, var(--surface-2) 55%, var(--surface));
   border-bottom: 1px solid var(--border);
@@ -388,8 +388,8 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   font-size: .72rem;
   font-weight: 650;
   padding: .12rem .5rem;
-  border-radius: 999px;
-  border: 1px solid var(--border);
+  border-radius: 4px;
+  border: 1px solid transparent;
   background: var(--surface-2);
   color: var(--text-muted);
   white-space: nowrap;
@@ -412,7 +412,7 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
    just doubles the gap next to it. */
 .spacer { flex: 1; }
 
-.page { padding: 1.35rem 1.6rem 2rem; max-width: 1400px; }
+.page { padding: 1.6rem 1.75rem 2rem; max-width: 1600px; }
 .page-header {
   display: flex;
   align-items: baseline;
@@ -515,10 +515,10 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
    rules (.topbar.svelte-xyz) and dark palette blocks. */
 
 :root[data-look^="glass"] {
-  --bg: #e9edf5;
-  --surface: rgba(255, 255, 255, 0.62);
-  --surface-2: rgba(237, 241, 249, 0.55);
-  --surface-elevated: rgba(255, 255, 255, 0.72);
+  --bg: #eef1f2;
+  --surface: rgba(255, 255, 255, 0.82);
+  --surface-2: rgba(232, 237, 239, 0.7);
+  --surface-elevated: rgba(255, 255, 255, 0.94);
   --bucket-bg: rgba(255, 255, 255, 0.32);
   --border: rgba(101, 119, 148, 0.17);
   --border-strong: rgba(101, 119, 148, 0.35);
@@ -526,24 +526,24 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   --accent-soft: color-mix(in srgb, var(--accent) 13%, transparent);
   --avatar-bg: color-mix(in srgb, var(--accent) 16%, transparent);
   --shadow-xs: 0 1px 3px rgba(23, 32, 54, 0.07);
-  --shadow: 0 2px 6px rgba(23, 32, 54, 0.05), 0 12px 32px rgba(23, 32, 54, 0.09);
+  --shadow: 0 1px 3px rgba(23, 32, 54, 0.05);
   --shadow-lg: 0 8px 24px rgba(23, 32, 54, 0.12), 0 28px 64px rgba(23, 32, 54, 0.2);
   /* Overscroll + canvas color while body itself is transparent. */
   background: var(--bg);
 }
 
 :root[data-theme="dark"][data-look^="glass"] {
-  --bg: #111318;
-  --surface: rgba(39, 44, 56, 0.55);
-  --surface-2: rgba(53, 59, 75, 0.5);
-  --surface-elevated: rgba(41, 46, 59, 0.7);
-  --bucket-bg: rgba(17, 20, 28, 0.4);
+  --bg: #191c20;
+  --surface: rgba(36, 41, 46, 0.82);
+  --surface-2: rgba(48, 54, 60, 0.7);
+  --surface-elevated: rgba(39, 44, 50, 0.96);
+  --bucket-bg: rgba(28, 32, 36, 0.45);
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.17);
   --accent-soft: color-mix(in srgb, var(--accent) 17%, transparent);
   --avatar-bg: color-mix(in srgb, var(--accent) 22%, transparent);
   --shadow-xs: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 12px 36px rgba(0, 0, 0, 0.42);
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
   --shadow-lg: 0 10px 32px rgba(0, 0, 0, 0.55), 0 32px 72px rgba(0, 0, 0, 0.5);
 }
 
@@ -558,15 +558,15 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   z-index: -1;
   pointer-events: none;
   background:
-    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
-    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #7c3aed 13%, transparent), transparent 64%),
+    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 62%),
+    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #8a9caa 6%, transparent), transparent 64%),
     radial-gradient(44rem 32rem at 55% 112%, color-mix(in srgb, var(--accent) 12%, transparent), transparent 66%),
     var(--bg);
 }
 :root[data-theme="dark"][data-look^="glass"] body::before {
   background:
-    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 16%, transparent), transparent 60%),
-    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #8b5cf6 12%, transparent), transparent 62%),
+    radial-gradient(46rem 32rem at 12% -6%, color-mix(in srgb, var(--accent) 7%, transparent), transparent 60%),
+    radial-gradient(52rem 36rem at 106% 8%, color-mix(in srgb, #8a9caa 5%, transparent), transparent 62%),
     radial-gradient(44rem 32rem at 55% 114%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 64%),
     var(--bg);
 }
@@ -663,19 +663,19 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
 @media (prefers-reduced-transparency: reduce) {
   :root[data-look^="glass"] {
     --surface: #ffffff;
-    --surface-2: #eef1f6;
+    --surface-2: #eff1f2;
     --surface-elevated: #ffffff;
-    --bucket-bg: #f6f8fb;
-    --border: #e4e8ef;
-    --border-strong: #cfd6e0;
+    --bucket-bg: #eceff1;
+    --border: #e0e4e6;
+    --border-strong: #cbd2d6;
   }
   :root[data-theme="dark"][data-look^="glass"] {
-    --surface: #252526;
-    --surface-2: #2d2d30;
-    --surface-elevated: #2b2b2e;
-    --bucket-bg: #232324;
-    --border: #333336;
-    --border-strong: #48484c;
+    --surface: #22262b;
+    --surface-2: #2b3036;
+    --surface-elevated: #262b30;
+    --bucket-bg: #1e2227;
+    --border: #343a40;
+    --border-strong: #4a535c;
   }
   :root[data-look^="glass"] body::before { background: var(--bg); }
   :root[data-look^="glass"] .topbar,
@@ -744,3 +744,82 @@ table.data tr.detail-row:hover td:first-child { box-shadow: none; }
 .detail-grid dd { margin: .1rem 0 0; }
 .date-cell { white-space: nowrap; }
 .table-wrap { overflow-x: auto; }
+
+/* Shared working controls. Page-specific rules supply only layout, leaving
+   the same view, filter, and table grammar across daily workflows. */
+.view-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--surface-2);
+}
+.view-toggle button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .4rem;
+  min-height: 1.85rem;
+  padding: .2rem .7rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text-muted);
+  box-shadow: none;
+  font-size: .8rem;
+}
+.view-toggle button.active {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: var(--shadow-xs);
+}
+.page .record-toolbar {
+  padding: .7rem .8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  gap: .65rem;
+  margin-bottom: 1.25rem;
+}
+.record-toolbar input[type="search"] { flex: 1 1 12rem; max-width: 22rem; min-width: 0; }
+.record-toolbar .result-count { color: var(--text-muted); white-space: nowrap; font-size: .78rem; }
+.table-scroll { overflow-x: auto; border-radius: var(--radius-lg); margin-bottom: .9rem; }
+.table-scroll:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.table-scroll > table { min-width: 640px; }
+.record-person { font-weight: 600; }
+.date-cell, .date-col { font-variant-numeric: tabular-nums; }
+.page table.data td { padding: .8rem .9rem; }
+.page table.data th { padding: .65rem .9rem; }
+.page table.data td:first-child .cell-link { color: var(--text); font-weight: 600; }
+.page table.data td:first-child .cell-link:hover { color: var(--accent); }
+.page table.data .group-row td {
+  background: color-mix(in srgb, var(--surface-2) 65%, var(--surface));
+  font-size: .72rem;
+  letter-spacing: .03em;
+  padding-top: .55rem;
+  padding-bottom: .55rem;
+}
+.page .travel-stats, .page .board-stats { gap: .5rem; }
+.page .travel-stats button, .page .board-stats button {
+  border-radius: 6px;
+  box-shadow: none;
+  font-size: .78rem;
+  min-height: 2rem;
+  padding: .3rem .65rem;
+}
+.page .travel-stats button.active, .page .board-stats button.active {
+  box-shadow: none;
+  border-color: var(--accent);
+}
+.page .travel-stats strong, .page .board-stats strong { font-variant-numeric: tabular-nums; }
+@media (max-width: 760px) {
+  .page { padding: 1rem .85rem; }
+  .record-toolbar input[type="search"] { max-width: none; flex-basis: 100%; }
+}
+@media print {
+  .workspace-actions, .record-toolbar { display: none !important; }
+  .table-scroll { overflow: visible; }
+}

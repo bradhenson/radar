@@ -141,8 +141,8 @@
     top: 0;
     left: 0;
     right: 0;
-    height: 2.5px;
-    background: linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 45%, #7c3aed));
+    height: 1px;
+    background: var(--border-strong);
     pointer-events: none;
   }
   .dialog.wide { max-width: 52rem; }
