@@ -60,20 +60,20 @@
   });
 
   const NAV: { page: string; label: string; icon: string; section?: string }[] = [
-    { page: "board", label: "Tasks", icon: "board", section: "Daily workspace" },
-    { page: "telework", label: "Telework", icon: "telework" },
-    { page: "travel", label: "Travel", icon: "travel" },
-    { page: "leave", label: "Leave", icon: "leave" },
+    { page: "board", label: "Tasks", icon: "board", section: "Work" },
     { page: "calendar", label: "Calendar", icon: "calendar" },
-    { page: "employees", label: "Employees", icon: "employees", section: "People & records" },
+    { page: "today", label: "Today", icon: "today" },
     { page: "projects", label: "Projects", icon: "projects" },
     { page: "meetings", label: "Meetings", icon: "meetings" },
     { page: "notes", label: "Notes", icon: "notes" },
+    { page: "employees", label: "Employees", icon: "employees", section: "People" },
     { page: "performance", label: "Performance", icon: "performance" },
     { page: "training", label: "Training", icon: "training" },
+    { page: "leave", label: "Leave", icon: "leave" },
+    { page: "telework", label: "Telework", icon: "telework" },
+    { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "today", label: "Today", icon: "today", section: "Review & manage" },
-    { page: "activity", label: "Activity", icon: "activity" },
+    { page: "activity", label: "Activity", icon: "activity", section: "System" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
@@ -87,7 +87,7 @@
 
   // Narrow windows get a compact primary nav plus a "More" menu instead of a
   // long horizontal scroll strip.
-  const PRIMARY_NAV = new Set(["board", "telework", "travel", "leave"]);
+  const PRIMARY_NAV = new Set(["board", "calendar", "today", "employees"]);
   let primaryNavItems = $derived(NAV.filter((i) => PRIMARY_NAV.has(i.page)));
   let moreNavItems = $derived(NAV.filter((i) => !PRIMARY_NAV.has(i.page)));
   let isNarrow = $state(false);

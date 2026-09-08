@@ -22,7 +22,11 @@ try {
   await seed.waitFor({ state: "hidden" });
 
   async function go(name, heading = name) {
-    await page.getByRole("link", { name, exact: true }).first().click();
+    const link = page.getByRole("link", { name, exact: true }).first();
+    if (!(await link.isVisible())) await page.getByRole("button", { name: /More/ }).click();
+    // Compact overflow destinations have the menuitem role.
+    if (await link.isVisible()) await link.click();
+    else await page.getByRole("menuitem", { name, exact: true }).click();
     await page.getByRole("heading", { name: heading, exact: true }).waitFor();
   }
   async function settled() {
