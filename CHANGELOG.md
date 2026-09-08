@@ -4,6 +4,8 @@
 
 ### Workspace design preview
 
+- Changed the preview’s default accent to blue in light and dark mode, including buttons, navigation highlights, focus indicators, and avatars.
+
 - Refined the shared light/dark surfaces, typography, controls, tables, and navigation. Tasks, Telework, Travel, and Leave lead the daily workspace; existing accent palettes and glass appearances remain available.
 - Introduced consistent headers and action placement on the four daily pages, with searchable availability lists, clear filter reset actions, and tables that scroll within their content area.
 - Added a compact task-card option and retained the Board/List selection, filters, sort, card density, and horizontal board position when returning from another page or task editor during the same session. Existing task editing, status changes, and storage formats are preserved.

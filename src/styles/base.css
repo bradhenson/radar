@@ -22,9 +22,9 @@
   --text-muted: #647179;
 
   /* Brand */
-  --accent: #196f65;
-  --accent-hover: #12594f;
-  --accent-soft: #e0efeb;
+  --accent: #3661e4;
+  --accent-hover: #2b51c7;
+  --accent-soft: #e9eefc;
   --accent-text: #ffffff;
 
   /* Semantics */
@@ -38,8 +38,8 @@
   --duesoon-fg: #755c04;
   --success-bg: #dff3e6;
   --success-fg: #0e5c2e;
-  --avatar-bg: #dfede9;
-  --avatar-fg: #22695f;
+  --avatar-bg: #dfe8fb;
+  --avatar-fg: #2b4bad;
 
   /* Shape + depth */
   --radius: 6px;
@@ -68,10 +68,10 @@
   --text: #e0e5e9;
   --text-muted: #a1abb4;
 
-  --accent: #79caba;
-  --accent-hover: #96d8cb;
-  --accent-soft: #233d38;
-  --accent-text: #102923;
+  --accent: #4daafc;
+  --accent-hover: #6cbbff;
+  --accent-soft: #1e2f42;
+  --accent-text: #0c1a27;
 
   --danger: #ef7186;
   --warning: #d9b13b;
@@ -82,8 +82,8 @@
   --duesoon-fg: #e8ce7f;
   --success-bg: #1c3d2b;
   --success-fg: #8fe0b2;
-  --avatar-bg: #29453e;
-  --avatar-fg: #a4dcce;
+  --avatar-bg: #1c3a55;
+  --avatar-fg: #a8d2fa;
 
   --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.4);
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.12);

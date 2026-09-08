@@ -2,7 +2,7 @@
 
 Branch: `codex/workspace-redesign`. This is a reviewable design iteration; it has not been merged into main.
 
-The focus is Tasks, Telework, Travel, and Leave. Daily navigation is grouped first, the four pages share a header and action pattern, and the app uses quieter surfaces with a teal default accent. Existing palettes and the three appearance choices remain available.
+The focus is Tasks, Telework, Travel, and Leave. Daily navigation is grouped first, the four pages share a header and action pattern, and the app uses quieter surfaces with a blue default accent. Existing palettes and the three appearance choices remain available.
 
 On Tasks, try **Compact cards**, switch between Board and List, and open and close a task. Your filters, sort, density, and horizontal board position return during the same app session. Reloading starts a fresh presentation session; records remain persisted as before.
 
