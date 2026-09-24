@@ -323,16 +323,10 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors.some((e) => e.includes("boardOrder"))).toBe(true);
   });
 
-  it("accepts an optional command-authorized flag on telework but rejects a non-boolean one", () => {
-    const ok = createBackupPackage(createSampleSnapshot());
-    (ok.data.teleworkRecords[0] as Record<string, unknown>).commandAuthorized = true;
-    expect(parseAndValidateBackup(reseal(ok)).valid).toBe(true);
-
-    const bad = createBackupPackage(createSampleSnapshot());
-    (bad.data.teleworkRecords[0] as Record<string, unknown>).commandAuthorized = "yes";
-    const r = parseAndValidateBackup(reseal(bad));
-    expect(r.valid).toBe(false);
-    expect(r.errors.some((e) => e.includes("commandAuthorized"))).toBe(true);
+  it("accepts the command-approved telework status", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.teleworkRecords[0] as Record<string, unknown>).status = "command_approved";
+    expect(parseAndValidateBackup(reseal(pkg)).valid).toBe(true);
   });
 
   it("warns (not errors) about orphan references", () => {

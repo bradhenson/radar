@@ -279,6 +279,8 @@ export type TeleworkStatus =
   | "pending_supervisor"
   | "pending_approval"
   | "approved"
+  /** Situational requests only: directed or approved by the command, so it uses none of the pay period allowance. */
+  | "command_approved"
   | "active"
   | "expired"
   | "denied"
@@ -293,12 +295,6 @@ export interface TeleworkRecord {
   expirationDate?: IsoDate;
   status: TeleworkStatus;
   scheduleSummary?: string;
-  /**
-   * Situational requests only: telework directed or authorized by the command
-   * (weather closure, facility outage, etc.). Still tracked, but uses none of
-   * the per-pay-period allowance. Absent on records written before the flag.
-   */
-  commandAuthorized?: boolean;
   sourceSystem?: string;
   sourceReference?: string;
   lastVerifiedDate?: IsoDate;

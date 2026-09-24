@@ -20,7 +20,9 @@
     requestEndDate,
     requestPayPeriodStart,
     SITUATIONAL_REQUEST_TYPE,
+    SITUATIONAL_STATUS_OPTIONS,
     teleworkDays,
+    teleworkStatusLabel,
     teleworkUsageByPayPeriod,
     usageKey,
     type TeleworkPayPeriodUsage
@@ -29,16 +31,10 @@
   import { newId } from "../utils/ids";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
-  import { humanizeCode } from "../utils/labels";
 
   const SITUATIONAL_TYPE = SITUATIONAL_REQUEST_TYPE;
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
-  const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
-    { value: "pending", label: "Pending" },
-    { value: "approved", label: "Approved" },
-    { value: "denied", label: "Denied" },
-    { value: "cancelled", label: "Cancelled" }
-  ];
+  const STATUS_OPTIONS = SITUATIONAL_STATUS_OPTIONS;
 
   const AGREEMENT_TYPES = TELEWORK_RECORD_TYPES.filter((t) => t !== SITUATIONAL_TYPE);
   const AGREEMENT_STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
@@ -66,7 +62,6 @@
   let fStartDate = $state("");
   let fEndDate = $state("");
   let fNotes = $state("");
-  let fCommandAuthorized = $state(false);
   let fError = $state("");
   // Agreement form (telework agreements, renewals, modifications).
   let agreementFormOpen = $state(false);
@@ -101,7 +96,7 @@
   });
 
   function statusLabel(status: TeleworkStatus): string {
-    return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? humanizeCode(status);
+    return teleworkStatusLabel(status);
   }
 
   /**
@@ -123,7 +118,7 @@
   // Snapshots of the values each form opened with, for the unsaved-changes guards.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fStatus, fRequestDate, fStartDate, fEndDate, fNotes, fCommandAuthorized]);
+    return JSON.stringify([fEmployee, fStatus, fRequestDate, fStartDate, fEndDate, fNotes]);
   }
   let openedAgreementSnapshot = $state("");
   function agreementSnapshot(): string {
@@ -141,7 +136,6 @@
     fStartDate = t?.effectiveDate ?? defaults.effectiveDate ?? "";
     fEndDate = t?.expirationDate ?? defaults.expirationDate ?? "";
     fNotes = t?.notes ?? "";
-    fCommandAuthorized = t?.commandAuthorized ?? false;
     fError = "";
     openedSnapshot = formSnapshot();
     formOpen = true;
@@ -199,14 +193,13 @@
         requestDate: fRequestDate,
         effectiveDate: fStartDate,
         expirationDate: endDate,
-        notes: fNotes,
-        commandAuthorized: fCommandAuthorized
+        notes: fNotes
       },
       { id: newId(), now: nowTimestamp() }
     );
     await app.putRecord("teleworkRecords", record, {
       actionType: editing ? "updated" : "created",
-      summary: `${editing ? "Updated" : "Added"} ${fCommandAuthorized ? "command-authorized" : "situational"} telework request for ${app.employeeName(fEmployee)}`
+      summary: `${editing ? "Updated" : "Added"} situational telework request for ${app.employeeName(fEmployee)}`
     });
     formOpen = false;
   }
@@ -277,7 +270,7 @@
       .filter(isSituationalRequest)
       .filter((t) => showHistorical || inRequestWindow(t))
       .filter((t) => !filterEmployee || t.employeeId === filterEmployee)
-      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.recordType} ${statusLabel(t.status)} ${t.commandAuthorized ? "command authorized" : ""} ${t.effectiveDate ?? ""} ${t.requestDate ?? ""}`.toLowerCase().includes(searchTerm))
+      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.recordType} ${statusLabel(t.status)} ${t.effectiveDate ?? ""} ${t.requestDate ?? ""}`.toLowerCase().includes(searchTerm))
       .filter((t) => !filterStatus || t.status === filterStatus)
       .sort((a, b) => {
         const aDate = a.effectiveDate ?? a.requestDate ?? "9999-12-31";
@@ -389,7 +382,6 @@
         "Telework start",
         "Telework end",
         "Telework days",
-        "Command authorized",
         "Pay period",
         "Days used in pay period",
         "Pay period allowance",
@@ -404,7 +396,6 @@
         t.effectiveDate,
         requestEndDate(t),
         teleworkDays(t).length,
-        t.commandAuthorized ? "Yes" : "No",
         requestPayPeriodStart(t, app.settings.payPeriodAnchorDate),
         usageFor(t)?.totalDays,
         teleworkLimit,
@@ -528,8 +519,8 @@
                 <td class="date-cell">{formatDate(t.effectiveDate)}</td>
                 <td class="date-cell">{formatDate(requestEndDate(t))}</td>
                 <td class="usage-cell">
-                  {#if t.commandAuthorized}
-                    <span class="badge command-tag" title="Command-authorized telework uses none of the pay period allowance">Command authorized</span>
+                  {#if t.status === "command_approved"}
+                    <span class="muted" title="Command-approved telework uses none of the pay period allowance">Not counted</span>
                   {:else if usage}
                     <span
                       class="badge"
@@ -586,7 +577,7 @@
                 >
               </td>
               <td>{t.recordType}</td>
-              <td><span class="badge status-{t.status}">{humanizeCode(t.status)}</span></td>
+              <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
               <td class="date-cell">{formatDate(t.effectiveDate)}</td>
               <td class="date-cell">
                 {#if expirationState(t) === "overdue"}
@@ -647,7 +638,7 @@
                   {#each day.events.slice(0, 4) as event (event.id)}
                     <button type="button" class="calendar-event status-{event.status}" onclick={() => openForm(event)}>
                       <span>{app.employeeName(event.employeeId)}</span>
-                      <small>{statusLabel(event.status)}{event.commandAuthorized ? " · Command" : ""}</small>
+                      <small>{statusLabel(event.status)}</small>
                     </button>
                   {/each}
                   {#if day.events.length > 4}
@@ -701,13 +692,6 @@
           <input id="tw-end" type="date" bind:value={fEndDate} style="width:100%" />
         </div>
       </div>
-      <label class="check-option" for="tw-command">
-        <input id="tw-command" type="checkbox" bind:checked={fCommandAuthorized} />
-        <span>
-          <strong>Command authorized</strong>
-          <span class="check-hint">Directed or approved by the command (for example, a weather or facility closure). It is still tracked, but does not count toward the {teleworkLimit}-day pay period limit.</span>
-        </span>
-      </label>
       <label for="tw-notes">Notes</label>
       <textarea id="tw-notes" bind:value={fNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
       <div class="dialog-actions">
@@ -984,6 +968,7 @@
     color: var(--text-muted);
   }
   .status-approved,
+  .status-command_approved,
   .status-active {
     background: var(--success-bg, var(--surface-2));
   }
@@ -1021,10 +1006,6 @@
   }
   .usage-cell {
     white-space: nowrap;
-  }
-  .command-tag {
-    background: var(--accent-soft);
-    color: var(--accent);
   }
   .usage-cell .small {
     margin-left: .35rem;

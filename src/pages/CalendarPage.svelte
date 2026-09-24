@@ -7,6 +7,7 @@
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
+  import { teleworkStatusLabel } from "../domain/rules/telework";
   import { awardDueMap, leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap, travelDayMap } from "../domain/rules/calendar";
   import { addDays, addMonths, formatDate } from "../utils/dates";
 
@@ -304,7 +305,7 @@
                 <button
                   type="button"
                   class="chip kind-chip kind-telework"
-                  title={`${app.employeeName(rec.employeeId)} — situational telework (${rec.status.replace(/_/g, " ")}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the record.`}
+                  title={`${app.employeeName(rec.employeeId)} — situational telework (${teleworkStatusLabel(rec.status).toLowerCase()}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the record.`}
                   onclick={() => router.go("telework", rec.id)}
                 >
                   <span class="chip-text">Telework · {app.employeeName(rec.employeeId)}</span>

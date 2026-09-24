@@ -18,6 +18,7 @@
   import { INTERACTION_TYPES, statusLabel, type EmployeeInteraction, type EmployeeNote, type EmployeeProfileField, type MeetingNote } from "../domain/models";
   import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
+  import { teleworkStatusLabel } from "../domain/rules/telework";
   import { compareDates, daysBetween, formatDate, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
@@ -522,7 +523,7 @@
           <tbody>
             {#each telework as t (t.id)}
               <tr>
-                <td><button type="button" class="link" onclick={() => router.go("telework", t.id)}>{t.recordType}</button></td><td>{humanizeCode(t.status)}{t.commandAuthorized ? " · Command authorized" : ""}</td>
+                <td><button type="button" class="link" onclick={() => router.go("telework", t.id)}>{t.recordType}</button></td><td>{teleworkStatusLabel(t.status)}</td>
                 <td>{formatDate(t.requestDate)}</td><td>{teleworkRange(t)}</td>
                 <td>{t.scheduleSummary ?? ""}</td><td>{t.sourceReference ?? ""}</td>
               </tr>

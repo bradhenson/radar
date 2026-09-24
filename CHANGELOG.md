@@ -2,9 +2,9 @@
 
 ## Unreleased
 
-### Telework: command-authorized requests
+### Telework: Command Approved status
 
-- Situational telework requests have a **Command authorized** checkbox. Use it for telework the command directs or approves (a weather or facility closure, for example). The request is still listed, exported, and shown on the calendars, but its days do not count toward the per-pay-period limit. The Pay period use column shows "Command authorized" in place of a count, searching for "command" finds these requests, and the CSV export gains a Command authorized column. Existing requests are unaffected, and backups carry the new flag.
+- Situational telework requests have a new status, **Command Approved**, in the Status dropdown beside Approved. Use it for telework the command directs or approves (a weather or facility closure, for example). The request is still listed, exported, and shown on the calendars, but its days do not count toward the per-pay-period limit; the Pay period use column reads "Not counted" for it. Backups carry and validate the new status, and the sample data includes one such request.
 
 ### Consistent page layout
 

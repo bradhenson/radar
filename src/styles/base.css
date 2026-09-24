@@ -333,27 +333,6 @@ label .req { color: var(--danger); }
 .field-hint { color: var(--text-muted); font-size: .78rem; font-weight: 400; }
 .field-error { color: var(--danger); font-size: .85rem; margin-top: .2rem; }
 
-/* Checkbox with a bold label and a plain-language explanation beneath it.
-   The whole block is the click target. */
-label.check-option {
-  display: flex;
-  align-items: flex-start;
-  gap: .6rem;
-  margin: .85rem 0 .2rem;
-  padding: .65rem .75rem;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--surface-2);
-  font-weight: 400;
-  cursor: pointer;
-}
-label.check-option:has(input:checked) {
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
-  background: var(--accent-soft);
-}
-label.check-option input { margin-top: .15rem; flex: none; }
-label.check-option strong { display: block; font-weight: 650; }
-label.check-option .check-hint { display: block; color: var(--text-muted); font-size: .8rem; line-height: 1.4; }
 
 /* ---------- data tables ---------- */
 

@@ -11,6 +11,7 @@ import {
   requestPayPeriodStart,
   SITUATIONAL_REQUEST_TYPE,
   teleworkDays,
+  teleworkStatusLabel,
   teleworkUsageByPayPeriod,
   usageKey
 } from "../../src/domain/rules/telework";
@@ -118,10 +119,16 @@ describe("countsTowardTeleworkLimit", () => {
     expect(countsTowardTeleworkLimit({ recordType: "Agreement", status: "active" })).toBe(false);
   });
 
-  it("ignores command-authorized requests whatever their status", () => {
-    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "approved", commandAuthorized: true })).toBe(false);
-    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "pending", commandAuthorized: true })).toBe(false);
-    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "approved", commandAuthorized: false })).toBe(true);
+  it("ignores command-approved requests", () => {
+    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "command_approved" })).toBe(false);
+  });
+});
+
+describe("teleworkStatusLabel", () => {
+  it("uses the form's wording, and reads stored codes as words otherwise", () => {
+    expect(teleworkStatusLabel("command_approved")).toBe("Command Approved");
+    expect(teleworkStatusLabel("approved")).toBe("Approved");
+    expect(teleworkStatusLabel("pending_supervisor")).toBe("Pending supervisor");
   });
 });
 
@@ -151,11 +158,11 @@ describe("teleworkUsageByPayPeriod", () => {
     expect(usage.get(usageKey("e2", "2026-07-19"))).toBeUndefined();
   });
 
-  it("leaves command-authorized days out of the tally", () => {
+  it("leaves command-approved days out of the tally", () => {
     const withCommand = teleworkUsageByPayPeriod(
       [
         ...records,
-        request({ id: "r8", employeeId: "e1", effectiveDate: "2026-07-22", expirationDate: "2026-07-24", commandAuthorized: true })
+        request({ id: "r8", employeeId: "e1", effectiveDate: "2026-07-22", expirationDate: "2026-07-24", status: "command_approved" })
       ],
       ANCHOR
     );

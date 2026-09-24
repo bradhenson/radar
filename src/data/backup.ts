@@ -238,7 +238,7 @@ const ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readonly string
   teleworkRecords: {
     status: [
       "draft", "pending", "pending_employee", "pending_supervisor", "pending_approval",
-      "approved", "active", "expired", "denied", "cancelled"
+      "approved", "command_approved", "active", "expired", "denied", "cancelled"
     ]
   },
   travelRecords: {
@@ -301,11 +301,6 @@ const BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employeeNotes: ["isArchived"],
   quickNotes: ["isPinned", "isArchived"],
   meetingNotes: ["isArchived"]
-};
-
-// Optional boolean fields validated only when present.
-const OPTIONAL_BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
-  teleworkRecords: ["commandAuthorized"]
 };
 
 function isParseableTimestamp(v: unknown): boolean {
@@ -611,12 +606,6 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
       for (const field of BOOLEAN_FIELDS[name] ?? []) {
         if (typeof rec[field] !== "boolean") {
           result.errors.push(`${name}[${i}].${field} must be true or false.`);
-        }
-      }
-      for (const field of OPTIONAL_BOOLEAN_FIELDS[name] ?? []) {
-        const v = rec[field];
-        if (v !== undefined && v !== null && typeof v !== "boolean") {
-          result.errors.push(`${name}[${i}].${field} must be true or false when provided.`);
         }
       }
       if (name === "trainingRequirements") {
