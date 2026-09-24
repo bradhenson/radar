@@ -5,6 +5,9 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import { humanizeCode } from "../utils/labels";
   import type { ActivityEntry } from "../domain/models";
   import { groupActivityEntries } from "../domain/rules/activityGroups";
   import { formatTimestamp, timestampToLocalDate } from "../utils/dates";
@@ -53,7 +56,7 @@
   }
 
   function actionLabel(actionType: string): string {
-    return actionType.replaceAll("_", " ");
+    return humanizeCode(actionType);
   }
 
   let entityOptions = $derived(
@@ -143,13 +146,10 @@
 </script>
 
 <div class="page">
-  <div class="page-header">
-    <h1>Activity</h1>
-    <span class="muted">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
-  </div>
+  <WorkspaceHeader title="Activity" section="System" description="A running record of every change made in RADAR, newest first." />
 
-  <div class="toolbar activity-toolbar">
-    <input type="search" bind:value={search} placeholder="Search activity" aria-label="Search activity summaries" />
+  <div class="toolbar record-toolbar activity-toolbar">
+    <input type="search" bind:value={search} placeholder="Search activity…" aria-label="Search activity summaries" />
     <select bind:value={filterEntity} aria-label="Filter by record type">
       <option value="">All record types</option>
       {#each entityOptions as option (option.value)}
@@ -164,8 +164,10 @@
     </select>
     <label class="date-field">From <input type="date" bind:value={fromDate} max={toDate || undefined} /></label>
     <label class="date-field">To <input type="date" bind:value={toDate} min={fromDate || undefined} /></label>
+    <span class="spacer"></span>
+    <span class="result-count">{filtered.length} entr{filtered.length === 1 ? "y" : "ies"}</span>
     {#if hasFilters}
-      <button type="button" onclick={clearFilters}>Clear</button>
+      <button type="button" class="link small clear-filters" onclick={clearFilters}>Clear filters</button>
     {/if}
   </div>
 
@@ -186,13 +188,13 @@
           aria-expanded={open}
           onclick={() => (expandedGroups[group.key] = !open)}
         >
-          <span class="disclosure" aria-hidden="true">{open ? "▾" : "▸"}</span>
+          <span class="group-chevron" aria-hidden="true"><Icon name="chevron" size={14} /></span>
           {group.title}
           <span class="group-count">{group.entries.length}</span>
         </button>
       </h2>
       {#if open}
-        <div class="table-wrap">
+        <div class="table-scroll">
           <table class="data activity-table">
             <thead>
               <tr><th>When</th><th>Type</th><th>Action</th><th>Summary</th><th></th></tr>
@@ -237,7 +239,6 @@
 <style>
   /* Not sticky: the filter row scrolls with the groups it filters, and a
      sticky row needs a fill, which paints a band over the Look's backdrop. */
-  .activity-toolbar input[type="search"] { min-width: 15rem; flex: 1; }
   .date-field {
     display: inline-flex;
     align-items: center;
@@ -247,31 +248,6 @@
     color: var(--text-muted);
     white-space: nowrap;
   }
-  .group-heading { margin: 1rem 0 .35rem; }
-  .group-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    border: none;
-    background: none;
-    box-shadow: none;
-    padding: .1rem .2rem;
-    font: inherit;
-    font-weight: 700;
-    color: var(--text);
-  }
-  .group-toggle:hover { background: none; color: var(--accent); }
-  .group-toggle .disclosure { color: var(--text-muted); font-size: .8rem; }
-  .group-count {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: .02rem .45rem;
-    color: var(--text-muted);
-    font-size: .74rem;
-    font-weight: 700;
-  }
-  .table-wrap { overflow-x: auto; }
   .when-cell { white-space: nowrap; color: var(--text-muted); font-size: .82rem; }
   .action-cell { white-space: nowrap; color: var(--text-muted); }
   .open-cell { text-align: right; }

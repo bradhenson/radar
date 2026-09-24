@@ -6,6 +6,7 @@ import {
   daysBetween,
   describeDueDistance,
   formatDate,
+  formatLongDate,
   isValidIsoDate
 } from "../../src/utils/dates";
 
@@ -84,5 +85,14 @@ describe("formatting", () => {
     expect(describeDueDistance("2026-07-03", "2026-07-04")).toBe("overdue by 1 day");
     expect(describeDueDistance("2026-07-01", "2026-07-04")).toBe("overdue by 3 days");
     expect(describeDueDistance("2026-07-05", "2026-07-04")).toBe("due in 1 day");
+  });
+});
+
+describe("formatLongDate", () => {
+  it("spells out the weekday and month without timezone drift", () => {
+    expect(formatLongDate("2026-09-24")).toBe("Thursday, September 24, 2026");
+    expect(formatLongDate("2026-01-04")).toBe("Sunday, January 4, 2026");
+    expect(formatLongDate("")).toBe("");
+    expect(formatLongDate("not-a-date")).toBe("not-a-date");
   });
 });

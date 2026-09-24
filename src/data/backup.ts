@@ -303,6 +303,11 @@ const BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
   meetingNotes: ["isArchived"]
 };
 
+// Optional boolean fields validated only when present.
+const OPTIONAL_BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
+  teleworkRecords: ["commandAuthorized"]
+};
+
 function isParseableTimestamp(v: unknown): boolean {
   return typeof v === "string" && v.length > 0 && !Number.isNaN(Date.parse(v));
 }
@@ -606,6 +611,12 @@ export function parseAndValidateBackup(jsonText: string, limits: BackupValidatio
       for (const field of BOOLEAN_FIELDS[name] ?? []) {
         if (typeof rec[field] !== "boolean") {
           result.errors.push(`${name}[${i}].${field} must be true or false.`);
+        }
+      }
+      for (const field of OPTIONAL_BOOLEAN_FIELDS[name] ?? []) {
+        const v = rec[field];
+        if (v !== undefined && v !== null && typeof v !== "boolean") {
+          result.errors.push(`${name}[${i}].${field} must be true or false when provided.`);
         }
       }
       if (name === "trainingRequirements") {

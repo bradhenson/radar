@@ -417,14 +417,14 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
 <div class="page board-page" class:list-mode={view === "list"}>
-  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} section="Daily workspace"
-    description="A clear view of the work ahead.">
+  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} section="Work"
+    description={view === "board" ? "Every task, organized by where it stands. Drag a card to move it." : "Every task in one sortable list."}>
     {#snippet actions()}
       <div class="view-toggle" role="group" aria-label="Task view">
         <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}><Icon name="board" size={14} /> Board</button>
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
       </div>
-      <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New task</button>
+      <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
     {/snippet}
   </WorkspaceHeader>
   <div class="board-overview">
@@ -503,7 +503,7 @@
     />
   {:else if view === "list"}
     {#if listRows.length === 0}
-      <EmptyState message="No tasks yet." hint="Use + New task to add the first one." />
+      <EmptyState message="No tasks yet." hint="Use + New Task to add the first one." />
     {:else}
       <div class="table-wrap">
       <table class="data task-list">

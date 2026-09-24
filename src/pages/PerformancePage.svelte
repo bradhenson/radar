@@ -4,11 +4,13 @@
   import { router } from "../app/router.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import type { PerformanceInput, RichTextField } from "../domain/models";
   import { daysBetween, formatDate } from "../utils/dates";
   import { downloadText, backupFilename } from "../utils/download";
   import { richTextDocToPlainText } from "../utils/richTextDoc";
+  import { humanizeCode } from "../utils/labels";
 
   type ViewMode = "inputs" | "employees" | "coverage";
   type SortMode = "newest" | "oldest" | "employee";
@@ -28,7 +30,7 @@
   }
 
   function statusText(value: string): string {
-    return value.replaceAll("_", " ");
+    return humanizeCode(value);
   }
 
   // Table rows are short summaries, so flatten any rich-text formatting to
@@ -180,7 +182,7 @@
     <td class="summary-cell"><span class="clamp2">{summaryText(input.actionOrAccomplishment)}</span></td>
     <td>{#if input.projectId}{app.projectName(input.projectId)}{:else}<span class="muted">—</span>{/if}</td>
     <td>{#if input.result}<span class="muted">Yes</span>{:else}<span class="badge warning">Missing</span>{/if}</td>
-    <td><span class="badge">{statusText(input.inputStatus)}</span></td>
+    <td><span class="badge" class:success={input.inputStatus === "ready"}>{statusText(input.inputStatus)}</span></td>
   </tr>
   {#if open}
     <tr class="detail-row">
@@ -222,24 +224,21 @@
 {/snippet}
 
 <div class="page">
-  <div class="page-header">
-    <h1>Performance</h1>
-    <span class="muted">{viewMode === "coverage" ? `${coverage.length} employees shown` : `${inputs.length} inputs shown`}</span>
-    <span class="spacer"></span>
-    <button type="button" onclick={exportText} disabled={inputs.length === 0}>Export text</button>
-    <button type="button" class="primary" onclick={() => (ui.performanceFormPrefill = { employeeId: filterEmployee || undefined })}>
-      New Performance Input
-    </button>
-  </div>
+  <WorkspaceHeader title="Performance" section="People" description="Record accomplishments as they happen so evaluations write themselves.">
+    {#snippet actions()}
+      <div class="view-toggle" role="group" aria-label="Performance view">
+        <button type="button" class:active={viewMode === "inputs"} aria-pressed={viewMode === "inputs"} onclick={() => (viewMode = "inputs")}>All Inputs</button>
+        <button type="button" class:active={viewMode === "employees"} aria-pressed={viewMode === "employees"} onclick={() => (viewMode = "employees")}>By Employee</button>
+        <button type="button" class:active={viewMode === "coverage"} aria-pressed={viewMode === "coverage"} onclick={() => (viewMode = "coverage")}>Coverage</button>
+      </div>
+      <button type="button" class="primary" onclick={() => (ui.performanceFormPrefill = { employeeId: filterEmployee || undefined })}>
+        + New Performance Input
+      </button>
+    {/snippet}
+  </WorkspaceHeader>
 
-  <div class="view-tabs" aria-label="Performance view">
-    <button type="button" class:active={viewMode === "inputs"} aria-pressed={viewMode === "inputs"} onclick={() => (viewMode = "inputs")}>All Inputs</button>
-    <button type="button" class:active={viewMode === "employees"} aria-pressed={viewMode === "employees"} onclick={() => (viewMode = "employees")}>By Employee</button>
-    <button type="button" class:active={viewMode === "coverage"} aria-pressed={viewMode === "coverage"} onclick={() => (viewMode = "coverage")}>Coverage</button>
-  </div>
-
-  <div class="toolbar filter-toolbar">
-    <input type="search" bind:value={search} placeholder={viewMode === "coverage" ? "Search employees" : "Search inputs"} aria-label="Search performance" />
+  <div class="toolbar record-toolbar">
+    <input type="search" bind:value={search} placeholder={viewMode === "coverage" ? "Search employees…" : "Search inputs…"} aria-label="Search performance" />
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
       {#each app.activeEmployees as employee (employee.id)}<option value={employee.id}>{employee.displayName}</option>{/each}
@@ -261,13 +260,16 @@
         <option value="employee">Employee name</option>
       </select>
     {/if}
+    <span class="spacer"></span>
+    <button type="button" onclick={exportText} disabled={inputs.length === 0}>Export text</button>
+    <span class="result-count">{viewMode === "coverage" ? `${coverage.length} employees shown` : `${inputs.length} inputs shown`}</span>
   </div>
 
   {#if viewMode === "coverage"}
     {#if coverage.length === 0}
       <EmptyState message="No employees match." hint="Clear the employee filter or search to review coverage." />
     {:else}
-      <div class="table-wrap">
+      <div class="table-scroll">
         <table class="data coverage-table">
           <thead><tr><th>Employee</th><th>Inputs</th><th>Most recent</th><th>Missing result / impact</th><th></th></tr></thead>
           <tbody>
@@ -281,7 +283,7 @@
                     {#if row.age !== undefined && row.age >= app.settings.performanceInputReminderDays}
                       <span class="badge warning">{row.age}d ago</span>
                     {/if}
-                  {:else}<span class="badge warning">none</span>{/if}
+                  {:else}<span class="badge warning">None yet</span>{/if}
                 </td>
                 <td>{row.missingResult}</td>
                 <td>
@@ -300,7 +302,7 @@
   {:else if inputs.length === 0}
     <EmptyState message="No performance inputs match." hint="Capture accomplishments with New Performance Input, or adjust the filters." />
   {:else}
-    <div class="table-wrap">
+    <div class="table-scroll">
       <table class="data input-table">
         <thead>
           <tr>
@@ -332,13 +334,6 @@
 </div>
 
 <style>
-  .view-tabs { display: inline-flex; gap: .25rem; padding: .25rem; margin-bottom: .8rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
-  .view-tabs button { min-height: 1.9rem; border: 0; background: transparent; color: var(--text-muted); }
-  .view-tabs button.active { background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent); }
-  /* Transparent, like the Meetings filter row: a flat --bg fill paints an
-     opaque band over the Look's ambient backdrop instead of blending with it. */
-  .filter-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: transparent; }
-  .filter-toolbar input[type="search"] { min-width: 15rem; flex: 1; }
   .employee-cell { white-space: nowrap; }
   .summary-cell { min-width: 16rem; }
   .summary-cell .clamp2 {

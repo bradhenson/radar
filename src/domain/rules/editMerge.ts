@@ -117,6 +117,8 @@ export interface TeleworkEditFields {
   notes: string;
   /** Only the agreement form exposes this; omit to preserve the stored value. */
   scheduleSummary?: string;
+  /** Only the request form exposes this; omit to preserve the stored value. */
+  commandAuthorized?: boolean;
 }
 
 export function mergeTeleworkEdit(existing: TeleworkRecord | undefined, f: TeleworkEditFields, ctx: EditContext): TeleworkRecord {
@@ -134,6 +136,10 @@ export function mergeTeleworkEdit(existing: TeleworkRecord | undefined, f: Telew
     updatedAt: ctx.now
   };
   if (f.scheduleSummary !== undefined) record.scheduleSummary = f.scheduleSummary.trim() || undefined;
+  if (f.commandAuthorized !== undefined) {
+    if (f.commandAuthorized) record.commandAuthorized = true;
+    else delete record.commandAuthorized;
+  }
   return record;
 }
 

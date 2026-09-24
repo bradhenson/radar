@@ -117,6 +117,12 @@ describe("countsTowardTeleworkLimit", () => {
   it("ignores agreements, which are not per-day requests", () => {
     expect(countsTowardTeleworkLimit({ recordType: "Agreement", status: "active" })).toBe(false);
   });
+
+  it("ignores command-authorized requests whatever their status", () => {
+    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "approved", commandAuthorized: true })).toBe(false);
+    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "pending", commandAuthorized: true })).toBe(false);
+    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "approved", commandAuthorized: false })).toBe(true);
+  });
 });
 
 describe("teleworkUsageByPayPeriod", () => {
@@ -143,6 +149,17 @@ describe("teleworkUsageByPayPeriod", () => {
 
   it("leaves out denied requests and agreements entirely", () => {
     expect(usage.get(usageKey("e2", "2026-07-19"))).toBeUndefined();
+  });
+
+  it("leaves command-authorized days out of the tally", () => {
+    const withCommand = teleworkUsageByPayPeriod(
+      [
+        ...records,
+        request({ id: "r8", employeeId: "e1", effectiveDate: "2026-07-22", expirationDate: "2026-07-24", commandAuthorized: true })
+      ],
+      ANCHOR
+    );
+    expect(withCommand.get(usageKey("e1", "2026-07-19"))?.totalDays).toBe(3);
   });
 
   it("splits a request that straddles a pay period boundary", () => {

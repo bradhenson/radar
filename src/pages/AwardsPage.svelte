@@ -7,6 +7,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
@@ -126,15 +127,14 @@
 </script>
 
 <div class="page">
-  <div class="page-header">
-    <h1>Awards</h1>
-    {#if app.awardRecords.length > 0}<span class="muted small">{rows.length} shown</span>{/if}
-    <span class="spacer"></span>
-    <button type="button" class="primary" onclick={() => openForm()}>Add Award</button>
-  </div>
+  <WorkspaceHeader title="Awards" section="People" description="Track recognition from first idea through nomination and decision.">
+    {#snippet actions()}
+      <button type="button" class="primary" onclick={() => openForm()}>+ Add Award</button>
+    {/snippet}
+  </WorkspaceHeader>
 
-  <div class="toolbar awards-toolbar">
-    <input type="search" bind:value={search} placeholder="Search awards" aria-label="Search awards" />
+  <div class="toolbar record-toolbar">
+    <input type="search" bind:value={search} placeholder="Search awards…" aria-label="Search awards" />
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
       {#each app.activeEmployees as employee (employee.id)}<option value={employee.id}>{employee.displayName}</option>{/each}
@@ -149,8 +149,10 @@
         {#each typeOptions as type (type)}<option value={type}>{type}</option>{/each}
       </select>
     {/if}
+    <span class="spacer"></span>
+    <span class="result-count">{rows.length} shown</span>
     {#if hasFilters}
-      <button type="button" onclick={clearFilters}>Clear</button>
+      <button type="button" class="link small clear-filters" onclick={clearFilters}>Clear filters</button>
     {/if}
   </div>
 
@@ -162,6 +164,8 @@
         : "Track nomination ideas, drafts, and submissions here."}
     />
   {:else}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Award records" tabindex="0">
     <table class="data">
       <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th></tr></thead>
       <tbody>
@@ -181,12 +185,13 @@
             </td>
             <td>{app.employeeName(a.employeeId)}</td>
             <td>{a.awardType ?? ""}</td>
-            <td><span class="badge">{a.status}</span></td>
+            <td><span class="badge" class:success={a.status === "Approved" || a.status === "Complete"}>{a.status}</span></td>
             <td class="date-cell">{formatDate(a.nominationDueDate)}</td>
           </tr>
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
 </div>
 
@@ -210,7 +215,7 @@
       <label for="aw-title">Title <span class="req">*</span></label>
       <input id="aw-title" type="text" bind:value={fTitle} maxlength="200" style="width:100%" />
       {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="aw-type">Award type</label>
           <input id="aw-type" type="text" bind:value={fType} maxlength="100" style="width:100%" />

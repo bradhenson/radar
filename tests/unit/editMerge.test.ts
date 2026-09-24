@@ -220,6 +220,14 @@ describe("mergeTeleworkEdit", () => {
     const cleared = mergeTeleworkEdit(full, { ...formFields(full), scheduleSummary: "  " }, ctx);
     expect(cleared.scheduleSummary).toBeUndefined();
   });
+
+  it("sets and clears command authorization only when the form exposes it", () => {
+    const marked = mergeTeleworkEdit(full, { ...formFields(full), commandAuthorized: true }, ctx);
+    expect(marked.commandAuthorized).toBe(true);
+    expect(mergeTeleworkEdit(marked, formFields(marked), ctx).commandAuthorized).toBe(true);
+    const cleared = mergeTeleworkEdit(marked, { ...formFields(marked), commandAuthorized: false }, ctx);
+    expect("commandAuthorized" in cleared).toBe(false);
+  });
 });
 
 describe("mergeTravelEdit", () => {
