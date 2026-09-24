@@ -25,12 +25,14 @@
     TRAVEL_PHASE_LABELS,
     travelPhase,
     travelPhaseRank,
+    travelSteps,
     travelVoucherDueDate,
     voucherStatusOf,
     voucherUrgency,
     type TravelPhase,
     type TravelSummaryFilter
   } from "../domain/rules/travel";
+  import TravelSteps from "../components/cues/TravelSteps.svelte";
   import { mergeTravelEdit } from "../domain/rules/editMerge";
   import { monthGrid, monthOf } from "../domain/rules/calendar";
   import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
@@ -99,12 +101,6 @@
   }
   function dtsLabel(v: TravelDtsAuthStatus): string {
     return TRAVEL_DTS_AUTH_STATUS_OPTIONS.find((o) => o.value === v)?.label ?? v.replace(/_/g, " ");
-  }
-  function iptBadgeClass(v: TravelIptConcurrence): string {
-    return v === "concurred" ? "success" : v === "pending" ? "warning" : "";
-  }
-  function dtsBadgeClass(v: TravelDtsAuthStatus): string {
-    return v === "approved" ? "success" : v === "created" ? "warning" : "";
   }
 
   function voucherLabel(v: TravelVoucherStatus): string {
@@ -504,13 +500,14 @@
     {#if rows.length === 0}
       <EmptyState message={search || filterEmployee || summaryFilter ? "No trips match this view." : "No travel records."} hint={search || filterEmployee || summaryFilter ? "Clear filters to see the other trips." : "Add a trip to track who's away, DTS status, and voucher due dates."} />
     {:else}
+      <p class="section-hint">Progress runs IPT → DTS → Trip → Voucher: ✓ done · ◉ in progress · ! needs attention · – not required. Hover a step for details.</p>
       <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="table-scroll" role="region" aria-label="Travel records" tabindex="0">
       <table class="data travel-table">
         <thead>
           <tr>
-            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>IPT</th><th>DTS authorization</th><th>Voucher</th>
+            <th>Employee</th><th>Destination</th><th class="date-col">Start</th><th class="date-col">End</th><th>Progress</th><th>Voucher</th>
           </tr>
         </thead>
         <tbody>
@@ -518,7 +515,7 @@
                voucher / who is away / who leaves soon" is readable at a glance. -->
           {#each groups as group (group.phase)}
             <tr class="group-row">
-              <td colspan="7">{TRAVEL_PHASE_LABELS[group.phase]} <span>({group.trips.length})</span></td>
+              <td colspan="6">{TRAVEL_PHASE_LABELS[group.phase]} <span>({group.trips.length})</span></td>
             </tr>
             {#each group.trips as t (t.id)}
               {@const open = Boolean(expanded[t.id])}
@@ -553,8 +550,13 @@
                 </td>
                 <td class="date-col">{formatDate(t.startDate)}</td>
                 <td class="date-col">{formatDate(t.endDate)}</td>
-                <td><span class="badge {iptBadgeClass(t.iptConcurrence)}">{iptLabel(t.iptConcurrence)}</span></td>
-                <td><span class="badge {dtsBadgeClass(t.dtsAuthorizationStatus)}">{dtsLabel(t.dtsAuthorizationStatus)}</span></td>
+                <td class="progress-cell">
+                  {#if cancelled}
+                    <span class="muted">Cancelled</span>
+                  {:else}
+                    <TravelSteps steps={travelSteps(t, app.today)} />
+                  {/if}
+                </td>
                 <td class="voucher-cell">
                   {#if cancelled}
                     <span class="muted">Not required</span>
@@ -573,10 +575,12 @@
               </tr>
               {#if open}
                 <tr class="detail-row">
-                  <td colspan="7">
+                  <td colspan="6">
                     <div class="detail" aria-label={`Travel details for ${app.employeeName(t.employeeId)}`}>
                       <dl class="detail-grid">
                         <div><dt>Trip status</dt><dd>{tripStatusDetail(t)}</dd></div>
+                        <div><dt>IPT concurrence</dt><dd>{iptLabel(t.iptConcurrence)}</dd></div>
+                        <div><dt>DTS authorization</dt><dd>{dtsLabel(t.dtsAuthorizationStatus)}</dd></div>
                         <div><dt>Voucher</dt><dd>{voucherDetail(t)}</dd></div>
                         {#if t.dtsAuthorizationId}
                           <div><dt>DTS authorization ID</dt><dd>{t.dtsAuthorizationId}</dd></div>

@@ -13,6 +13,7 @@
   import type { Employee } from "../domain/models";
   import { activeProfileFields, activeProfileSections, formattedProfileValue } from "../domain/employeeProfile";
   import { travelPhase } from "../domain/rules/travel";
+  import { isTeleworkingOn } from "../domain/rules/telework";
 
   const NO_COMPETENCY_FILTER = "__none";
   const STALE_INPUT_DAYS = 30;
@@ -80,6 +81,7 @@
             return compareDates(a.startDate, b.startDate) || compareDates(a.endDate, b.endDate);
           })[0];
         const onTravelNow = Boolean(upcomingTravel && travelPhase(upcomingTravel, app.today) === "on_travel");
+        const teleworkToday = app.teleworkRecords.some((t) => t.employeeId === e.id && isTeleworkingOn(t, app.today));
         const staleInput = !lastInput || daysBetween(lastInput, app.today) > STALE_INPUT_DAYS;
         return {
           e,
@@ -91,6 +93,7 @@
           onLeaveNow,
           upcomingTravel,
           onTravelNow,
+          teleworkToday,
           staleInput
         };
       })
@@ -371,6 +374,13 @@
                   router.go("employees", r.e.id);
                 }}>{r.e.displayName}</button
               >
+              {#if r.onLeaveNow || r.onTravelNow || r.teleworkToday}
+                <span class="where-today">
+                  {#if r.onLeaveNow}<span class="where-chip" title="On leave today"><Icon name="leave" size={12} /> Leave</span>{/if}
+                  {#if r.onTravelNow}<span class="where-chip" title="On travel today"><Icon name="travel" size={12} /> Travel</span>{/if}
+                  {#if r.teleworkToday && !r.onLeaveNow && !r.onTravelNow}<span class="where-chip" title="Teleworking today"><Icon name="telework" size={12} /> Telework</span>{/if}
+                </span>
+              {/if}
             </td>
             <td>{@render textOrDash(app.competencyCode(r.e.competencyId))}</td>
             <td>{@render textOrDash(r.e.team)}</td>
@@ -475,6 +485,26 @@
 {/if}
 
 <style>
+  .where-today {
+    display: inline-flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin-left: .35rem;
+    vertical-align: middle;
+  }
+  .where-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .2rem;
+    padding: .05rem .4rem;
+    border: 1px solid var(--border);
+    border-radius: 99px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .7rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
   th .th-sort {
     font: inherit;
     font-weight: inherit;

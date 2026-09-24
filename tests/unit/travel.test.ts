@@ -7,6 +7,7 @@ import {
   matchesTravelSummaryFilter,
   travelPhase,
   travelPhaseRank,
+  travelSteps,
   travelVoucherDueDate,
   voucherStatusOf,
   voucherUrgency,
@@ -143,5 +144,33 @@ describe("travelPhaseRank", () => {
     expect(travelPhaseRank("on_travel")).toBeLessThan(travelPhaseRank("upcoming"));
     expect(travelPhaseRank("upcoming")).toBeLessThan(travelPhaseRank("complete"));
     expect(travelPhaseRank("complete")).toBeLessThan(travelPhaseRank("cancelled"));
+  });
+});
+
+describe("travelSteps", () => {
+  const states = (t: TravelRecord, today = TODAY) => travelSteps(t, today).map((s) => `${s.key}:${s.state}`).join(" ");
+
+  it("walks an upcoming trip: paperwork in progress, trip and voucher still to come", () => {
+    const upcoming = trip({ startDate: "2026-08-03", endDate: "2026-08-05", voucherDueDate: "2026-08-10", iptConcurrence: "pending", dtsAuthorizationStatus: "not_started" });
+    expect(states(upcoming)).toBe("ipt:current dts:todo trip:todo voucher:todo");
+  });
+
+  it("marks paperwork still open after departure as late", () => {
+    const underway = trip({ startDate: "2026-07-19", endDate: "2026-07-22", iptConcurrence: "pending", dtsAuthorizationStatus: "created" });
+    expect(states(underway)).toBe("ipt:late dts:late trip:current voucher:todo");
+  });
+
+  it("shows the voucher as current when due and late when past due", () => {
+    expect(states(trip({ voucherDueDate: "2026-07-22" }))).toBe("ipt:done dts:done trip:done voucher:current");
+    expect(states(trip({ voucherDueDate: "2026-07-15" }))).toBe("ipt:done dts:done trip:done voucher:late");
+  });
+
+  it("finishes when the voucher is submitted, and skips steps that are not required", () => {
+    expect(states(trip({ voucherStatus: "submitted" }))).toBe("ipt:done dts:done trip:done voucher:done");
+    expect(states(trip({ iptConcurrence: "not_required", voucherStatus: "not_required" }))).toBe("ipt:skipped dts:done trip:done voucher:skipped");
+  });
+
+  it("has no tracker for a cancelled trip", () => {
+    expect(travelSteps(trip({ tripStatus: "cancelled" }), TODAY)).toEqual([]);
   });
 });

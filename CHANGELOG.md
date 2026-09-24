@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### At-a-glance visual cues
+
+- **Telework:** the Pay period use column shows a row of dots before the "3 of 2" count: filled for approved days, a ring for pending days, a dashed ring for days still unused, and a diamond for any day past the limit. A key sits above the table.
+- **Training:** each requirement's Progress shows a bar under the "27/40 complete" text, green for completed and red-striped for overdue.
+- **Performance → Coverage:** a new "Last 6 months" column shows one small bar per month, taller when more inputs were recorded, and flat when none were, so a gap before an evaluation stands out. Hovering a bar gives the month and count.
+- **Travel:** the separate IPT and DTS authorization columns are replaced by a Progress tracker, IPT → DTS → Trip → Voucher. Each step shows a check when done, a dot when in progress, an exclamation mark when it needs attention (paperwork still open after departure, or a voucher past due), and a dash when not required. Hovering a step explains it, and the expanded row still lists IPT concurrence and DTS authorization in words.
+- **Employees:** a small Leave, Travel, or Telework label appears beside a person's name when they are out or teleworking today.
+- Every cue keeps its text alongside, uses shape as well as color, and is described for screen readers.
+
 ### Telework: Command Approved status
 
 - Situational telework requests have a new status, **Command Approved**, in the Status dropdown beside Approved. Use it for telework the command directs or approves (a weather or facility closure, for example). The request is still listed, exported, and shown on the calendars, but its days do not count toward the per-pay-period limit; the Pay period use column reads "Not counted" for it. Backups carry and validate the new status, and the sample data includes one such request.

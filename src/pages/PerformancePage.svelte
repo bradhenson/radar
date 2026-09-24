@@ -5,6 +5,8 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import MonthStrip from "../components/cues/MonthStrip.svelte";
+  import { monthlyCounts } from "../domain/rules/performance";
   import RichTextView from "../components/common/RichTextView.svelte";
   import type { PerformanceInput, RichTextField } from "../domain/models";
   import { daysBetween, formatDate } from "../utils/dates";
@@ -93,7 +95,8 @@
           count: list.length,
           last,
           age: last ? daysBetween(last, app.today) : undefined,
-          missingResult: list.filter((p) => !p.result).length
+          missingResult: list.filter((p) => !p.result).length,
+          months: monthlyCounts(list.map((p) => p.inputDate), app.today)
         };
       })
       .sort((a, b) => a.employee.displayName.localeCompare(b.employee.displayName));
@@ -271,12 +274,13 @@
     {:else}
       <div class="table-scroll">
         <table class="data coverage-table">
-          <thead><tr><th>Employee</th><th>Inputs</th><th>Most recent</th><th>Missing result / impact</th><th></th></tr></thead>
+          <thead><tr><th>Employee</th><th>Inputs</th><th>Last 6 months</th><th>Most recent</th><th>Missing result / impact</th><th></th></tr></thead>
           <tbody>
             {#each coverage as row (row.employee.id)}
               <tr>
                 <td><strong>{row.employee.displayName}</strong></td>
                 <td>{row.count}</td>
+                <td><MonthStrip months={row.months} /></td>
                 <td>
                   {#if row.last}
                     {formatDate(row.last)}

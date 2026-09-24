@@ -10,7 +10,9 @@
   import { TELEWORK_RECORD_TYPES, type TeleworkRecord, type TeleworkStatus } from "../domain/models";
   import { mergeTeleworkEdit } from "../domain/rules/editMerge";
   import { monthGrid, monthOf } from "../domain/rules/calendar";
+  import UsageDots from "../components/cues/UsageDots.svelte";
   import {
+    allowanceDots,
     allowanceState,
     countsTowardTeleworkLimit,
     isSituationalRequest,
@@ -473,6 +475,7 @@
     <p class="small muted section-hint">
       Requests from the last {app.settings.teleworkLookbackDays} days plus everything upcoming, grouped by pay period.
       Each employee may use {teleworkLimit} telework day{teleworkLimit === 1 ? "" : "s"} per pay period.
+      <span class="dot-key">Pay period use: ● approved · ○ pending · ◆ ◇ over the limit.</span>
     </p>
     {#if rows.length === 0}
       <EmptyState message={search || filterEmployee || filterStatus ? "No requests match this view." : "No situational telework requests."} hint={search || filterEmployee || filterStatus ? "Clear filters to see the other requests." : "Add requests as they arrive by email."} />
@@ -522,6 +525,7 @@
                   {#if t.status === "command_approved"}
                     <span class="muted" title="Command-approved telework uses none of the pay period allowance">Not counted</span>
                   {:else if usage}
+                    <UsageDots dots={allowanceDots(usage.approvedDays, usage.pendingDays, teleworkLimit)} />
                     <span
                       class="badge"
                       class:overdue={state === "over"}
@@ -1005,6 +1009,9 @@
     text-transform: none;
   }
   .usage-cell {
+    white-space: nowrap;
+  }
+  .dot-key {
     white-space: nowrap;
   }
   .usage-cell .small {

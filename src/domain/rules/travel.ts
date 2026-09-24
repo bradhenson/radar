@@ -118,3 +118,70 @@ const PHASE_ORDER: Record<TravelPhase, number> = {
 export function travelPhaseRank(phase: TravelPhase): number {
   return PHASE_ORDER[phase];
 }
+
+/**
+ * One stop on the trip progress tracker. `state` drives the drawing (each
+ * state has its own shape, not only its own color); `detail` is the words a
+ * screen reader and the tooltip use.
+ */
+export type TravelStepState = "done" | "skipped" | "current" | "todo" | "late";
+
+export interface TravelStep {
+  key: "ipt" | "dts" | "trip" | "voucher";
+  label: string;
+  state: TravelStepState;
+  detail: string;
+}
+
+/**
+ * The paperwork-and-travel sequence for a trip: IPT concurrence, DTS
+ * authorization, the trip itself, then the voucher. Paperwork still open once
+ * the trip has started, and a voucher past its due date, read as late.
+ * Cancelled trips have no tracker (returns an empty list).
+ */
+export function travelSteps(
+  trip: TripLifecycleFields & Pick<TravelRecord, "iptConcurrence" | "dtsAuthorizationStatus">,
+  today: IsoDate
+): TravelStep[] {
+  const phase = travelPhase(trip, today);
+  if (phase === "cancelled") return [];
+  const started = phase !== "upcoming";
+
+  const ipt: TravelStep =
+    trip.iptConcurrence === "concurred"
+      ? { key: "ipt", label: "IPT", state: "done", detail: "IPT concurred" }
+      : trip.iptConcurrence === "not_required"
+        ? { key: "ipt", label: "IPT", state: "skipped", detail: "IPT concurrence not required" }
+        : { key: "ipt", label: "IPT", state: started ? "late" : "current", detail: "IPT concurrence pending" };
+
+  const dts: TravelStep =
+    trip.dtsAuthorizationStatus === "approved"
+      ? { key: "dts", label: "DTS", state: "done", detail: "DTS authorization approved" }
+      : trip.dtsAuthorizationStatus === "created"
+        ? { key: "dts", label: "DTS", state: started ? "late" : "current", detail: "DTS authorization created, not yet approved" }
+        : { key: "dts", label: "DTS", state: started ? "late" : "todo", detail: "DTS authorization not started" };
+
+  const tripStep: TravelStep =
+    phase === "upcoming"
+      ? { key: "trip", label: "Trip", state: "todo", detail: "Trip not started" }
+      : phase === "on_travel"
+        ? { key: "trip", label: "Trip", state: "current", detail: "On travel now" }
+        : { key: "trip", label: "Trip", state: "done", detail: "Returned" };
+
+  const voucherStatus = voucherStatusOf(trip);
+  const voucher: TravelStep =
+    voucherStatus === "submitted"
+      ? { key: "voucher", label: "Voucher", state: "done", detail: "Voucher submitted" }
+      : voucherStatus === "not_required"
+        ? { key: "voucher", label: "Voucher", state: "skipped", detail: "Voucher not required" }
+        : phase === "voucher_due"
+          ? {
+              key: "voucher",
+              label: "Voucher",
+              state: voucherUrgency(trip, today) === "overdue" ? "late" : "current",
+              detail: voucherUrgency(trip, today) === "overdue" ? "Voucher past due" : "Voucher due"
+            }
+          : { key: "voucher", label: "Voucher", state: "todo", detail: "Voucher after return" };
+
+  return [ipt, dts, tripStep, voucher];
+}

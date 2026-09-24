@@ -9,6 +9,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import ProgressBar from "../components/cues/ProgressBar.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
   import type { TrainingStatusRow } from "../stores/app.svelte";
   import { TRAINING_STATE_LABELS, TRAINING_STATE_ORDER, rollingExpiration, type TrainingState, type TrainingStatus } from "../domain/rules/training";
@@ -337,9 +338,10 @@
             </td>
             <td>{scheduleText(s.req)}</td>
             <td>{scopeText(s.req)}</td>
-            <td>
+            <td class="progress-cell">
               {s.done}/{s.total} complete
               {#if s.overdue > 0}<span class="badge overdue" style="margin-left:.4rem">{s.overdue} overdue</span>{/if}
+              <ProgressBar done={s.done} overdue={s.overdue} total={s.total} />
             </td>
           </tr>
           {#if open && selectedReq}

@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type TeleworkRecord } from "../../src/domain/models";
 import {
+  allowanceDots,
   allowanceState,
+  isTeleworkingOn,
   countsTowardTeleworkLimit,
   isWithinTeleworkWindow,
   payPeriodFor,
@@ -216,5 +218,41 @@ describe("allowanceState", () => {
     expect(allowanceState(1, 2)).toBe("under");
     expect(allowanceState(2, 2)).toBe("at");
     expect(allowanceState(3, 2)).toBe("over");
+  });
+});
+
+describe("allowanceDots", () => {
+  const draw = (approved: number, pending: number, limit: number) =>
+    allowanceDots(approved, pending, limit).map((d) => (d.kind === "used" ? "●" : d.kind === "pending" ? "○" : "·") + (d.over ? "!" : "")).join("");
+
+  it("fills approved days, then pending, then empty slots up to the allowance", () => {
+    expect(draw(1, 0, 2)).toBe("●·");
+    expect(draw(1, 1, 2)).toBe("●○");
+    expect(draw(0, 0, 2)).toBe("··");
+  });
+
+  it("flags every day past the allowance", () => {
+    expect(draw(2, 1, 2)).toBe("●●○!");
+    expect(draw(3, 0, 2)).toBe("●●●!");
+  });
+
+  it("falls back to no dots when the row would be too long or empty", () => {
+    expect(allowanceDots(9, 0, 2)).toEqual([]);
+    expect(allowanceDots(0, 0, 0)).toEqual([]);
+  });
+});
+
+describe("isTeleworkingOn", () => {
+  it("counts approved and command-approved requests covering the day", () => {
+    expect(isTeleworkingOn(request({ id: "a", employeeId: "e1", effectiveDate: "2026-07-21", expirationDate: "2026-07-23" }), "2026-07-22")).toBe(true);
+    expect(isTeleworkingOn(request({ id: "b", employeeId: "e1", effectiveDate: "2026-07-22", status: "command_approved" }), "2026-07-22")).toBe(true);
+  });
+
+  it("ignores pending, denied, other days, weekends inside a range, and agreements", () => {
+    expect(isTeleworkingOn(request({ id: "c", employeeId: "e1", effectiveDate: "2026-07-22", status: "pending" }), "2026-07-22")).toBe(false);
+    expect(isTeleworkingOn(request({ id: "d", employeeId: "e1", effectiveDate: "2026-07-22", status: "denied" }), "2026-07-22")).toBe(false);
+    expect(isTeleworkingOn(request({ id: "e", employeeId: "e1", effectiveDate: "2026-07-21" }), "2026-07-22")).toBe(false);
+    expect(isTeleworkingOn(request({ id: "f", employeeId: "e1", effectiveDate: "2026-07-24", expirationDate: "2026-07-27" }), "2026-07-25")).toBe(false);
+    expect(isTeleworkingOn(request({ id: "g", employeeId: "e1", recordType: "Agreement", status: "active", effectiveDate: "2026-07-22" }), "2026-07-22")).toBe(false);
   });
 });
