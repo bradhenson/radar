@@ -101,6 +101,17 @@ export function formatDate(date: IsoDate | undefined): string {
   return `${months[m - 1]} ${d}, ${y}`;
 }
 
+/** Long display form, e.g. "Thursday, September 24, 2026". Weekday from UTC day arithmetic. */
+export function formatLongDate(date: IsoDate | undefined): string {
+  if (!date) return "";
+  if (!isValidIsoDate(date)) return date;
+  const [y, m, d] = date.split("-").map(Number) as [number, number, number];
+  const weekdays = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+  const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+  return `${weekdays[dow]}, ${months[m - 1]} ${d}, ${y}`;
+}
+
 export function formatTimestamp(ts: IsoTimestamp | undefined): string {
   if (!ts) return "";
   const d = new Date(ts);

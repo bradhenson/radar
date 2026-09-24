@@ -238,7 +238,7 @@ const ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readonly string
   teleworkRecords: {
     status: [
       "draft", "pending", "pending_employee", "pending_supervisor", "pending_approval",
-      "approved", "active", "expired", "denied", "cancelled"
+      "approved", "command_approved", "active", "expired", "denied", "cancelled"
     ]
   },
   travelRecords: {

@@ -279,6 +279,8 @@ export type TeleworkStatus =
   | "pending_supervisor"
   | "pending_approval"
   | "approved"
+  /** Situational requests only: directed or approved by the command, so it uses none of the pay period allowance. */
+  | "command_approved"
   | "active"
   | "expired"
   | "denied"

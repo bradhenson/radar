@@ -30,7 +30,7 @@
     <label for="confirm-phrase">Type <strong>{typedPhrase}</strong> to confirm</label>
     <input id="confirm-phrase" type="text" bind:value={typed} autocomplete="off" />
   {/if}
-  <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+  <div class="dialog-actions">
     <button type="button" onclick={oncancel}>Cancel</button>
     <button type="button" class={danger ? "danger" : "primary"} disabled={!canConfirm} onclick={onconfirm}>
       {confirmLabel}

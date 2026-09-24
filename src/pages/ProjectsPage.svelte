@@ -7,13 +7,15 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { mergeProjectEdit } from "../domain/rules/editMerge";
   import { emptyRichText, isRichTextEmpty, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
-  import type { Project, ProjectStatus } from "../domain/models";
+  import { statusLabel, type Project, type ProjectStatus } from "../domain/models";
+  import { humanizeCode } from "../utils/labels";
 
   let showClosed = $state(false);
   let formOpen = $state(false);
@@ -159,20 +161,24 @@
 </script>
 
 <div class="page">
-  <div class="page-header">
-    <h1>Projects</h1>
-  </div>
-  <div class="toolbar">
-    <label style="display:flex; align-items:center; gap:.35rem; font-weight:400; margin:0">
+  <WorkspaceHeader title="Projects" section="Work" description="Group related tasks and see what is open or overdue in each project.">
+    {#snippet actions()}
+      <button type="button" class="primary" onclick={() => openForm()}>+ Add Project</button>
+    {/snippet}
+  </WorkspaceHeader>
+  <div class="toolbar record-toolbar">
+    <label class="inline-toggle">
       <input type="checkbox" bind:checked={showClosed} /> Show complete and cancelled
     </label>
     <span class="spacer"></span>
-    <button type="button" class="primary" onclick={() => openForm()}>Add Project</button>
+    <span class="result-count">{rows.length} shown</span>
   </div>
 
   {#if rows.length === 0}
     <EmptyState message="No projects." hint="Add a project to group related work." />
   {:else}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Projects" tabindex="0">
     <table class="data">
       <thead>
         <tr><th>Project</th><th>Status</th><th>Start</th><th>Target end</th><th>Lead</th><th>Open</th><th>Overdue</th><th></th></tr>
@@ -206,9 +212,9 @@
                 >
               </span>
             </td>
-            <td>{r.p.status.replace("_", " ")}</td>
-            <td>{formatDate(r.p.startDate)}</td>
-            <td>{formatDate(r.p.targetEndDate)}</td>
+            <td><span class="badge project-status-{r.p.status}">{humanizeCode(r.p.status)}</span></td>
+            <td class="date-cell">{formatDate(r.p.startDate)}</td>
+            <td class="date-cell">{formatDate(r.p.targetEndDate)}</td>
             <td>{app.employeeName(r.p.leadEmployeeId)}</td>
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
@@ -246,7 +252,7 @@
                       <li>
                         <button type="button" class="link cell-link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button>
                         <span class="muted small">
-                          {t.status.replace("_", " ")}{t.dueDate ? ` · due ${formatDate(t.dueDate)}` : ""}{t.employeeId ? ` · ${app.employeeName(t.employeeId)}` : ""}
+                          {statusLabel(t.status)}{t.dueDate ? ` · due ${formatDate(t.dueDate)}` : ""}{t.employeeId ? ` · ${app.employeeName(t.employeeId)}` : ""}
                         </span>
                       </li>
                     {/each}
@@ -258,6 +264,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
 </div>
 
@@ -268,6 +275,14 @@
     gap: .5rem;
     justify-content: flex-end;
     flex-wrap: wrap;
+  }
+  .project-status-active {
+    background: var(--success-bg);
+    color: var(--success-fg);
+  }
+  .project-status-on_hold {
+    background: var(--duesoon-bg);
+    color: var(--duesoon-fg);
   }
   .project-name {
     display: inline-flex;
@@ -291,7 +306,7 @@
       <label for="pf-name">Name <span class="req">*</span></label>
       <input id="pf-name" type="text" bind:value={fName} maxlength="200" style="width:100%" />
       {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="pf-short">Short name</label>
           <input id="pf-short" type="text" bind:value={fShort} maxlength="50" style="width:100%" />
@@ -300,7 +315,7 @@
           <label for="pf-status">Status</label>
           <select id="pf-status" bind:value={fStatus} style="width:100%">
             {#each ["proposed", "active", "on_hold", "complete", "cancelled"] as s (s)}
-              <option value={s}>{s.replace("_", " ")}</option>
+              <option value={s}>{humanizeCode(s)}</option>
             {/each}
           </select>
         </div>
@@ -320,7 +335,7 @@
       </select>
       <label for="pf-desc">Description</label>
       <RichTextEditor id="pf-desc" bind:value={fDesc} rows={3} maxlength={10000} ariaLabel="Project description" />
-      <div style="display:flex; gap:.5rem; align-items:center; margin-top:1rem;">
+      <div class="dialog-actions">
         {#if editing}
           <button type="button" class="icon-btn danger" aria-label="Delete project" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
         {/if}

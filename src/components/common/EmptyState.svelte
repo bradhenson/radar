@@ -1,21 +1,37 @@
 <script lang="ts">
-  let { message, hint }: { message: string; hint?: string } = $props();
+  // compact: a slim one-line version for secondary sections (Archive groups,
+  // "Next 14 days") where the full illustration would dominate the page.
+  let { message, hint, compact = false }: { message: string; hint?: string; compact?: boolean } = $props();
 </script>
 
-<div class="empty-state">
-  <!-- Decorative radar ping: expanding rings around a steady contact dot.
-       Purely ornamental (aria-hidden); the message carries the meaning. -->
-  <span class="ping" aria-hidden="true">
-    <span class="ring"></span>
-    <span class="ring r2"></span>
-    <span class="ring r3"></span>
-    <span class="core"></span>
-  </span>
-  <p style="margin:.2rem 0"><strong>{message}</strong></p>
-  {#if hint}<p class="small" style="margin:.2rem 0">{hint}</p>{/if}
+<div class="empty-state" class:compact>
+  {#if !compact}
+    <!-- Decorative radar ping: expanding rings around a steady contact dot.
+         Purely ornamental (aria-hidden); the message carries the meaning. -->
+    <span class="ping" aria-hidden="true">
+      <span class="ring"></span>
+      <span class="ring r2"></span>
+      <span class="ring r3"></span>
+      <span class="core"></span>
+    </span>
+  {/if}
+  <p class="empty-message"><strong>{message}</strong></p>
+  {#if hint}<p class="small empty-hint">{hint}</p>{/if}
 </div>
 
 <style>
+  .empty-message,
+  .empty-hint {
+    margin: .2rem 0;
+  }
+  .compact {
+    padding: .9rem 1rem;
+    text-align: left;
+    border-width: 1px;
+  }
+  .compact .empty-message strong {
+    font-weight: 600;
+  }
   .ping {
     position: relative;
     display: inline-grid;

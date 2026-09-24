@@ -75,7 +75,7 @@
     <input id="ef-name" type="text" bind:value={displayName} maxlength="200" style="width:100%" />
     {#if error}<div class="field-error" role="alert">{error}</div>{/if}
 
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+    <div class="form-grid">
       <div>
         <label for="ef-comp">Competency</label>
         <select id="ef-comp" bind:value={competencyId} style="width:100%">
@@ -96,7 +96,7 @@
       </div>
     </div>
 
-    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+    <div class="dialog-actions">
       <button type="button" onclick={onclose}>Cancel</button>
       <button type="submit" class="primary">Save</button>
     </div>

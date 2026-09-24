@@ -5,6 +5,8 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import { humanizeCode } from "../utils/labels";
   import type { Employee, MeetingNote, QuickNote } from "../domain/models";
   import { quickNoteTitle } from "../domain/rules/quickNotes";
   import { formatDate, nowTimestamp } from "../utils/dates";
@@ -134,16 +136,16 @@
 </script>
 
 <div class="page">
-  <div class="page-header"><h1>Archive</h1></div>
-  <div class="toolbar">
-    <input type="search" placeholder="Search archived items" bind:value={search} aria-label="Search archive" />
+  <WorkspaceHeader title="Archive" section="System" description="Finished and put-away items. Restore anything to bring it back." />
+  <div class="toolbar record-toolbar">
+    <input type="search" placeholder="Search archived items…" bind:value={search} aria-label="Search archive" />
   </div>
 
-  <h2>Archived tasks</h2>
+  <h2 class="section-heading">Archived tasks</h2>
   {#if archivedTasks.length === 0}
-    <EmptyState message="No archived tasks." hint="Tasks move here when you select Done or archive them from task details." />
+    <EmptyState compact message="No archived tasks." hint="Tasks move here when you select Done or archive them from task details." />
   {:else}
-    <table class="data" style="margin-bottom:1.2rem">
+    <table class="data">
       <thead><tr><th>Title</th><th>Status</th><th>Employee</th><th>Completed</th><th></th></tr></thead>
       <tbody>
         {#each archivedTasks as t (t.id)}
@@ -164,11 +166,11 @@
     </table>
   {/if}
 
-  <h2>Archived meeting notes</h2>
+  <h2 class="section-heading">Archived meeting notes</h2>
   {#if archivedMeetingNotes.length === 0}
-    <p class="muted">No archived meeting notes.</p>
+    <EmptyState compact message="No archived meeting notes." />
   {:else}
-    <table class="data" style="margin-bottom:1.2rem">
+    <table class="data">
       <thead><tr><th>Title</th><th>Date</th><th>Type</th><th>Project</th><th></th></tr></thead>
       <tbody>
         {#each archivedMeetingNotes as note (note.id)}
@@ -189,11 +191,11 @@
     </table>
   {/if}
 
-  <h2>Archived notes</h2>
+  <h2 class="section-heading">Archived notes</h2>
   {#if archivedQuickNotes.length === 0}
-    <p class="muted">No archived notes.</p>
+    <EmptyState compact message="No archived notes." />
   {:else}
-    <table class="data" style="margin-bottom:1.2rem">
+    <table class="data">
       <thead><tr><th>Note</th><th>Captured</th><th></th></tr></thead>
       <tbody>
         {#each archivedQuickNotes as note (note.id)}
@@ -212,9 +214,9 @@
     </table>
   {/if}
 
-  <h2>Inactive employees</h2>
+  <h2 class="section-heading">Inactive employees</h2>
   {#if inactiveEmployees.length === 0}
-    <p class="muted">No inactive employees.</p>
+    <EmptyState compact message="No inactive employees." />
   {:else}
     <table class="data">
       <thead><tr><th>Name</th><th>Status</th><th>Competency</th><th></th></tr></thead>
@@ -222,7 +224,7 @@
         {#each inactiveEmployees as e (e.id)}
           <tr>
             <td><a href={"#/employees/" + e.id}>{e.displayName}</a></td>
-            <td>{e.activeStatus.replace("_", " ")}</td>
+            <td>{humanizeCode(e.activeStatus)}</td>
             <td>{app.competencyCode(e.competencyId)}</td>
             <td>
               <div class="row-actions">
@@ -270,6 +272,9 @@
 {/if}
 
 <style>
+  .page :global(table.data) {
+    margin-bottom: .5rem;
+  }
   .row-actions {
     display: flex;
     justify-content: flex-end;

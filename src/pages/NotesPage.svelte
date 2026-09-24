@@ -8,7 +8,8 @@
   import { router } from "../app/router.svelte";
   import type { QuickNote } from "../domain/models";
   import { quickNoteTitle } from "../domain/rules/quickNotes";
-  import { formatTimestamp, nowTimestamp } from "../utils/dates";
+  import { formatLongDate, formatTimestamp, nowTimestamp } from "../utils/dates";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { newId } from "../utils/ids";
   import {
     emptyRichText,
@@ -130,16 +131,12 @@
 </script>
 
 <div class="page notes-page">
-  <div class="page-header">
-    <div>
-      <h1>Notes</h1>
-    </div>
-  </div>
+  <WorkspaceHeader title="Notes" section="Work" description="Quick notes for anything worth remembering: part numbers, links, steps, ideas." />
 
   <section class="capture-card" aria-labelledby="capture-heading">
     <div class="capture-topline">
       <h2 id="capture-heading">{editingId ? "Edit note" : "What do you want to remember?"}</h2>
-      <span class="capture-date">{new Date().toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" })}</span>
+      <span class="capture-date">{formatLongDate(app.today)}</span>
     </div>
     <RichTextEditor
       id="notes-composer"
@@ -162,10 +159,10 @@
     </div>
   </section>
 
-  <div class="notes-toolbar">
-    <span class="muted small">{activeNotes.length} {activeNotes.length === 1 ? "note" : "notes"}</span>
+  <div class="toolbar record-toolbar notes-toolbar">
+    <input type="search" bind:value={search} placeholder="Search notes…" aria-label="Search notes" />
     <span class="spacer"></span>
-    <input type="search" bind:value={search} placeholder="Search notes" aria-label="Search notes" />
+    <span class="result-count">{activeNotes.length} {activeNotes.length === 1 ? "note" : "notes"}</span>
   </div>
 
   {#if matching.length === 0}
@@ -211,8 +208,6 @@
 
 <style>
   .notes-page { max-width: 1240px; }
-  .page-header { align-items: flex-end; margin-bottom: 1.2rem; }
-  .page-header h1 { font-size: 1.9rem; letter-spacing: -.025em; }
 
   .capture-card { padding: 1.2rem 1.3rem 1.1rem; border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: calc(var(--radius-lg) + 2px); background: linear-gradient(135deg, color-mix(in srgb, var(--accent-soft) 58%, var(--surface)) 0%, var(--surface) 58%); box-shadow: var(--shadow); }
   .capture-topline { display: flex; gap: 1rem; align-items: flex-start; margin-bottom: .75rem; }
@@ -220,8 +215,7 @@
   .capture-date { margin-left: auto; color: var(--text-muted); font-size: .78rem; }
   .capture-footer { display: flex; align-items: center; gap: .65rem; margin-top: .65rem; }
 
-  .notes-toolbar { display: flex; align-items: center; gap: .55rem; flex-wrap: wrap; margin: 1.35rem 0 1rem; }
-  .notes-toolbar input { min-width: 13rem; }
+  .notes-toolbar { margin-top: 1.35rem; }
   .note-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .85rem; align-items: stretch; }
 
   .note-card { cursor: pointer; display: flex; flex-direction: column; min-height: 10rem; padding: .8rem .9rem .5rem; border: 1px solid var(--border); border-top: 3px solid color-mix(in srgb, var(--accent) 58%, var(--border)); border-radius: var(--radius-lg); background: linear-gradient(145deg, color-mix(in srgb, var(--accent-soft) 22%, var(--surface)) 0%, var(--surface) 46%); box-shadow: var(--shadow-xs); transition: border-color .15s ease, box-shadow .15s ease, transform .15s ease; }

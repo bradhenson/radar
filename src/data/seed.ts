@@ -552,6 +552,8 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     // At the allowance.
     [4, payPeriodStart, 2, "approved", "Home internet install window."],
     [4, payPeriodStart, 10, "approved", "Documentation day."],
+    // Directed by the command: listed, but uses none of the allowance.
+    [4, payPeriodStart, 11, "command_approved", "Building closed for facility maintenance."],
     // Under the allowance, plus a denied request that uses none of it.
     [6, payPeriodStart, 8, "pending", "Awaiting supervisor decision."],
     [2, payPeriodStart, 4, "denied", "Coverage needed on site that day."],

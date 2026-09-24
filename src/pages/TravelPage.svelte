@@ -443,7 +443,7 @@
 </script>
 
 <div class="page travel-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Travel" section="People & availability" description="Follow each trip from planning through the final voucher.">
+  <WorkspaceHeader title="Travel" section="People" description="Follow each trip from planning through the final voucher.">
     {#snippet actions()}
       <div class="view-toggle" role="group" aria-label="Travel view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
@@ -865,14 +865,6 @@
   }
   .travel-toolbar select {
     min-width: 10rem;
-  }
-  .inline-toggle {
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-    font-weight: 400;
-    margin: 0;
-    white-space: nowrap;
   }
 
   /* Keep the full date on one line so Start/End don't wrap. */

@@ -11,11 +11,14 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import { humanizeCode } from "../utils/labels";
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import { INTERACTION_TYPES, statusLabel, type EmployeeInteraction, type EmployeeNote, type EmployeeProfileField, type MeetingNote } from "../domain/models";
   import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
+  import { teleworkStatusLabel } from "../domain/rules/telework";
   import { compareDates, daysBetween, formatDate, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
@@ -285,20 +288,22 @@
   <MeetingNoteForm note={editingMeetingNote} onclose={() => (editingMeetingNote = undefined)} />
 {:else}
   <div class="page">
-    <div class="page-header">
-      <h1>{employee.displayName}</h1>
-      {#if employee.competencyId}<span class="badge">{app.competencyCode(employee.competencyId)}</span>{/if}
-      {#if employee.positionTitle}<span class="muted">{employee.positionTitle}</span>{/if}
-      {#if employee.team}<span class="muted">{employee.team}</span>{/if}
-      {#if employee.activeStatus !== "active"}<span class="badge warning">{employee.activeStatus.replace("_", " ")}</span>{/if}
-      <span class="spacer"></span>
-      <button type="button" onclick={() => openCheckIn()}>Record check-in</button>
-      <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add task</button>
-      <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add performance input</button>
-      <button type="button" onclick={() => (meetingNoteOpen = true)}>Add meeting note</button>
-      <button type="button" class="icon-btn" aria-label="Edit employee" title="Edit" onclick={() => (editOpen = true)}><Icon name="edit" size={17} /></button>
-      <button type="button" class="icon-btn danger" aria-label="Delete employee" title="Delete" onclick={() => (confirmDeleteOpen = true)}><Icon name="trash" size={17} /></button>
-    </div>
+    <WorkspaceHeader title={employee.displayName} section="Employees" sectionHref="#/employees">
+      {#snippet meta()}
+        {#if employee.competencyId}<span class="badge">{app.competencyCode(employee.competencyId)}</span>{/if}
+        {#if employee.positionTitle}<span>{employee.positionTitle}</span>{/if}
+        {#if employee.team}<span>{employee.team}</span>{/if}
+        {#if employee.activeStatus !== "active"}<span class="badge warning">{humanizeCode(employee.activeStatus)}</span>{/if}
+      {/snippet}
+      {#snippet actions()}
+        <button type="button" class="icon-btn" aria-label="Edit employee" title="Edit" onclick={() => (editOpen = true)}><Icon name="edit" size={17} /></button>
+        <button type="button" class="icon-btn danger" aria-label="Delete employee" title="Delete" onclick={() => (confirmDeleteOpen = true)}><Icon name="trash" size={17} /></button>
+        <button type="button" onclick={() => ui.openNewTask({ employeeId, competencyId: employee.competencyId })}>Add Task</button>
+        <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId })}>Add Performance Input</button>
+        <button type="button" onclick={() => (meetingNoteOpen = true)}>Add Meeting Note</button>
+        <button type="button" class="primary" onclick={() => openCheckIn()}>Record Check-in</button>
+      {/snippet}
+    </WorkspaceHeader>
 
     <div class="summary-cards">
       <div class="stat"><div class="num">{openTasks.length}</div><div class="lbl">Open tasks</div></div>
@@ -518,7 +523,7 @@
           <tbody>
             {#each telework as t (t.id)}
               <tr>
-                <td><button type="button" class="link" onclick={() => router.go("telework", t.id)}>{t.recordType}</button></td><td>{t.status.replace(/_/g, " ")}</td>
+                <td><button type="button" class="link" onclick={() => router.go("telework", t.id)}>{t.recordType}</button></td><td>{teleworkStatusLabel(t.status)}</td>
                 <td>{formatDate(t.requestDate)}</td><td>{teleworkRange(t)}</td>
                 <td>{t.scheduleSummary ?? ""}</td><td>{t.sourceReference ?? ""}</td>
               </tr>
@@ -538,8 +543,8 @@
                 <td><button type="button" class="link" onclick={() => router.go("travel", t.id)}>{t.destination}</button></td>
                 <td>{formatDate(t.startDate)}</td>
                 <td>{formatDate(t.endDate)}</td>
-                <td>{t.iptConcurrence.replace(/_/g, " ")}</td>
-                <td>{t.dtsAuthorizationStatus.replace(/_/g, " ")}</td>
+                <td>{humanizeCode(t.iptConcurrence)}</td>
+                <td>{humanizeCode(t.dtsAuthorizationStatus)}</td>
                 <td>
                   {#if t.voucherDueDate && compareDates(t.voucherDueDate, app.today) < 0}
                     <span class="badge overdue">{formatDate(t.voucherDueDate)}</span>
@@ -587,7 +592,7 @@
   {/if}
   {#if checkInOpen}
     <Dialog title={checkInEditing ? "Edit check-in" : "Record check-in"} onclose={() => (checkInOpen = false)}>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="ci-date">Date</label>
           <input id="ci-date" type="date" bind:value={checkInDate} style="width:100%" />
@@ -605,7 +610,7 @@
       <label style="display:flex; align-items:center; gap:.4rem; font-weight:400">
         <input type="checkbox" bind:checked={checkInFollowUp} /> Follow-up required
       </label>
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div class="dialog-actions">
         <button type="button" onclick={() => (checkInOpen = false)}>Cancel</button>
         <button type="button" class="primary" onclick={() => void saveCheckIn()}>Save</button>
       </div>

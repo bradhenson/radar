@@ -15,6 +15,9 @@ if (!existsSync(artifact)) {
   process.exit(1);
 }
 
+// Must match RICH_TEXT_SCHEMA_VERSION in src/utils/richTextDoc.ts.
+const CURRENT_SCHEMA_VERSION = 2;
+
 /** Legacy records written straight into storage, as a pre-migration database would hold them. */
 const LEGACY = {
   quickNotes: {
@@ -127,7 +130,9 @@ try {
   await summary.getByRole("button", { name: "Done" }).click();
 
   // 5. Stored records are documents now, and the text survived.
-  const after = await page.evaluate(async () => {
+  // Converted fields carry the current envelope version (RICH_TEXT_SCHEMA_VERSION
+  // in src/utils/richTextDoc.ts; v2 added the link mark).
+  const after = await page.evaluate(async (schemaVersion) => {
     const open = indexedDB.open("supervisor-assistant");
     const db = await new Promise((res) => { open.onsuccess = () => res(open.result); });
     const read = async (store, id) => {
@@ -140,10 +145,10 @@ try {
     const note = await read("quickNotes", "legacy-note");
     const task = await read("tasks", "legacy-task");
     return {
-      noteIsDoc: typeof note.body === "object" && note.body?.schemaVersion === 1,
-      taskIsDoc: typeof task.description === "object" && task.description?.schemaVersion === 1
+      noteIsDoc: typeof note.body === "object" && note.body?.schemaVersion === schemaVersion,
+      taskIsDoc: typeof task.description === "object" && task.description?.schemaVersion === schemaVersion
     };
-  });
+  }, CURRENT_SCHEMA_VERSION);
   if (!after.noteIsDoc || !after.taskIsDoc) throw new Error(`Records were not converted: ${JSON.stringify(after)}`);
   console.log("  ok  stored records are versioned documents");
 

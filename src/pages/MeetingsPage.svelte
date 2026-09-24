@@ -5,6 +5,7 @@
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import MeetingNoteForm from "../components/forms/MeetingNoteForm.svelte";
   import { MEETING_TYPES, type MeetingNote } from "../domain/models";
@@ -167,13 +168,11 @@
   <MeetingNoteForm note={editing} onclose={() => (editing = undefined)} />
 {:else}
 <div class="page">
-  <div class="page-header">
-    <h1>Meeting Notes</h1>
-    <span class="muted">{notes.length === activeCount ? `${notes.length} shown` : `${notes.length} of ${activeCount} shown`}</span>
-    <span class="spacer"></span>
-    <button type="button" onclick={exportCsv} disabled={notes.length === 0}>Export CSV</button>
-    <button type="button" class="primary" onclick={() => (createOpen = true)}>New Meeting Note</button>
-  </div>
+  <WorkspaceHeader title="Meeting Notes" section="Work" description="Discussion and action items from each meeting, linked to projects and people.">
+    {#snippet actions()}
+      <button type="button" class="primary" onclick={() => (createOpen = true)}>+ New Meeting Note</button>
+    {/snippet}
+  </WorkspaceHeader>
 
   <div class="summary-cards">
     <div class="stat"><div class="num">{app.meetingNotes.filter((note) => !note.isArchived).length}</div><div class="lbl">Active notes</div></div>
@@ -181,8 +180,8 @@
     <div class="stat"><div class="num">{app.meetingNotes.filter((note) => !note.isArchived && note.actionItems).length}</div><div class="lbl">With actions</div></div>
   </div>
 
-  <div class="toolbar meeting-toolbar">
-    <input type="search" bind:value={search} placeholder="Search notes" aria-label="Search meeting notes" />
+  <div class="toolbar record-toolbar meeting-toolbar">
+    <input type="search" bind:value={search} placeholder="Search meeting notes…" aria-label="Search meeting notes" />
     <select bind:value={filterRange} aria-label="Filter by meeting date">
       {#each DATE_RANGE_OPTIONS as option (option.value)}
         <option value={option.value}>{option.label}</option>
@@ -214,6 +213,9 @@
         <option value={employee.id}>{employee.displayName}</option>
       {/each}
     </select>
+    <span class="spacer"></span>
+    <button type="button" onclick={exportCsv} disabled={notes.length === 0}>Export CSV</button>
+    <span class="result-count">{notes.length === activeCount ? `${notes.length} shown` : `${notes.length} of ${activeCount} shown`}</span>
   </div>
 
   {#if notes.length === 0}
@@ -224,7 +226,8 @@
         : "Capture product team discussion notes and action items as they happen."}
     />
   {:else}
-    <div class="table-wrap">
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Meeting notes" tabindex="0">
       <table class="data meeting-table">
         <thead>
           <tr><th>Date</th><th>Type</th><th>Title</th><th>Project</th><th>Attendees</th><th>Action items</th><th></th></tr>
@@ -253,7 +256,7 @@
               <td class="title-cell"><strong>{note.title}</strong></td>
               <td>{#if note.projectId}{app.projectName(note.projectId)}{:else}<span class="muted">—</span>{/if}</td>
               <td class="attendees-cell">{#if note.attendeeEmployeeIds.length}{employeeNames(note.attendeeEmployeeIds)}{:else}<span class="muted">—</span>{/if}</td>
-              <td>{#if note.actionItems}<span class="action-mark">Yes</span>{:else}<span class="muted">—</span>{/if}</td>
+              <td>{#if note.actionItems}<span class="badge action-mark"><Icon name="check" size={12} /> Yes</span>{:else}<span class="muted">—</span>{/if}</td>
               <td class="actions-cell">
                 <div class="row-actions">
                   <button
@@ -330,7 +333,6 @@
 {/if}
 
 <style>
-  .meeting-toolbar { position: sticky; top: 0; z-index: 3; padding: .5rem 0; background: transparent; }
   .date-range {
     display: inline-flex;
     align-items: center;
@@ -355,7 +357,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .action-mark { color: var(--accent); font-size: .7rem; font-weight: 650; text-transform: uppercase; letter-spacing: .04em; }
+  .action-mark { background: var(--accent-soft); color: var(--accent); }
   .detail-attendees { display: grid; gap: .2rem; }
   .detail-label { color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
   .meeting-sections {

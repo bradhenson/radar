@@ -1,5 +1,5 @@
 // Verifies the rich-text migration at its real surface: every editor in the app
-// exposes the same six-tool schema, no editor can produce a checkbox, and note
+// exposes the same seven-tool schema, no editor can produce a checkbox, and note
 // text saved before the migration still renders with its completion state.
 // Run `npm run build` first.
 
@@ -15,7 +15,8 @@ if (!existsSync(artifact)) {
   process.exit(1);
 }
 
-const EXPECTED_TOOLS = ["Bold", "Italic", "Underline", "Heading", "Bulleted list", "Numbered list"];
+// Link was added deliberately (safeLinkHref in src/utils/richTextDoc.ts).
+const EXPECTED_TOOLS = ["Bold", "Italic", "Underline", "Link", "Heading", "Bulleted list", "Numbered list"];
 
 const profileDir = mkdtempSync(join(tmpdir(), "radar-richtext-smoke-"));
 let context;
@@ -135,7 +136,7 @@ try {
   if (errors.length) throw new Error(`Console/page errors: ${errors.join(" | ")}`);
   if (requests.length) throw new Error(`Network requests attempted: ${requests.join(", ")}`);
 
-  console.log("\nsmoke-richtext: OK (7 editors, uniform 6-tool schema, no checkbox anywhere, legacy state preserved).");
+  console.log(`\nsmoke-richtext: OK (7 editors, uniform ${EXPECTED_TOOLS.length}-tool schema, no checkbox anywhere, legacy state preserved).`);
 } finally {
   await context?.close();
   rmSync(profileDir, { recursive: true, force: true });

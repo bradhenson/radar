@@ -4,8 +4,10 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
+  import { teleworkStatusLabel } from "../domain/rules/telework";
   import { awardDueMap, leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap, travelDayMap } from "../domain/rules/calendar";
   import { addDays, addMonths, formatDate } from "../utils/dates";
 
@@ -187,19 +189,17 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelDrag()} />
 
 <div class="page calendar-page">
-  <div class="cal-header">
-    <div>
-      <span class="eyebrow">Tasks</span>
-      <h1>Calendar</h1>
-    </div>
-    <div class="month-nav" aria-label="Month navigation">
-      <button type="button" onclick={() => shiftMonth(-1)} aria-label="Previous month">&lsaquo;</button>
-      <button type="button" onclick={() => (anchor = app.today)}>Today</button>
-      <button type="button" onclick={() => shiftMonth(1)} aria-label="Next month">&rsaquo;</button>
-      <h2 class="month-title" aria-live="polite">{monthTitle(ym.year, ym.month)}</h2>
-    </div>
-    <button type="button" class="primary" onclick={() => ui.openNewTask()}>+ New task</button>
-  </div>
+  <WorkspaceHeader title="Calendar" section="Work" description="Tasks by due date, with leave, telework, travel, and awards alongside.">
+    {#snippet actions()}
+      <div class="month-nav" role="group" aria-label="Month navigation">
+        <button type="button" onclick={() => shiftMonth(-1)} aria-label="Previous month">&lsaquo;</button>
+        <h2 class="month-title" aria-live="polite">{monthTitle(ym.year, ym.month)}</h2>
+        <button type="button" onclick={() => shiftMonth(1)} aria-label="Next month">&rsaquo;</button>
+        <button type="button" onclick={() => (anchor = app.today)}>Today</button>
+      </div>
+      <button type="button" class="primary" onclick={() => ui.openNewTask()}>+ New Task</button>
+    {/snippet}
+  </WorkspaceHeader>
 
   <div class="cal-toolbar" aria-label="Calendar filters">
     <select bind:value={filterEmployee} aria-label="Filter by employee">
@@ -305,7 +305,7 @@
                 <button
                   type="button"
                   class="chip kind-chip kind-telework"
-                  title={`${app.employeeName(rec.employeeId)} — situational telework (${rec.status.replace(/_/g, " ")}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the record.`}
+                  title={`${app.employeeName(rec.employeeId)} — situational telework (${teleworkStatusLabel(rec.status).toLowerCase()}), ${teleworkRange(rec)}${rec.scheduleSummary ? ". " + rec.scheduleSummary : ""}. Opens the record.`}
                   onclick={() => router.go("telework", rec.id)}
                 >
                   <span class="chip-text">Telework · {app.employeeName(rec.employeeId)}</span>
@@ -384,41 +384,24 @@
 <style>
   .calendar-page {
     max-width: none;
-    padding: 1rem 1.25rem 3.5rem;
-  }
-  .cal-header {
-    display: grid;
-    grid-template-columns: minmax(11rem, auto) 1fr auto;
-    gap: 1rem;
-    align-items: center;
-    margin-bottom: .8rem;
-  }
-  .eyebrow {
-    display: block;
-    color: var(--text-muted);
-    font-size: .75rem;
-    font-weight: 700;
-    letter-spacing: .08em;
-    text-transform: uppercase;
-    margin-bottom: .15rem;
-  }
-  .cal-header h1 {
-    font-size: 1.45rem;
-    margin: 0;
+    padding-bottom: 3.5rem;
   }
   .month-nav {
     display: flex;
     align-items: center;
     gap: .4rem;
+    margin-right: .5rem;
   }
   .month-nav button {
     min-width: 2.15rem;
     min-height: 2.15rem;
   }
   .month-title {
-    margin: 0 0 0 .5rem;
-    font-size: 1.15rem;
-    font-weight: 700;
+    margin: 0 .25rem;
+    min-width: 9.5rem;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 650;
   }
   .cal-toolbar {
     display: flex;
@@ -428,9 +411,8 @@
     padding: .65rem;
     margin-bottom: .85rem;
     border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: color-mix(in srgb, var(--surface) 88%, var(--bg));
-    box-shadow: var(--shadow);
+    border-radius: var(--radius);
+    background: var(--surface);
   }
   .cal-toolbar select {
     min-height: 2.15rem;
@@ -672,13 +654,6 @@
   }
 
   @media (max-width: 1000px) {
-    .cal-header {
-      grid-template-columns: 1fr auto;
-    }
-    .month-nav {
-      grid-column: 1 / -1;
-      order: 3;
-    }
     .hint {
       display: none;
     }

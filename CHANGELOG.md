@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Telework: Command Approved status
+
+- Situational telework requests have a new status, **Command Approved**, in the Status dropdown beside Approved. Use it for telework the command directs or approves (a weather or facility closure, for example). The request is still listed, exported, and shown on the calendars, but its days do not count toward the per-pay-period limit; the Pay period use column reads "Not counted" for it. Backups carry and validate the new status, and the sample data includes one such request.
+
+### Consistent page layout
+
+- Every page now opens the same way: a small section label (Work, People, or System, matching the sidebar), the page title, one sentence on what the page is for, and its buttons on the right with the main action last and in blue. Today, Calendar, Projects, Meeting Notes, Notes, Employees, Performance, Training, Awards, Activity, Archive, Settings, and each employee's page join Tasks, Leave, Telework, and Travel, which already worked this way.
+- Search boxes and filters sit together in one panel under the header, with the count of what is showing and any Export button at its right-hand end. Search boxes, "Show inactive"-style checkboxes, and Clear filters links look and behave the same on every page.
+- Statuses read as words rather than stored codes ("On hold", "Ready", "Active" instead of "on_hold", "ready", "active"), and project, performance-input, and award statuses are shown as colored labels that also carry the status in text.
+- Today groups its severity filter and a row of shortcuts (new task, performance input, training, leave, telework, meeting notes) into one panel instead of a wall of buttons. Quick Add and Quick Note sit in the header.
+- Settings has a "Jump to" row at the top that scrolls straight to Backup, Reminders, Telework, Appearance, and the other sections.
+- Archive shows a small note under each empty section instead of one large placeholder followed by plain text.
+- Collapsible groups on Today and Activity use the same arrow as expandable table rows. Summary tiles that filter a list show a check mark when selected, on every page.
+- Dialog footers share one layout: Delete on the left, then Cancel and Save on the right.
+
 ### Workspace design preview
 
 - Changed the preview’s default accent to blue in light and dark mode, including buttons, navigation highlights, focus indicators, and avatars.

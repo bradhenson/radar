@@ -4,6 +4,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import {
     APPLICATION_VERSION,
     MAX_BACKUP_CHARS,
@@ -368,12 +369,37 @@
     if (!status.estimateAvailable) return "storage estimate unavailable";
     return `${formatBytes(status.usageBytes)} used of ${formatBytes(status.quotaBytes)} available`;
   });
+
+  // Hash routing owns location.hash, so section links scroll instead of navigating.
+  function jumpTo(id: string) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    target.scrollIntoView({ behavior: "smooth", block: "start" });
+    const heading = target.querySelector("h2");
+    if (heading instanceof HTMLElement) {
+      heading.tabIndex = -1;
+      heading.focus({ preventScroll: true });
+    }
+  }
 </script>
 
 <div class="page">
-  <div class="page-header"><h1>Settings</h1></div>
+  <WorkspaceHeader title="Settings" section="System" description="Backups, reminders, appearance, and the lists RADAR uses." />
+  <nav class="settings-jump" aria-label="Settings sections">
+    <span class="jump-label">Jump to</span>
+      <button type="button" class="link" onclick={() => jumpTo("settings-backup")}>Backup</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-attention")}>Reminders</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-telework")}>Telework</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-appearance")}>Appearance</button>
+      <button type="button" class="link" onclick={() => jumpTo("employee-profile-fields")}>Profile fields</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-competencies")}>Competencies</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-board")}>Board columns</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-health")}>Database health</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-maintenance")}>Maintenance</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-about")}>About</button>
+  </nav>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-backup">
     <h2>Backup and restore</h2>
     <p class="small muted">
       {#if app.storageKind === "sqlite"}
@@ -433,7 +459,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-attention">
     <h2>Attention rule thresholds</h2>
     <div class="settings-grid">
       <label>Due soon (days)
@@ -460,7 +486,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-telework">
     <h2>Telework and pay periods</h2>
     <div class="settings-grid">
       <label>Telework days per pay period
@@ -478,7 +504,7 @@
     </p>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-appearance">
     <h2>Appearance</h2>
     <label for="set-theme">Theme</label>
     <select
@@ -536,7 +562,7 @@
     </div>
   </section>
 
-  <section class="card profile-fields-settings" id="employee-profile-fields" style="margin-bottom:1rem">
+  <section class="card settings-section profile-fields-settings" id="employee-profile-fields">
     <h2>Employee profile fields</h2>
     <p class="small muted">
       Define the sections and fields used by every employee profile. Labels and order can change without affecting saved
@@ -647,7 +673,7 @@
     </div>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-competencies">
     <h2>Competencies</h2>
     <p class="small muted">
       Active competencies appear in employee forms and training bulk-selection shortcuts. Deactivated competencies stay
@@ -727,7 +753,7 @@
     {/if}
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-board">
     <h2>Board columns</h2>
     <p class="small muted">
       Board columns organize cards visually. A column can also mark active tasks Open or Waiting when cards are
@@ -802,7 +828,7 @@
     </table>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-health">
     <h2>Database health</h2>
     <p>
       {#if healthIssues === 0}
@@ -837,7 +863,7 @@
     </details>
   </section>
 
-  <section class="card" style="margin-bottom:1rem">
+  <section class="card settings-section" id="settings-maintenance">
     <h2>Data maintenance</h2>
     <div style="display:flex; gap:.5rem; flex-wrap:wrap">
       <button type="button" onclick={() => (confirmSample = true)}>Load sample data</button>
@@ -846,7 +872,7 @@
     <p class="small muted">Loading sample data replaces the current database. Both actions offer/require safeguards.</p>
   </section>
 
-  <section class="card">
+  <section class="card settings-section" id="settings-about">
     <h2>About</h2>
     <p>
       RADAR v{APPLICATION_VERSION} — Reporting, Administration, Delegation, Analytics & Review. No server, no
@@ -931,6 +957,40 @@
 {/if}
 
 <style>
+  .settings-jump {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: .15rem .35rem;
+    margin: 0 0 1.25rem;
+    padding: .55rem .8rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+  .settings-jump button.link {
+    font-size: .82rem;
+  }
+  .jump-label {
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-right: .35rem;
+  }
+  .settings-section {
+    margin-bottom: 1rem;
+    scroll-margin-top: .75rem;
+  }
+  .settings-section > h2 {
+    margin-bottom: .75rem;
+    padding-bottom: .6rem;
+    border-bottom: 1px solid var(--border);
+  }
+  .settings-section > h2:focus {
+    outline: none;
+  }
   .palette-label {
     font-weight: 600;
     margin: .65rem 0 .2rem;

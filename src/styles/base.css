@@ -333,6 +333,7 @@ label .req { color: var(--danger); }
 .field-hint { color: var(--text-muted); font-size: .78rem; font-weight: 400; }
 .field-error { color: var(--danger); font-size: .85rem; margin-top: .2rem; }
 
+
 /* ---------- data tables ---------- */
 
 table.data {
@@ -815,6 +816,87 @@ table.data tr.detail-row:hover td:first-child { box-shadow: none; }
   border-color: var(--accent);
 }
 .page .travel-stats strong, .page .board-stats strong { font-variant-numeric: tabular-nums; }
+/* Dialog form layout: two-column field grid and a right-aligned footer
+   (destructive icon on the left, Cancel then the primary action). */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 .8rem;
+}
+.dialog-actions {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+/* Checkbox + text inside a toolbar ("Show historical"). */
+.inline-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .4rem;
+  margin: 0;
+  font-weight: 500;
+  font-size: .85rem;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.record-toolbar select { min-width: 9.5rem; max-width: 16rem; }
+.record-toolbar .clear-filters { font-size: .8rem; }
+/* Collapsible group heading (Today attention groups, Activity days). */
+.group-heading { margin: 1.4rem 0 .5rem; font-size: 1rem; }
+button.group-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: .45rem;
+  min-height: 0;
+  padding: .15rem .25rem .15rem 0;
+  border: none;
+  background: none;
+  box-shadow: none;
+  font: inherit;
+  font-weight: 650;
+  color: var(--text);
+}
+button.group-toggle:hover { background: none; color: var(--accent); }
+.group-toggle .group-chevron { display: inline-flex; color: var(--text-muted); transition: transform .16s var(--ease-out); }
+.group-toggle[aria-expanded="true"] .group-chevron { transform: rotate(90deg); }
+.group-count {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: .02rem .5rem;
+  color: var(--text-muted);
+  font-size: .74rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Titled section inside a page ("Situational requests", "Agreements"). */
+.section-heading { margin: 1.5rem 0 .3rem; font-size: 1rem; font-weight: 650; }
+.section-heading:first-child { margin-top: 0; }
+.section-hint { margin: 0 0 .65rem; color: var(--text-muted); font-size: .82rem; }
+/* Stat tiles that act as filters share one selected state. */
+.summary-cards button.stat { font: inherit; text-align: left; cursor: pointer; color: inherit; }
+.summary-cards button.stat:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--surface); }
+.summary-cards button.stat[aria-pressed="true"] {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow);
+}
+/* A check mark, not just the border color, marks the active filter tile. */
+.summary-cards button.stat[aria-pressed="true"]::after {
+  content: "✓";
+  position: absolute;
+  top: .45rem;
+  right: .6rem;
+  color: var(--accent);
+  font-size: .75rem;
+  font-weight: 800;
+}
 @media (max-width: 760px) {
   .page { padding: 1rem .85rem; }
   .record-toolbar input[type="search"] { max-width: none; flex-basis: 100%; }

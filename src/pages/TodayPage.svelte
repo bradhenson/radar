@@ -5,10 +5,12 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
+  import Icon from "../components/common/Icon.svelte";
   import type { AttentionItem } from "../domain/rules/attention";
   import { AWARD_FINAL_STATUSES } from "../domain/rules/calendar";
   import { isTripCancelled, isVoucherSettled } from "../domain/rules/travel";
-  import { addDays, formatDate } from "../utils/dates";
+  import { addDays, formatDate, formatLongDate } from "../utils/dates";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
 
   let overdueCount = $derived(app.attention.filter((i) => i.reasonCode === "overdue").length);
   let dueTodayCount = $derived(app.attention.filter((i) => i.reasonCode === "due_today").length);
@@ -147,30 +149,34 @@
 </script>
 
 <div class="page">
-  <div class="page-header">
-    <h1>Today</h1>
-    <span class="muted">{formatDate(app.today)}</span>
-  </div>
+  <WorkspaceHeader title="Today" section="Work" description={`${formatLongDate(app.today)} · Everything that needs your attention, most urgent first.`}>
+    {#snippet actions()}
+      <button type="button" onclick={() => (ui.quickNoteOpen = true)}>Quick Note</button>
+      <button type="button" class="primary" onclick={() => (ui.quickAddOpen = true)}>Quick Add</button>
+    {/snippet}
+  </WorkspaceHeader>
 
   <div class="summary-cards today-summary">
-    <button type="button" class="stat" class:alert={overdueCount > 0} class:selected={reasonFilter === "overdue"} aria-pressed={reasonFilter === "overdue"} onclick={() => toggleReasonFilter("overdue")}>
+    <button type="button" class="stat" class:alert={overdueCount > 0} aria-pressed={reasonFilter === "overdue"} onclick={() => toggleReasonFilter("overdue")}>
       <div class="num">{overdueCount}</div><div class="lbl">Overdue</div>
     </button>
-    <button type="button" class="stat" class:warn={dueTodayCount > 0} class:selected={reasonFilter === "due_today"} aria-pressed={reasonFilter === "due_today"} onclick={() => toggleReasonFilter("due_today")}>
+    <button type="button" class="stat" class:warn={dueTodayCount > 0} aria-pressed={reasonFilter === "due_today"} onclick={() => toggleReasonFilter("due_today")}>
       <div class="num">{dueTodayCount}</div><div class="lbl">Due today</div>
     </button>
-    <button type="button" class="stat" class:selected={reasonFilter === "due_soon"} aria-pressed={reasonFilter === "due_soon"} onclick={() => toggleReasonFilter("due_soon")}>
+    <button type="button" class="stat" aria-pressed={reasonFilter === "due_soon"} onclick={() => toggleReasonFilter("due_soon")}>
       <div class="num">{dueSoonCount}</div><div class="lbl">Due soon</div>
     </button>
-    <button type="button" class="stat" class:selected={reasonFilter === "waiting_too_long"} aria-pressed={reasonFilter === "waiting_too_long"} onclick={() => toggleReasonFilter("waiting_too_long")}>
+    <button type="button" class="stat" aria-pressed={reasonFilter === "waiting_too_long"} onclick={() => toggleReasonFilter("waiting_too_long")}>
       <div class="num">{waitingCount}</div><div class="lbl">Waiting too long</div>
     </button>
-    <button type="button" class="stat" class:selected={reasonFilter === "training"} aria-pressed={reasonFilter === "training"} onclick={() => toggleReasonFilter("training")}>
+    <button type="button" class="stat" aria-pressed={reasonFilter === "training"} onclick={() => toggleReasonFilter("training")}>
       <div class="num">{trainingCount}</div><div class="lbl">Training warnings</div>
     </button>
   </div>
 
+  <div class="toolbar record-toolbar today-toolbar">
   <div class="severity-filter" role="group" aria-label="Filter by severity">
+    <span class="filter-label">Severity</span>
     {#each SEVERITY_FILTERS as f (f.value)}
       <button
         type="button"
@@ -183,19 +189,19 @@
       </button>
     {/each}
     {#if anyAttentionFilter}
-      <button type="button" class="link small" onclick={() => { severityFilter = ""; reasonFilter = ""; }}>Clear filters</button>
+      <button type="button" class="link small clear-filters" onclick={() => { severityFilter = ""; reasonFilter = ""; }}>Clear filters</button>
     {/if}
   </div>
-
-  <div class="toolbar">
-    <button type="button" class="primary" onclick={() => (ui.quickAddOpen = true)}>Quick Add</button>
-    <button type="button" onclick={() => (ui.quickNoteOpen = true)}>Quick Note</button>
-    <button type="button" onclick={() => ui.openNewTask()}>New Task</button>
-    <button type="button" onclick={() => (ui.performanceFormPrefill = {})}>New Performance Input</button>
-    <button type="button" onclick={() => router.go("training")}>Record Training</button>
-    <button type="button" onclick={() => router.go("leave")}>Add Leave</button>
-    <button type="button" onclick={() => router.go("telework")}>Add Telework Item</button>
-    <button type="button" onclick={() => router.go("meetings")}>Meeting Notes</button>
+  <span class="spacer"></span>
+  <div class="shortcuts" role="group" aria-label="Shortcuts">
+    <span class="filter-label">Go to</span>
+    <button type="button" class="link" onclick={() => ui.openNewTask()}>New task</button>
+    <button type="button" class="link" onclick={() => (ui.performanceFormPrefill = {})}>Performance input</button>
+    <button type="button" class="link" onclick={() => router.go("training")}>Training</button>
+    <button type="button" class="link" onclick={() => router.go("leave")}>Leave</button>
+    <button type="button" class="link" onclick={() => router.go("telework")}>Telework</button>
+    <button type="button" class="link" onclick={() => router.go("meetings")}>Meeting notes</button>
+  </div>
   </div>
 
   {#if app.attention.length === 0}
@@ -217,12 +223,13 @@
             aria-expanded={!collapsedGroups[group.key]}
             onclick={() => (collapsedGroups[group.key] = !collapsedGroups[group.key])}
           >
-            <span class="disclosure" aria-hidden="true">{collapsedGroups[group.key] ? "▸" : "▾"}</span>
+            <span class="group-chevron" aria-hidden="true"><Icon name="chevron" size={14} /></span>
             {group.title}
             <span class="group-count">{group.items.length}</span>
           </button>
         </h2>
         {#if !collapsedGroups[group.key]}
+          <div class="table-scroll">
           <table class="data attention-table">
             <colgroup>
               <col class="reason-col" />
@@ -256,6 +263,7 @@
               {/each}
             </tbody>
           </table>
+          </div>
           {#if !showAll}
             <button type="button" class="show-all" onclick={() => (expandedGroups[group.key] = true)}>
               Show all {group.items.length} items
@@ -266,26 +274,25 @@
     {/each}
   {/if}
 
-  <div>
-    <section>
-      <h2 style="margin-top:1.2rem">Next 14 days</h2>
-      {#if upcoming.length === 0}
-        <p class="muted">No dated items in the next two weeks.</p>
-      {:else}
-        <table class="data">
-          <tbody>
-            {#each upcoming as ev, i (i)}
-              <tr>
-                <td style="width:7rem; white-space:nowrap">{formatDate(ev.date)}</td>
-                <td><span class="badge">{ev.kind}</span> {ev.label}</td>
-              </tr>
-            {/each}
-          </tbody>
-        </table>
-      {/if}
-    </section>
-
-  </div>
+  <section class="upcoming">
+    <h2 class="section-heading">Next 14 days</h2>
+    <p class="section-hint">Due dates, leave, training, telework, and meetings coming up.</p>
+    {#if upcoming.length === 0}
+      <EmptyState compact message="Nothing scheduled in the next two weeks." />
+    {:else}
+      <table class="data upcoming-table">
+        <tbody>
+          {#each upcoming as ev, i (i)}
+            <tr>
+              <td class="date-cell upcoming-date">{formatDate(ev.date)}</td>
+              <td class="upcoming-kind"><span class="badge">{ev.kind}</span></td>
+              <td>{ev.label}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    {/if}
+  </section>
 </div>
 
 <style>
@@ -296,20 +303,30 @@
   }
   .today-summary .stat {
     min-width: 0;
-    cursor: pointer;
-    text-align: left;
-    font: inherit;
   }
-  .today-summary .stat.selected {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+  .today-toolbar {
+    row-gap: .6rem;
   }
-  .severity-filter {
+  .severity-filter,
+  .shortcuts {
     display: flex;
     align-items: center;
     flex-wrap: wrap;
     gap: .35rem;
-    margin: .6rem 0 .2rem;
+  }
+  .shortcuts {
+    gap: .1rem .2rem;
+  }
+  .shortcuts button.link {
+    font-size: .82rem;
+  }
+  .filter-label {
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .06em;
+    margin-right: .25rem;
   }
   .severity-chip {
     display: inline-flex;
@@ -333,37 +350,17 @@
     font-size: .72rem;
     opacity: .8;
   }
-  .group-heading {
-    margin: 1rem 0 .35rem;
+  .group-heading:first-of-type {
+    margin-top: 0;
   }
-  .group-toggle {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    border: none;
-    background: none;
-    box-shadow: none;
-    padding: .1rem .2rem;
-    font: inherit;
-    font-weight: 700;
-    color: var(--text);
+  .upcoming {
+    margin-top: 1.75rem;
   }
-  .group-toggle:hover {
-    background: none;
-    color: var(--accent);
+  .upcoming-date {
+    width: 8rem;
   }
-  .group-toggle .disclosure {
-    color: var(--text-muted);
-    font-size: .8rem;
-  }
-  .group-count {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    padding: .02rem .45rem;
-    color: var(--text-muted);
-    font-size: .74rem;
-    font-weight: 700;
+  .upcoming-kind {
+    width: 7rem;
   }
   .show-all {
     margin-top: .35rem;

@@ -11,6 +11,7 @@ import {
   requestPayPeriodStart,
   SITUATIONAL_REQUEST_TYPE,
   teleworkDays,
+  teleworkStatusLabel,
   teleworkUsageByPayPeriod,
   usageKey
 } from "../../src/domain/rules/telework";
@@ -117,6 +118,18 @@ describe("countsTowardTeleworkLimit", () => {
   it("ignores agreements, which are not per-day requests", () => {
     expect(countsTowardTeleworkLimit({ recordType: "Agreement", status: "active" })).toBe(false);
   });
+
+  it("ignores command-approved requests", () => {
+    expect(countsTowardTeleworkLimit({ recordType: SITUATIONAL_REQUEST_TYPE, status: "command_approved" })).toBe(false);
+  });
+});
+
+describe("teleworkStatusLabel", () => {
+  it("uses the form's wording, and reads stored codes as words otherwise", () => {
+    expect(teleworkStatusLabel("command_approved")).toBe("Command Approved");
+    expect(teleworkStatusLabel("approved")).toBe("Approved");
+    expect(teleworkStatusLabel("pending_supervisor")).toBe("Pending supervisor");
+  });
 });
 
 describe("teleworkUsageByPayPeriod", () => {
@@ -143,6 +156,17 @@ describe("teleworkUsageByPayPeriod", () => {
 
   it("leaves out denied requests and agreements entirely", () => {
     expect(usage.get(usageKey("e2", "2026-07-19"))).toBeUndefined();
+  });
+
+  it("leaves command-approved days out of the tally", () => {
+    const withCommand = teleworkUsageByPayPeriod(
+      [
+        ...records,
+        request({ id: "r8", employeeId: "e1", effectiveDate: "2026-07-22", expirationDate: "2026-07-24", status: "command_approved" })
+      ],
+      ANCHOR
+    );
+    expect(withCommand.get(usageKey("e1", "2026-07-19"))?.totalDays).toBe(3);
   });
 
   it("splits a request that straddles a pay period boundary", () => {

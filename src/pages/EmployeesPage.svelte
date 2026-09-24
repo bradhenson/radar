@@ -6,6 +6,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { compareDates, daysBetween, formatDate } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
@@ -251,10 +252,18 @@
 {/snippet}
 
 <div class="page">
-  <div class="page-header">
-    <h1>Employees</h1>
-    <span class="muted">{sorted.length} shown</span>
-  </div>
+  <WorkspaceHeader title="Employees" section="People" description="Your team at a glance: open work, training, and who is out.">
+    {#snippet actions()}
+      <button
+        type="button"
+        class="primary"
+        onclick={() => {
+          editing = undefined;
+          formOpen = true;
+        }}>+ Add Employee</button
+      >
+    {/snippet}
+  </WorkspaceHeader>
 
   <div class="summary-cards" aria-label="Quick employee filters">
     <button
@@ -312,26 +321,19 @@
     </button>
   </div>
 
-  <div class="toolbar">
-    <input type="search" placeholder="Search employees" bind:value={search} aria-label="Search employees" />
+  <div class="toolbar record-toolbar">
+    <input type="search" placeholder="Search employees…" bind:value={search} aria-label="Search employees" />
     <select bind:value={filterCompetency} aria-label="Filter by competency">
       <option value="">All competencies</option>
       <option value={NO_COMPETENCY_FILTER}>No competency</option>
       {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
-    <label style="display:flex; align-items:center; gap:.35rem; font-weight:400; margin:0">
+    <label class="inline-toggle">
       <input type="checkbox" bind:checked={showInactive} /> Show inactive
     </label>
     <span class="spacer"></span>
     <button type="button" onclick={openExportDialog}>Export CSV…</button>
-    <button
-      type="button"
-      class="primary"
-      onclick={() => {
-        editing = undefined;
-        formOpen = true;
-      }}>Add Employee</button
-    >
+    <span class="result-count">{sorted.length} shown</span>
   </div>
 
   {#if sorted.length === 0}
@@ -463,7 +465,7 @@
         file in an approved location, and delete it when no longer needed.
       </p>
     {/if}
-    <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem">
+    <div class="dialog-actions">
       <button type="button" onclick={() => (exportOpen = false)}>Cancel</button>
       <button type="button" class="primary" onclick={exportCsv} disabled={selectedColumns.length === 0}>
         Export {selectedColumns.length} column{selectedColumns.length === 1 ? "" : "s"}
@@ -473,26 +475,6 @@
 {/if}
 
 <style>
-  .summary-cards button.stat {
-    text-align: left;
-  }
-  .summary-cards button.stat:hover {
-    background: var(--surface-2);
-    border-color: var(--accent);
-  }
-  .summary-cards button.stat.active {
-    border-color: var(--accent);
-    box-shadow: var(--shadow), inset 0 0 0 1px var(--accent);
-  }
-  .summary-cards button.stat.active::after {
-    content: "✓";
-    position: absolute;
-    top: .45rem;
-    right: .6rem;
-    color: var(--accent);
-    font-size: .75rem;
-    font-weight: 800;
-  }
   th .th-sort {
     font: inherit;
     font-weight: inherit;

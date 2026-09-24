@@ -323,6 +323,12 @@ describe("backup validation rejects bad input", () => {
     expect(r.errors.some((e) => e.includes("boardOrder"))).toBe(true);
   });
 
+  it("accepts the command-approved telework status", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    (pkg.data.teleworkRecords[0] as Record<string, unknown>).status = "command_approved";
+    expect(parseAndValidateBackup(reseal(pkg)).valid).toBe(true);
+  });
+
   it("warns (not errors) about orphan references", () => {
     const pkg = createBackupPackage(createSampleSnapshot());
     (pkg.data.tasks[0] as Record<string, unknown>).employeeId = "no-such-employee";

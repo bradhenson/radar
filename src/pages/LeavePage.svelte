@@ -188,7 +188,7 @@
 </script>
 
 <div class="page leave-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Leave and Availability" section="People & availability" description="Plan time away and keep upcoming absences in view.">
+  <WorkspaceHeader title="Leave and Availability" section="People" description="Plan time away and keep upcoming absences in view.">
     {#snippet actions()}
       <div class="view-toggle" role="group" aria-label="Leave view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
@@ -329,7 +329,7 @@
         {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
       </select>
       {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="lf-start">Start <span class="req">*</span></label>
           <input id="lf-start" type="date" bind:value={fStart} style="width:100%" />
@@ -394,14 +394,6 @@
   }
   .leave-toolbar select {
     min-width: 10rem;
-  }
-  .inline-toggle {
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-    font-weight: 400;
-    margin: 0;
-    white-space: nowrap;
   }
 
   .dialog-actions {

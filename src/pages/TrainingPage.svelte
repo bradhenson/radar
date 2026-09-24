@@ -8,6 +8,7 @@
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
+  import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import type { EmployeeTrainingRecord, TrainingRequirement } from "../domain/models";
   import type { TrainingStatusRow } from "../stores/app.svelte";
   import { TRAINING_STATE_LABELS, TRAINING_STATE_ORDER, rollingExpiration, type TrainingState, type TrainingStatus } from "../domain/rules/training";
@@ -293,17 +294,14 @@
 </script>
 
 <div class="page training-page" class:matrix-open={showMatrix}>
-  <div class="page-header">
-    <h1>Training</h1>
-  </div>
-
-  <div class="toolbar">
-    <button type="button" class="primary" onclick={() => openReqForm()}>Add Requirement</button>
-    <span class="spacer"></span>
-    {#if activeReqs.length > 0}
-      <button type="button" onclick={() => (showMatrix = !showMatrix)}>{showMatrix ? "Hide matrix" : "Show matrix"}</button>
-    {/if}
-  </div>
+  <WorkspaceHeader title="Training" section="People" description="Required training, who has completed it, and who is coming due.">
+    {#snippet actions()}
+      {#if activeReqs.length > 0}
+        <button type="button" aria-pressed={showMatrix} onclick={() => (showMatrix = !showMatrix)}>{showMatrix ? "Hide matrix" : "Show matrix"}</button>
+      {/if}
+      <button type="button" class="primary" onclick={() => openReqForm()}>+ Add Requirement</button>
+    {/snippet}
+  </WorkspaceHeader>
 
   {#if activeReqs.length === 0}
     <EmptyState
@@ -311,8 +309,11 @@
       hint="Add a requirement (for example, Annual Cybersecurity Awareness). It applies to every active employee unless you pick specific people."
     />
   {:else}
-    <h2>Requirements</h2>
-    <table class="data" style="margin-bottom:1.2rem">
+    <h2 class="section-heading">Requirements</h2>
+    <p class="section-hint">Select a requirement to see and update each person's status.</p>
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Training requirements" tabindex="0">
+    <table class="data">
       <thead><tr><th>Name</th><th>Due</th><th>Applies to</th><th>Progress</th></tr></thead>
       <tbody>
         {#each summaries as s (s.req.id)}
@@ -403,11 +404,12 @@
         {/each}
       </tbody>
     </table>
+    </div>
 
     {#if showMatrix}
       <section class="matrix-section">
-        <h2>Matrix overview</h2>
-        <p class="muted small">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
+        <h2 class="section-heading">Matrix overview</h2>
+        <p class="section-hint">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
         <div class="matrix-wrap">
           <table class="data matrix">
             <thead>
@@ -459,7 +461,7 @@
       <label for="tr-name">Name <span class="req">*</span></label>
       <input id="tr-name" type="text" bind:value={rName} maxlength="200" style="width:100%" />
 
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="tr-sched">Due schedule</label>
           <select id="tr-sched" bind:value={rSchedule} style="width:100%">
@@ -522,7 +524,7 @@
       {/if}
 
       {#if rError}<div class="field-error">{rError}</div>{/if}
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div class="dialog-actions">
         <button type="button" onclick={() => (reqFormOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>
@@ -538,7 +540,7 @@
         void saveRecord();
       }}
     >
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:0 .8rem;">
+      <div class="form-grid">
         <div>
           <label for="rec-status">Status</label>
           <select id="rec-status" bind:value={recStatus} style="width:100%">
@@ -561,7 +563,7 @@
         </div>
       </div>
       {#if recError}<div class="field-error">{recError}</div>{/if}
-      <div style="display:flex; gap:.5rem; justify-content:flex-end; margin-top:1rem;">
+      <div class="dialog-actions">
         <button type="button" onclick={() => (recordDialog = undefined)}>Cancel</button>
         <button type="submit" class="primary">Save</button>
       </div>

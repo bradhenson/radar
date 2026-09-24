@@ -20,7 +20,9 @@
     requestEndDate,
     requestPayPeriodStart,
     SITUATIONAL_REQUEST_TYPE,
+    SITUATIONAL_STATUS_OPTIONS,
     teleworkDays,
+    teleworkStatusLabel,
     teleworkUsageByPayPeriod,
     usageKey,
     type TeleworkPayPeriodUsage
@@ -32,12 +34,7 @@
 
   const SITUATIONAL_TYPE = SITUATIONAL_REQUEST_TYPE;
   const HISTORICAL_STATUSES = new Set<TeleworkStatus>(["denied", "cancelled", "expired"]);
-  const STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
-    { value: "pending", label: "Pending" },
-    { value: "approved", label: "Approved" },
-    { value: "denied", label: "Denied" },
-    { value: "cancelled", label: "Cancelled" }
-  ];
+  const STATUS_OPTIONS = SITUATIONAL_STATUS_OPTIONS;
 
   const AGREEMENT_TYPES = TELEWORK_RECORD_TYPES.filter((t) => t !== SITUATIONAL_TYPE);
   const AGREEMENT_STATUS_OPTIONS: { value: TeleworkStatus; label: string }[] = [
@@ -99,7 +96,7 @@
   });
 
   function statusLabel(status: TeleworkStatus): string {
-    return STATUS_OPTIONS.find((s) => s.value === status)?.label ?? status.replace(/_/g, " ");
+    return teleworkStatusLabel(status);
   }
 
   /**
@@ -438,7 +435,7 @@
 </script>
 
 <div class="page telework-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Telework" section="People & availability" description="Requests, agreements, and pay period usage in one place.">
+  <WorkspaceHeader title="Telework" section="People" description="Requests, agreements, and pay period usage in one place.">
     {#snippet actions()}
       <div class="view-toggle" role="group" aria-label="Telework view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
@@ -522,7 +519,9 @@
                 <td class="date-cell">{formatDate(t.effectiveDate)}</td>
                 <td class="date-cell">{formatDate(requestEndDate(t))}</td>
                 <td class="usage-cell">
-                  {#if usage}
+                  {#if t.status === "command_approved"}
+                    <span class="muted" title="Command-approved telework uses none of the pay period allowance">Not counted</span>
+                  {:else if usage}
                     <span
                       class="badge"
                       class:overdue={state === "over"}
@@ -578,7 +577,7 @@
                 >
               </td>
               <td>{t.recordType}</td>
-              <td><span class="badge status-{t.status}">{t.status.replace(/_/g, " ")}</span></td>
+              <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
               <td class="date-cell">{formatDate(t.effectiveDate)}</td>
               <td class="date-cell">
                 {#if expirationState(t) === "overdue"}
@@ -789,17 +788,6 @@
   .telework-toolbar {
     align-items: center;
   }
-  .telework-toolbar select {
-    min-width: 10rem;
-  }
-  .inline-toggle {
-    display: flex;
-    align-items: center;
-    gap: .35rem;
-    font-weight: 400;
-    margin: 0;
-    white-space: nowrap;
-  }
 
   .form-grid {
     display: grid;
@@ -980,6 +968,7 @@
     color: var(--text-muted);
   }
   .status-approved,
+  .status-command_approved,
   .status-active {
     background: var(--success-bg, var(--surface-2));
   }
@@ -1021,13 +1010,6 @@
   .usage-cell .small {
     margin-left: .35rem;
     font-size: .72rem;
-  }
-  .section-heading {
-    margin: 1.1rem 0 .4rem;
-    font-size: 1rem;
-  }
-  .section-hint {
-    margin: 0 0 .5rem;
   }
   @media (max-width: 900px) {
     .form-grid {
