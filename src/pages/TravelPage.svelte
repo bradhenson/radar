@@ -439,44 +439,25 @@
 </script>
 
 <div class="page travel-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Travel" section="People" description="Follow each trip from planning through the final voucher.">
-    {#snippet actions()}
+  <WorkspaceHeader title="Travel" section="People">
+    {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Travel view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
         <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
       </div>
+    {/snippet}
+    {#snippet filters()}
+      <div class="filter-pills" aria-label="Quick travel filters">
+        <button type="button" class:active={!summaryFilter} aria-pressed={!summaryFilter} onclick={() => (summaryFilter = "")}><strong>{inScopeCount}</strong> trips</button>
+        <button type="button" class:alert={phaseCounts.voucherDue > 0} class:active={summaryFilter === "voucher_due"} aria-pressed={summaryFilter === "voucher_due"} onclick={() => toggleSummaryFilter("voucher_due")}><strong>{phaseCounts.voucherDue}</strong> voucher due</button>
+        <button type="button" class:info={phaseCounts.onTravel > 0} class:active={summaryFilter === "on_travel"} aria-pressed={summaryFilter === "on_travel"} onclick={() => toggleSummaryFilter("on_travel")}><strong>{phaseCounts.onTravel}</strong> on travel now</button>
+        <button type="button" class:active={summaryFilter === "upcoming"} aria-pressed={summaryFilter === "upcoming"} onclick={() => toggleSummaryFilter("upcoming")}><strong>{phaseCounts.upcoming}</strong> upcoming</button>
+    </div>
+    {/snippet}
+    {#snippet actions()}
       <button type="button" class="primary" onclick={() => openForm()}>+ Add Travel</button>
     {/snippet}
   </WorkspaceHeader>
-
-  <div class="travel-stats" aria-label="Quick travel filters">
-    <button
-      type="button"
-      class:active={!summaryFilter}
-      aria-pressed={!summaryFilter}
-      onclick={() => (summaryFilter = "")}><strong>{inScopeCount}</strong> trips</button
-    >
-    <button
-      type="button"
-      class:alert={phaseCounts.voucherDue > 0}
-      class:active={summaryFilter === "voucher_due"}
-      aria-pressed={summaryFilter === "voucher_due"}
-      onclick={() => toggleSummaryFilter("voucher_due")}><strong>{phaseCounts.voucherDue}</strong> voucher due</button
-    >
-    <button
-      type="button"
-      class:on-travel={phaseCounts.onTravel > 0}
-      class:active={summaryFilter === "on_travel"}
-      aria-pressed={summaryFilter === "on_travel"}
-      onclick={() => toggleSummaryFilter("on_travel")}><strong>{phaseCounts.onTravel}</strong> on travel now</button
-    >
-    <button
-      type="button"
-      class:active={summaryFilter === "upcoming"}
-      aria-pressed={summaryFilter === "upcoming"}
-      onclick={() => toggleSummaryFilter("upcoming")}><strong>{phaseCounts.upcoming}</strong> upcoming</button
-    >
-  </div>
 
   <div class="toolbar record-toolbar travel-toolbar">
     <input type="search" bind:value={search} placeholder="Search travel…" aria-label="Search travel" />
@@ -795,56 +776,6 @@
      calendar spans full width. */
   .travel-page.wide {
     max-width: none;
-  }
-  /* Quick filters: same pill grammar as the board summary. */
-  .travel-stats {
-    display: flex;
-    gap: .45rem;
-    flex-wrap: wrap;
-    margin-bottom: .75rem;
-  }
-  .travel-stats button {
-    display: inline-flex;
-    align-items: baseline;
-    gap: .3rem;
-    padding: .3rem .6rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-    font-size: .8rem;
-    font-weight: 500;
-    color: var(--text-muted);
-    box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
-    white-space: nowrap;
-  }
-  .travel-stats button:hover { border-color: currentColor; }
-  .travel-stats button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .travel-stats strong {
-    color: var(--text);
-    font-size: .98rem;
-  }
-  .travel-stats button.alert {
-    background: var(--overdue-bg);
-    border-color: transparent;
-    color: var(--overdue-fg);
-  }
-  .travel-stats button.on-travel {
-    background: var(--accent-soft);
-    border-color: transparent;
-    color: var(--accent);
-  }
-  .travel-stats button.alert strong,
-  .travel-stats button.on-travel strong {
-    color: inherit;
-  }
-  .travel-stats button.active {
-    border-color: currentColor;
-    box-shadow: inset 0 0 0 1px currentColor;
-  }
-  .travel-stats button.active::after {
-    content: "✓";
-    font-size: .7rem;
-    font-weight: 800;
   }
   /* Phase separators inside the list (same grammar as Performance groups). */
   .group-row td {

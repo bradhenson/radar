@@ -161,7 +161,7 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Projects" section="Work" description="Group related tasks and see what is open or overdue in each project.">
+  <WorkspaceHeader title="Projects" section="Work">
     {#snippet actions()}
       <button type="button" class="primary" onclick={() => openForm()}>+ Add Project</button>
     {/snippet}

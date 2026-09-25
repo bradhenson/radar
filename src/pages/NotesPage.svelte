@@ -131,7 +131,7 @@
 </script>
 
 <div class="page notes-page">
-  <WorkspaceHeader title="Notes" section="Work" description="Quick notes for anything worth remembering: part numbers, links, steps, ideas." />
+  <WorkspaceHeader title="Notes" section="Work" />
 
   <section class="capture-card" aria-labelledby="capture-heading">
     <div class="capture-topline">

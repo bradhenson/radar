@@ -437,12 +437,14 @@
 </script>
 
 <div class="page telework-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Telework" section="People" description="Requests, agreements, and pay period usage in one place.">
-    {#snippet actions()}
+  <WorkspaceHeader title="Telework" section="People">
+    {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Telework view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
         <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
       </div>
+    {/snippet}
+    {#snippet actions()}
       <button type="button" onclick={() => openAgreementForm()}>Add Agreement</button>
       <button type="button" class="primary" onclick={() => openForm()}>+ Add Request</button>
     {/snippet}

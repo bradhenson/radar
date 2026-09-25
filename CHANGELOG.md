@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Compact page headers and filters
+
+- Training opens directly onto the requirements table, without its extra heading and instruction lines; the matrix keeps its status details on each cell. Travel, Leave, Telework, and Performance place their view toggles beside their titles like the Board.
+- The Board/List toggle sits beside the task title with reserved title width, so switching views does not shift the pills. Both toggle choices use text only. Tinted quick-filter pills now show the same hover border as neutral ones.
+- Page titles, quick filters, and actions share a compact header that wraps at narrower widths. Repeated section labels and descriptive subtitle lines are removed.
+- Interactive quick filters on Today, Board, Employees, and Travel use the same count pills and selected check mark. Today severity and Calendar layer filters use the same pill treatment. Meeting and employee profile totals appear as compact inline metrics.
+
 ### At-a-glance visual cues
 
 - **Telework:** the Pay period use column shows a row of dots before the "3 of 2" count: filled for approved days, a ring for pending days, a dashed ring for days still unused, and a diamond for any day past the limit. A key sits above the table.

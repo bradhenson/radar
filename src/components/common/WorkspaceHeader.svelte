@@ -1,71 +1,70 @@
 <script lang="ts">
   import type { Snippet } from "svelte";
 
-  // Shared page header: eyebrow (the nav group, or a link back to the parent
-  // list), title, one plain-language line about the page, and the page's
-  // actions on the right with the primary action last.
-  let { title, description, section = "Workspace", sectionHref, meta, actions }: {
+  // Keep the title, quick filters, and actions in one compact, wrapping row.
+  let { title, titleMinWidth, section = "Workspace", sectionHref, meta, filters, actions }: {
     title: string;
-    description?: string;
+    /** Reserve space when the title changes between views. */
+    titleMinWidth?: string;
     section?: string;
-    /** Makes the eyebrow a link back to a parent page (e.g. "#/employees"). */
+    /** Optional link back to a parent page (e.g. "#/employees"). */
     sectionHref?: string;
-    /** Extra inline content under the title (badges, role, team). */
+    /** Extra content beside the title (badges, role, team). */
     meta?: Snippet;
+    filters?: Snippet;
     actions?: Snippet;
   } = $props();
 </script>
 
-<header class="workspace-header">
+<header class="workspace-header" class:detail-header={Boolean(sectionHref)}>
   <div class="workspace-heading">
     {#if sectionHref}
-      <a class="workspace-eyebrow eyebrow-link" href={sectionHref}><span aria-hidden="true">‹</span> {section}</a>
-    {:else}
-      <span class="workspace-eyebrow">{section}</span>
+      <a class="workspace-back" href={sectionHref}><span aria-hidden="true">‹</span> {section}</a>
     {/if}
-    <h1>{title}</h1>
+    <h1 style:min-width={titleMinWidth}>{title}</h1>
     {#if meta}<div class="workspace-meta">{@render meta()}</div>{/if}
-    {#if description}<p>{description}</p>{/if}
   </div>
+  {#if filters}<div class="workspace-filters">{@render filters()}</div>{/if}
   {#if actions}<div class="workspace-actions">{@render actions()}</div>{/if}
 </header>
 
 <style>
   .workspace-header {
-    display: flex;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    flex-wrap: wrap;
-    gap: .8rem 1.5rem;
-    margin-bottom: 1.4rem;
+    gap: .55rem 1rem;
+    margin-bottom: .8rem;
     flex-shrink: 0;
   }
-  .workspace-heading { min-width: 0; }
-  .workspace-eyebrow {
-    display: block;
-    color: var(--text-muted);
-    text-transform: uppercase;
-    font-size: .65rem;
-    font-weight: 650;
-    letter-spacing: .13em;
-    margin-bottom: .4rem;
-  }
-  .eyebrow-link { display: inline-block; }
-  .eyebrow-link:hover { color: var(--accent); text-decoration: none; }
-  h1 { font-size: 1.7rem; letter-spacing: -.035em; margin: 0; font-weight: 650; }
-  p { margin: .35rem 0 0; color: var(--text-muted); font-size: .82rem; }
+  .workspace-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .7rem; min-width: 0; }
+  .workspace-back { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
+  .workspace-back:hover { color: var(--accent); text-decoration: none; }
+  h1 { font-size: 1.55rem; letter-spacing: -.035em; margin: 0; font-weight: 650; }
   .workspace-meta {
     display: flex;
     flex-wrap: wrap;
     align-items: center;
     gap: .35rem .6rem;
-    margin-top: .4rem;
     color: var(--text-muted);
     font-size: .85rem;
   }
-  .workspace-actions { display: flex; align-items: center; flex-wrap: wrap; gap: .5rem; }
+  .workspace-filters { display: flex; align-items: center; min-width: 0; }
+  .workspace-actions { grid-column: 3; display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: .5rem; }
+  @media (min-width: 1201px) {
+    .detail-header { grid-template-columns: minmax(0, 1fr) auto; }
+    .detail-header .workspace-filters { grid-column: 1 / -1; grid-row: 2; }
+    .detail-header .workspace-actions { grid-column: 2; grid-row: 1; }
+  }
+  @media (max-width: 1200px) {
+    .workspace-header { grid-template-columns: minmax(0, 1fr) auto; }
+    .workspace-filters { grid-column: 1 / -1; grid-row: 2; }
+    .workspace-actions { grid-column: 2; grid-row: 1; }
+  }
   @media (max-width: 760px) {
-    .workspace-header { margin-bottom: 1rem; }
-    h1 { font-size: 1.45rem; }
+    .workspace-header { margin-bottom: .7rem; }
+    h1 { font-size: 1.35rem; }
+    .workspace-actions { grid-column: 1 / -1; grid-row: 2; justify-content: flex-start; }
+    .workspace-filters { grid-row: 3; }
   }
 </style>

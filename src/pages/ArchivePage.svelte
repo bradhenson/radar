@@ -136,7 +136,7 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Archive" section="System" description="Finished and put-away items. Restore anything to bring it back." />
+  <WorkspaceHeader title="Archive" section="System" />
   <div class="toolbar record-toolbar">
     <input type="search" placeholder="Search archived items…" bind:value={search} aria-label="Search archive" />
   </div>

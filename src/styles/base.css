@@ -815,19 +815,34 @@ table.data tr.detail-row:hover td:first-child { box-shadow: none; }
   padding-top: .55rem;
   padding-bottom: .55rem;
 }
-.page .travel-stats, .page .board-stats { gap: .5rem; }
-.page .travel-stats button, .page .board-stats button {
-  border-radius: 6px;
-  box-shadow: none;
-  font-size: .78rem;
+/* Quick filters share the same compact pill shape and pressed state. */
+.filter-pills { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; }
+.filter-pills button {
+  display: inline-flex;
+  align-items: baseline;
+  gap: .3rem;
   min-height: 2rem;
   padding: .3rem .65rem;
-}
-.page .travel-stats button.active, .page .board-stats button.active {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text-muted);
   box-shadow: none;
-  border-color: var(--accent);
+  white-space: nowrap;
+  font-size: .78rem;
+  font-weight: 500;
 }
-.page .travel-stats strong, .page .board-stats strong { font-variant-numeric: tabular-nums; }
+.filter-pills button strong { color: var(--text); font-size: .94rem; font-variant-numeric: tabular-nums; }
+.filter-pills button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filter-pills button.warn { background: var(--duesoon-bg); border-color: transparent; color: var(--duesoon-fg); }
+.filter-pills button.alert { background: var(--overdue-bg); border-color: transparent; color: var(--overdue-fg); }
+.filter-pills button.info { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.filter-pills button.warn strong, .filter-pills button.alert strong, .filter-pills button.info strong { color: inherit; }
+.filter-pills button:hover { border-color: currentColor; }
+.filter-pills button[aria-pressed="true"] { border-color: currentColor; box-shadow: inset 0 0 0 1px currentColor; }
+.filter-pills button[aria-pressed="true"]::after { content: "✓"; font-size: .7rem; font-weight: 800; }
+.header-metrics { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .85rem; color: var(--text-muted); font-size: .78rem; }
+.header-metrics strong { color: var(--text); font-size: .92rem; font-variant-numeric: tabular-nums; }
 /* Dialog form layout: two-column field grid and a right-aligned footer
    (destructive icon on the left, Cancel then the primary action). */
 .form-grid {
@@ -892,23 +907,6 @@ button.group-toggle:hover { background: none; color: var(--accent); }
 .section-heading { margin: 1.5rem 0 .3rem; font-size: 1rem; font-weight: 650; }
 .section-heading:first-child { margin-top: 0; }
 .section-hint { margin: 0 0 .65rem; color: var(--text-muted); font-size: .82rem; }
-/* Stat tiles that act as filters share one selected state. */
-.summary-cards button.stat { font: inherit; text-align: left; cursor: pointer; color: inherit; }
-.summary-cards button.stat:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--surface); }
-.summary-cards button.stat[aria-pressed="true"] {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 1px var(--accent) inset, var(--shadow);
-}
-/* A check mark, not just the border color, marks the active filter tile. */
-.summary-cards button.stat[aria-pressed="true"]::after {
-  content: "✓";
-  position: absolute;
-  top: .45rem;
-  right: .6rem;
-  color: var(--accent);
-  font-size: .75rem;
-  font-weight: 800;
-}
 @media (max-width: 760px) {
   .page { padding: 1rem .85rem; }
   .record-toolbar input[type="search"] { max-width: none; flex-basis: 100%; }

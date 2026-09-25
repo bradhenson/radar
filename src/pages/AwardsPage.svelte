@@ -127,7 +127,7 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Awards" section="People" description="Track recognition from first idea through nomination and decision.">
+  <WorkspaceHeader title="Awards" section="People">
     {#snippet actions()}
       <button type="button" class="primary" onclick={() => openForm()}>+ Add Award</button>
     {/snippet}

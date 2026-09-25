@@ -417,58 +417,31 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
 <div class="page board-page" class:list-mode={view === "list"}>
-  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} section="Work"
-    description={view === "board" ? "Every task, organized by where it stands. Drag a card to move it." : "Every task in one sortable list."}>
-    {#snippet actions()}
+  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} titleMinWidth="11rem" section="Work">
+    {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Task view">
-        <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}><Icon name="board" size={14} /> Board</button>
+        <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
       </div>
+    {/snippet}
+    {#snippet filters()}
+    <div class="filter-pills board-stats" aria-label="Quick board filters">
+      <button type="button" class:active={!summaryFilter} aria-pressed={!summaryFilter} onclick={() => (summaryFilter = "")}><strong>{boardStats.total}</strong> tasks</button>
+      <button type="button" class:warn={boardStats.dueSoon > 0} class:active={summaryFilter === "due_soon"} aria-pressed={summaryFilter === "due_soon"} onclick={() => toggleSummaryFilter("due_soon")}><strong>{boardStats.dueSoon}</strong> due soon</button>
+      <button type="button" class:alert={boardStats.overdue > 0} class:active={summaryFilter === "overdue"} aria-pressed={summaryFilter === "overdue"} onclick={() => toggleSummaryFilter("overdue")}><strong>{boardStats.overdue}</strong> overdue</button>
+      <button type="button" class:active={summaryFilter === "waiting"} aria-pressed={summaryFilter === "waiting"} onclick={() => toggleSummaryFilter("waiting")}><strong>{boardStats.waiting}</strong> waiting</button>
+      <button type="button" class:alert={boardStats.priority > 0} class:active={summaryFilter === "priority"} aria-pressed={summaryFilter === "priority"} onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button>
+    </div>
+    {/snippet}
+    {#snippet actions()}
+      {#if view === "board"}
+        <button class="density-toggle" type="button" aria-pressed={compact} onclick={() => (compact = !compact)} title="Hide descriptions and checklist previews for a denser board">
+          {compact ? "✓ Compact cards" : "Compact cards"}
+        </button>
+      {/if}
       <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
     {/snippet}
   </WorkspaceHeader>
-  <div class="board-overview">
-    <div class="board-stats" aria-label="Quick board filters">
-      <button
-        type="button"
-        class:active={!summaryFilter}
-        aria-pressed={!summaryFilter}
-        onclick={() => (summaryFilter = "")}><strong>{boardStats.total}</strong> tasks</button
-      >
-      <button
-        type="button"
-        class:warn={boardStats.dueSoon > 0}
-        class:active={summaryFilter === "due_soon"}
-        aria-pressed={summaryFilter === "due_soon"}
-        onclick={() => toggleSummaryFilter("due_soon")}><strong>{boardStats.dueSoon}</strong> due soon</button
-      >
-      <button
-        type="button"
-        class:alert={boardStats.overdue > 0}
-        class:active={summaryFilter === "overdue"}
-        aria-pressed={summaryFilter === "overdue"}
-        onclick={() => toggleSummaryFilter("overdue")}><strong>{boardStats.overdue}</strong> overdue</button
-      >
-      <button
-        type="button"
-        class:active={summaryFilter === "waiting"}
-        aria-pressed={summaryFilter === "waiting"}
-        onclick={() => toggleSummaryFilter("waiting")}><strong>{boardStats.waiting}</strong> waiting</button
-      >
-      <button
-        type="button"
-        class:alert={boardStats.priority > 0}
-        class:active={summaryFilter === "priority"}
-        aria-pressed={summaryFilter === "priority"}
-        onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button
-      >
-    </div>
-    {#if view === "board"}
-      <button class="density-toggle" type="button" aria-pressed={compact} onclick={() => (compact = !compact)} title="Hide descriptions and checklist previews for a denser board">
-        {compact ? "✓ Compact cards" : "Compact cards"}
-      </button>
-    {/if}
-  </div>
 
   <div class="board-toolbar" aria-label="Board filters">
     <div class="search-field">
@@ -778,61 +751,10 @@
     flex-direction: column;
     height: calc(100vh - var(--topbar-h));
   }
-  .board-overview { display: flex; align-items: center; justify-content: space-between; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
   .density-toggle { color: var(--text-muted); background: transparent; border-color: transparent; box-shadow: none; font-size: .78rem; }
   .density-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
   .search-field { display: flex; align-items: center; gap: .45rem; color: var(--text-muted); padding-left: .5rem; }
   .search-field input { min-width: 0; }
-  .board-stats {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    gap: .45rem;
-    flex-wrap: wrap;
-  }
-  .board-stats button {
-    display: inline-flex;
-    align-items: baseline;
-    gap: .3rem;
-    min-height: 1.8rem;
-    padding: .25rem .55rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--text-muted);
-    box-shadow: 0 1px 1px rgba(16, 24, 40, .04);
-    white-space: nowrap;
-    font-weight: 500;
-  }
-  .board-stats button:hover { border-color: currentColor; }
-  .board-stats button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .board-stats strong {
-    color: var(--text);
-    font-size: .98rem;
-  }
-  .board-stats button.warn {
-    background: var(--duesoon-bg);
-    border-color: transparent;
-    color: var(--duesoon-fg);
-  }
-  .board-stats button.alert {
-    background: var(--overdue-bg);
-    border-color: transparent;
-    color: var(--overdue-fg);
-  }
-  .board-stats button.warn strong,
-  .board-stats button.alert strong {
-    color: inherit;
-  }
-  .board-stats button.active {
-    border-color: currentColor;
-    box-shadow: inset 0 0 0 1px currentColor;
-  }
-  .board-stats button.active::after {
-    content: "✓";
-    font-size: .7rem;
-    font-weight: 800;
-  }
   /* The board pins itself to the window so lanes scroll internally. The list is
      an ordinary document that grows with its rows, so it takes normal page flow
      and lets the window scroll instead. */
@@ -1216,11 +1138,6 @@
     background: var(--accent-soft);
   }
   @media (max-width: 1200px) {
-    .board-stats {
-      grid-column: 1 / -1;
-      justify-content: flex-start;
-      order: 3;
-    }
     .board-toolbar {
       grid-template-columns: repeat(3, minmax(0, 1fr));
     }
@@ -1235,12 +1152,7 @@
       padding-inline: .75rem;
       height: auto;
     }
-    .board-stats {
-      order: initial;
-    }
-    .board-new-task {
-      width: 100%;
-    }
+    .board-page :global(.workspace-actions) { justify-content: flex-end; }
     .board-toolbar {
       grid-template-columns: 1fr;
     }

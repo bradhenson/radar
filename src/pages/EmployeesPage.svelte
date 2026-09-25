@@ -255,7 +255,16 @@
 {/snippet}
 
 <div class="page">
-  <WorkspaceHeader title="Employees" section="People" description="Your team at a glance: open work, training, and who is out.">
+  <WorkspaceHeader title="Employees" section="People">
+    {#snippet filters()}
+      <div class="filter-pills" aria-label="Quick employee filters">
+        <button type="button" class:alert={stats.overdue > 0} class:active={summaryFilter === "overdue"} aria-pressed={summaryFilter === "overdue"} onclick={() => toggleSummaryFilter("overdue")}><strong>{stats.overdue}</strong> overdue tasks</button>
+        <button type="button" class:warn={stats.trainingDue > 0} class:active={summaryFilter === "training"} aria-pressed={summaryFilter === "training"} onclick={() => toggleSummaryFilter("training")}><strong>{stats.trainingDue}</strong> training due</button>
+        <button type="button" class:warn={stats.staleInput > 0} class:active={summaryFilter === "stale_input"} aria-pressed={summaryFilter === "stale_input"} onclick={() => toggleSummaryFilter("stale_input")}><strong>{stats.staleInput}</strong> no input {STALE_INPUT_DAYS}+ days</button>
+        <button type="button" class:active={summaryFilter === "on_leave"} aria-pressed={summaryFilter === "on_leave"} onclick={() => toggleSummaryFilter("on_leave")}><strong>{stats.onLeave}</strong> on leave now</button>
+        <button type="button" class:active={summaryFilter === "on_travel"} aria-pressed={summaryFilter === "on_travel"} onclick={() => toggleSummaryFilter("on_travel")}><strong>{stats.onTravel}</strong> on travel now</button>
+      </div>
+    {/snippet}
     {#snippet actions()}
       <button
         type="button"
@@ -267,62 +276,6 @@
       >
     {/snippet}
   </WorkspaceHeader>
-
-  <div class="summary-cards" aria-label="Quick employee filters">
-    <button
-      type="button"
-      class="stat"
-      class:alert={stats.overdue > 0}
-      class:active={summaryFilter === "overdue"}
-      aria-pressed={summaryFilter === "overdue"}
-      onclick={() => toggleSummaryFilter("overdue")}
-    >
-      <div class="num">{stats.overdue}</div>
-      <div class="lbl">Overdue tasks</div>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:warn={stats.trainingDue > 0}
-      class:active={summaryFilter === "training"}
-      aria-pressed={summaryFilter === "training"}
-      onclick={() => toggleSummaryFilter("training")}
-    >
-      <div class="num">{stats.trainingDue}</div>
-      <div class="lbl">Training due</div>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:warn={stats.staleInput > 0}
-      class:active={summaryFilter === "stale_input"}
-      aria-pressed={summaryFilter === "stale_input"}
-      onclick={() => toggleSummaryFilter("stale_input")}
-    >
-      <div class="num">{stats.staleInput}</div>
-      <div class="lbl">No input {STALE_INPUT_DAYS}+ days</div>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:active={summaryFilter === "on_leave"}
-      aria-pressed={summaryFilter === "on_leave"}
-      onclick={() => toggleSummaryFilter("on_leave")}
-    >
-      <div class="num">{stats.onLeave}</div>
-      <div class="lbl">On leave now</div>
-    </button>
-    <button
-      type="button"
-      class="stat"
-      class:active={summaryFilter === "on_travel"}
-      aria-pressed={summaryFilter === "on_travel"}
-      onclick={() => toggleSummaryFilter("on_travel")}
-    >
-      <div class="num">{stats.onTravel}</div>
-      <div class="lbl">On travel now</div>
-    </button>
-  </div>
 
   <div class="toolbar record-toolbar">
     <input type="search" placeholder="Search employees…" bind:value={search} aria-label="Search employees" />

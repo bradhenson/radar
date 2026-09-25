@@ -188,12 +188,14 @@
 </script>
 
 <div class="page leave-page" class:wide={view === "calendar"}>
-  <WorkspaceHeader title="Leave and Availability" section="People" description="Plan time away and keep upcoming absences in view.">
-    {#snippet actions()}
+  <WorkspaceHeader title="Leave and Availability" section="People">
+    {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Leave view">
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
         <button type="button" class:active={view === "calendar"} aria-pressed={view === "calendar"} onclick={() => (view = "calendar")}>Calendar</button>
       </div>
+    {/snippet}
+    {#snippet actions()}
       <button type="button" class="primary" onclick={() => openForm()}>+ Add Leave</button>
     {/snippet}
   </WorkspaceHeader>

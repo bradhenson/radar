@@ -384,7 +384,7 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Settings" section="System" description="Backups, reminders, appearance, and the lists RADAR uses." />
+  <WorkspaceHeader title="Settings" section="System" />
   <nav class="settings-jump" aria-label="Settings sections">
     <span class="jump-label">Jump to</span>
       <button type="button" class="link" onclick={() => jumpTo("settings-backup")}>Backup</button>

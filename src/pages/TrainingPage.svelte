@@ -295,7 +295,7 @@
 </script>
 
 <div class="page training-page" class:matrix-open={showMatrix}>
-  <WorkspaceHeader title="Training" section="People" description="Required training, who has completed it, and who is coming due.">
+  <WorkspaceHeader title="Training" section="People">
     {#snippet actions()}
       {#if activeReqs.length > 0}
         <button type="button" aria-pressed={showMatrix} onclick={() => (showMatrix = !showMatrix)}>{showMatrix ? "Hide matrix" : "Show matrix"}</button>
@@ -310,8 +310,6 @@
       hint="Add a requirement (for example, Annual Cybersecurity Awareness). It applies to every active employee unless you pick specific people."
     />
   {:else}
-    <h2 class="section-heading">Requirements</h2>
-    <p class="section-hint">Select a requirement to see and update each person's status.</p>
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="table-scroll" role="region" aria-label="Training requirements" tabindex="0">
     <table class="data">
@@ -411,7 +409,6 @@
     {#if showMatrix}
       <section class="matrix-section">
         <h2 class="section-heading">Matrix overview</h2>
-        <p class="section-hint">✓ complete · ⚠ expiring · ! due soon · ✗ overdue or expired · – not completed · W waived. Click a cell to edit.</p>
         <div class="matrix-wrap">
           <table class="data matrix">
             <thead>

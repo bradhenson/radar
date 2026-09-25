@@ -168,17 +168,18 @@
   <MeetingNoteForm note={editing} onclose={() => (editing = undefined)} />
 {:else}
 <div class="page">
-  <WorkspaceHeader title="Meeting Notes" section="Work" description="Discussion and action items from each meeting, linked to projects and people.">
+  <WorkspaceHeader title="Meeting Notes" section="Work">
+    {#snippet filters()}
+      <div class="header-metrics" aria-label="Meeting note totals">
+        <span><strong>{app.meetingNotes.filter((note) => !note.isArchived).length}</strong> active notes</span>
+        <span><strong>{recentCount}</strong> today or later</span>
+        <span><strong>{app.meetingNotes.filter((note) => !note.isArchived && note.actionItems).length}</strong> with actions</span>
+      </div>
+    {/snippet}
     {#snippet actions()}
       <button type="button" class="primary" onclick={() => (createOpen = true)}>+ New Meeting Note</button>
     {/snippet}
   </WorkspaceHeader>
-
-  <div class="summary-cards">
-    <div class="stat"><div class="num">{app.meetingNotes.filter((note) => !note.isArchived).length}</div><div class="lbl">Active notes</div></div>
-    <div class="stat"><div class="num">{recentCount}</div><div class="lbl">Today or later</div></div>
-    <div class="stat"><div class="num">{app.meetingNotes.filter((note) => !note.isArchived && note.actionItems).length}</div><div class="lbl">With actions</div></div>
-  </div>
 
   <div class="toolbar record-toolbar meeting-toolbar">
     <input type="search" bind:value={search} placeholder="Search meeting notes…" aria-label="Search meeting notes" />

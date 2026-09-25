@@ -227,13 +227,15 @@
 {/snippet}
 
 <div class="page">
-  <WorkspaceHeader title="Performance" section="People" description="Record accomplishments as they happen so evaluations write themselves.">
-    {#snippet actions()}
+  <WorkspaceHeader title="Performance" section="People">
+    {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Performance view">
         <button type="button" class:active={viewMode === "inputs"} aria-pressed={viewMode === "inputs"} onclick={() => (viewMode = "inputs")}>All Inputs</button>
         <button type="button" class:active={viewMode === "employees"} aria-pressed={viewMode === "employees"} onclick={() => (viewMode = "employees")}>By Employee</button>
         <button type="button" class:active={viewMode === "coverage"} aria-pressed={viewMode === "coverage"} onclick={() => (viewMode = "coverage")}>Coverage</button>
       </div>
+    {/snippet}
+    {#snippet actions()}
       <button type="button" class="primary" onclick={() => (ui.performanceFormPrefill = { employeeId: filterEmployee || undefined })}>
         + New Performance Input
       </button>

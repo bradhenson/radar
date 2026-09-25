@@ -146,7 +146,7 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Activity" section="System" description="A running record of every change made in RADAR, newest first." />
+  <WorkspaceHeader title="Activity" section="System" />
 
   <div class="toolbar record-toolbar activity-toolbar">
     <input type="search" bind:value={search} placeholder="Search activity…" aria-label="Search activity summaries" />

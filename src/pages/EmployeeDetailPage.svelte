@@ -295,6 +295,14 @@
         {#if employee.team}<span>{employee.team}</span>{/if}
         {#if employee.activeStatus !== "active"}<span class="badge warning">{humanizeCode(employee.activeStatus)}</span>{/if}
       {/snippet}
+      {#snippet filters()}
+        <div class="header-metrics" aria-label="Employee totals">
+          <span><strong>{openTasks.length}</strong> open tasks</span>
+          <span><strong>{overdueTasks.length}</strong> overdue</span>
+          <span><strong>{inputs.length}</strong> performance inputs</span>
+          <span><strong>{formatDate(employee.lastCheckInDate) || "—"}</strong> last check-in</span>
+        </div>
+      {/snippet}
       {#snippet actions()}
         <button type="button" class="icon-btn" aria-label="Edit employee" title="Edit" onclick={() => (editOpen = true)}><Icon name="edit" size={17} /></button>
         <button type="button" class="icon-btn danger" aria-label="Delete employee" title="Delete" onclick={() => (confirmDeleteOpen = true)}><Icon name="trash" size={17} /></button>
@@ -304,13 +312,6 @@
         <button type="button" class="primary" onclick={() => openCheckIn()}>Record Check-in</button>
       {/snippet}
     </WorkspaceHeader>
-
-    <div class="summary-cards">
-      <div class="stat"><div class="num">{openTasks.length}</div><div class="lbl">Open tasks</div></div>
-      <div class="stat" class:alert={overdueTasks.length > 0}><div class="num">{overdueTasks.length}</div><div class="lbl">Overdue</div></div>
-      <div class="stat"><div class="num">{inputs.length}</div><div class="lbl">Perf. inputs</div></div>
-      <div class="stat"><div class="num">{formatDate(employee.lastCheckInDate) || "—"}</div><div class="lbl">Last check-in</div></div>
-    </div>
 
     <div class="tabs" role="tablist" aria-label="Employee sections">
       {#each TABS as [value, label], i (value)}

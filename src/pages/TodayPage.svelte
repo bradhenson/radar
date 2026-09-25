@@ -9,7 +9,7 @@
   import type { AttentionItem } from "../domain/rules/attention";
   import { AWARD_FINAL_STATUSES } from "../domain/rules/calendar";
   import { isTripCancelled, isVoucherSettled } from "../domain/rules/travel";
-  import { addDays, formatDate, formatLongDate } from "../utils/dates";
+  import { addDays, formatDate } from "../utils/dates";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
 
   let overdueCount = $derived(app.attention.filter((i) => i.reasonCode === "overdue").length);
@@ -149,43 +149,34 @@
 </script>
 
 <div class="page">
-  <WorkspaceHeader title="Today" section="Work" description={`${formatLongDate(app.today)} · Everything that needs your attention, most urgent first.`}>
+  <WorkspaceHeader title="Today" section="Work">
+    {#snippet meta()}<span>{formatDate(app.today)}</span>{/snippet}
+    {#snippet filters()}
+      <div class="filter-pills" aria-label="Quick attention filters">
+        <button type="button" class:alert={overdueCount > 0} aria-pressed={reasonFilter === "overdue"} onclick={() => toggleReasonFilter("overdue")}><strong>{overdueCount}</strong> overdue</button>
+        <button type="button" class:warn={dueTodayCount > 0} aria-pressed={reasonFilter === "due_today"} onclick={() => toggleReasonFilter("due_today")}><strong>{dueTodayCount}</strong> due today</button>
+        <button type="button" aria-pressed={reasonFilter === "due_soon"} onclick={() => toggleReasonFilter("due_soon")}><strong>{dueSoonCount}</strong> due soon</button>
+        <button type="button" aria-pressed={reasonFilter === "waiting_too_long"} onclick={() => toggleReasonFilter("waiting_too_long")}><strong>{waitingCount}</strong> waiting too long</button>
+        <button type="button" aria-pressed={reasonFilter === "training"} onclick={() => toggleReasonFilter("training")}><strong>{trainingCount}</strong> training warnings</button>
+      </div>
+    {/snippet}
     {#snippet actions()}
       <button type="button" onclick={() => (ui.quickNoteOpen = true)}>Quick Note</button>
       <button type="button" class="primary" onclick={() => (ui.quickAddOpen = true)}>Quick Add</button>
     {/snippet}
   </WorkspaceHeader>
 
-  <div class="summary-cards today-summary">
-    <button type="button" class="stat" class:alert={overdueCount > 0} aria-pressed={reasonFilter === "overdue"} onclick={() => toggleReasonFilter("overdue")}>
-      <div class="num">{overdueCount}</div><div class="lbl">Overdue</div>
-    </button>
-    <button type="button" class="stat" class:warn={dueTodayCount > 0} aria-pressed={reasonFilter === "due_today"} onclick={() => toggleReasonFilter("due_today")}>
-      <div class="num">{dueTodayCount}</div><div class="lbl">Due today</div>
-    </button>
-    <button type="button" class="stat" aria-pressed={reasonFilter === "due_soon"} onclick={() => toggleReasonFilter("due_soon")}>
-      <div class="num">{dueSoonCount}</div><div class="lbl">Due soon</div>
-    </button>
-    <button type="button" class="stat" aria-pressed={reasonFilter === "waiting_too_long"} onclick={() => toggleReasonFilter("waiting_too_long")}>
-      <div class="num">{waitingCount}</div><div class="lbl">Waiting too long</div>
-    </button>
-    <button type="button" class="stat" aria-pressed={reasonFilter === "training"} onclick={() => toggleReasonFilter("training")}>
-      <div class="num">{trainingCount}</div><div class="lbl">Training warnings</div>
-    </button>
-  </div>
-
   <div class="toolbar record-toolbar today-toolbar">
-  <div class="severity-filter" role="group" aria-label="Filter by severity">
+  <div class="filter-pills severity-filter" role="group" aria-label="Filter by severity">
     <span class="filter-label">Severity</span>
     {#each SEVERITY_FILTERS as f (f.value)}
       <button
         type="button"
-        class="severity-chip"
         class:active={severityFilter === f.value}
         aria-pressed={severityFilter === f.value}
         onclick={() => (severityFilter = f.value)}
       >
-        {f.label} <span class="chip-count">{severityCount(f.value)}</span>
+        <strong>{severityCount(f.value)}</strong> {f.label}
       </button>
     {/each}
     {#if anyAttentionFilter}
@@ -296,14 +287,6 @@
 </div>
 
 <style>
-  .today-summary {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(8.5rem, 1fr));
-    align-items: stretch;
-  }
-  .today-summary .stat {
-    min-width: 0;
-  }
   .today-toolbar {
     row-gap: .6rem;
   }
@@ -327,28 +310,6 @@
     text-transform: uppercase;
     letter-spacing: .06em;
     margin-right: .25rem;
-  }
-  .severity-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    min-height: 1.9rem;
-    padding: .2rem .65rem;
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface);
-    color: var(--text-muted);
-    font-size: .8rem;
-    font-weight: 600;
-  }
-  .severity-chip.active {
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-    background: var(--accent-soft);
-    color: var(--accent);
-  }
-  .chip-count {
-    font-size: .72rem;
-    opacity: .8;
   }
   .group-heading:first-of-type {
     margin-top: 0;
@@ -388,11 +349,7 @@
   }
   .actions { display: flex; gap: .3rem; flex-wrap: wrap; }
   .actions button { font-size: .78rem; padding: .15rem .5rem; }
-  @media (max-width: 1000px) {
-    .today-summary { grid-template-columns: repeat(3, minmax(8.5rem, 1fr)); }
-  }
   @media (max-width: 760px) {
-    .today-summary { grid-template-columns: repeat(2, minmax(8.5rem, 1fr)); }
     .attention-table .reason-col { width: 12rem; }
     .attention-table .actions-col { width: 12rem; }
   }

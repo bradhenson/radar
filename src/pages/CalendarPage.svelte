@@ -189,7 +189,7 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelDrag()} />
 
 <div class="page calendar-page">
-  <WorkspaceHeader title="Calendar" section="Work" description="Tasks by due date, with leave, telework, travel, and awards alongside.">
+  <WorkspaceHeader title="Calendar" section="Work">
     {#snippet actions()}
       <div class="month-nav" role="group" aria-label="Month navigation">
         <button type="button" onclick={() => shiftMonth(-1)} aria-label="Previous month">&lsaquo;</button>
@@ -422,22 +422,28 @@
     display: inline-flex;
     align-items: center;
     gap: .35rem;
-    min-height: 2.15rem;
+    min-height: 2rem;
     margin: 0;
     padding: .3rem .65rem;
     border: 1px solid var(--border);
     border-radius: 999px;
     background: var(--surface);
     color: var(--text-muted);
-    font-weight: 600;
+    box-shadow: none;
+    font-size: .78rem;
+    font-weight: 500;
     white-space: nowrap;
     cursor: pointer;
+    position: relative;
   }
+  .pill-toggle input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .pill-toggle:hover { border-color: currentColor; }
+  .pill-toggle:focus-within { outline: 2px solid var(--accent); outline-offset: 2px; }
   .pill-toggle.active {
-    border-color: color-mix(in srgb, var(--accent) 55%, var(--border));
-    background: var(--accent-soft);
-    color: var(--accent);
+    border-color: currentColor;
+    box-shadow: inset 0 0 0 1px currentColor;
   }
+  .pill-toggle.active::after { content: "✓"; font-size: .7rem; font-weight: 800; }
   .kind-dot {
     width: .55rem;
     height: .55rem;
