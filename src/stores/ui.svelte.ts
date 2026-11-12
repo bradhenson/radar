@@ -9,7 +9,7 @@ class UiState {
   // Session-only presentation state. Returning from a full-page task editor
   // restores the working view without adding preferences to operator backups.
   boardView = {
-    view: "board" as "board" | "list",
+    view: "board" as "board" | "list" | "recurring",
     search: "", employee: "", competency: "", project: "", priority: "",
     summary: "" as BoardSummaryFilter,
     sortKey: "column" as TaskListSortKey,

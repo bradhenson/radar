@@ -4,6 +4,8 @@
   // assignment is declarative (everyone, or a selected list), and the primary
   // working view is a per-requirement roster with one-click completion.
   import { app } from "../stores/app.svelte";
+  import { ui } from "../stores/ui.svelte";
+  import { trainingFollowUpTask } from "../domain/rules/followUpTasks";
   import { router } from "../app/router.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -353,6 +355,8 @@
                       Mark {checkedIds.length || "selected"} complete
                     </button>
                     <span class="spacer"></span>
+                    <!-- Opens the new-task editor prefilled; nothing is created until it is saved. -->
+                    <button type="button" onclick={() => ui.openNewTask(trainingFollowUpTask(selectedReq!, s.overdue, app.today))}>Add task</button>
                     <button type="button" onclick={() => openReqForm(selectedReq)}>Edit requirement</button>
                   </div>
                   <table class="data">

@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Recurring tasks, and board cards started from other records
+
+- **Recurring tasks.** The Tasks page has a third view, Recurring, beside Board and List. Add a schedule there for work that comes back (timecards each pay period, a weekly status report, a monthly review) and RADAR puts the card on the board for you. Choose Every weekday, Weekly, Every pay period (2 weeks), Monthly, Quarterly, Yearly, or Custom (every N days, weeks, or months), a first due date, and how many days before the due date the card should appear. The form shows the schedule in words and the first three due dates before you save. Each schedule can also carry a description, priority, employee, and project, which are copied onto every card it creates.
+- Cards are created when RADAR opens, when the date rolls over while it is open, and when a schedule is saved. They land at the bottom of the first board column with a small "Repeats" mark, and from then on they are ordinary tasks: finish, move, edit, or delete them like any other. Deleting a card does not bring it back, and the same occurrence is never created twice.
+- A schedule looks forward. A first due date in the past sets the rhythm without creating a card that is already overdue. If RADAR has not been opened for a while, only the most recent missed occurrence is created, not one card for every week away.
+- Each schedule can be paused and resumed from its row; resuming picks up from today. Deleting a schedule asks first and keeps the cards it already created. The Recurring view lists each schedule's next due date and how many of its cards are still open.
+- Recurring tasks are stored in a new collection, so the backup format moves to version 7. Older backups import as before, with no recurring tasks; the desktop database and the browser database add the new table when they are next opened. The sample data includes three schedules.
+- **Add task** buttons start a board card from other records. On Travel, an expanded trip offers a card for its open paperwork (due the day travel starts) or its voucher (due on the voucher date), assigned to the traveler. On Training, an open roster offers a card naming the requirement and how many people are overdue. On Awards, the edit dialog offers a card for the nomination, due on the nomination date. Each opens the new-task editor filled in, so nothing is created until you choose Create task.
+
+### Fixed
+
+- A new task opened already filled in (from a meeting note's follow-up button, and now from Travel, Training, and Awards) was not created if you chose Create task without changing anything; the editor closed as though it had saved. Create task now always creates the task.
+
 ### Decisions from the list, and counts in the sidebar
 
 - **Sidebar counts.** A number now sits beside any page that has something waiting on you, so it shows from whichever page is open: overdue tasks on Tasks, overdue training records on Training, leave requests awaiting approval on Leave, telework requests awaiting your decision (and expired agreements) on Telework, trips with a late step or paperwork still open on Travel, and overdue nominations on Awards. A neutral count is an open decision; a red one is already late. Hovering the page name says what the number means, and screen readers hear the same words. A page with nothing waiting shows no number. In a narrow window the counts roll up onto the More button.

@@ -214,7 +214,11 @@
     if (saving) return false;
     const fields = editableFieldsFromDraft();
     if (!validateDraft(fields)) return false;
-    if (!hasUnsavedChanges) {
+    // "Nothing changed, nothing to save" holds only for a task that already
+    // exists. A new task opened prefilled (from a meeting, trip, award, or
+    // training requirement) matches its own starting values, and Create task
+    // must still create it rather than close as if it had.
+    if (!isNewTask && !hasUnsavedChanges) {
       if (closeAfter) close();
       return true;
     }

@@ -27,6 +27,7 @@
     tasks: "Task",
     taskNotes: "Task note",
     checklistItems: "Checklist item",
+    recurringTasks: "Recurring task",
     employees: "Employee",
     employeeNotes: "Employee note",
     quickNotes: "General note",

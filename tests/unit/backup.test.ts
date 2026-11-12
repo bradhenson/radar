@@ -177,6 +177,36 @@ describe("backup format migrations", () => {
     expect(result.warnings.some((warning) => warning.includes("version 3 to 4"))).toBe(true);
   });
 
+  it("adds an empty recurring-task collection when importing a v6 backup", () => {
+    const pkg = createBackupPackage(createSampleSnapshot());
+    pkg.formatVersion = 6;
+    delete (pkg.data as unknown as Record<string, unknown>).recurringTasks;
+    delete pkg.integrity.recordCounts.recurringTasks;
+    pkg.integrity.checksum = backupChecksum(JSON.stringify(pkg.data));
+
+    const result = parseAndValidateBackup(JSON.stringify(pkg));
+
+    expect(result.valid).toBe(true);
+    expect(result.package!.data.recurringTasks).toEqual([]);
+    expect(result.warnings.some((warning) => warning.includes("recurringTasks"))).toBe(true);
+    expect(result.warnings.some((warning) => warning.includes("version 6 to 7"))).toBe(true);
+  });
+
+  it("carries recurring tasks through a backup and rejects a schedule with an unknown unit", () => {
+    const snapshot = createSampleSnapshot();
+    expect(snapshot.collections.recurringTasks.length).toBeGreaterThan(0);
+    const pkg = createBackupPackage(snapshot);
+    const ok = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(ok.valid).toBe(true);
+    expect(ok.package!.data.recurringTasks).toEqual(snapshot.collections.recurringTasks);
+
+    (pkg.data.recurringTasks[0] as unknown as Record<string, unknown>).unit = "fortnights";
+    pkg.integrity.checksum = backupChecksum(JSON.stringify(pkg.data));
+    const bad = parseAndValidateBackup(JSON.stringify(pkg));
+    expect(bad.valid).toBe(false);
+    expect(bad.errors.some((e) => e.includes("recurringTasks") && e.includes("unit"))).toBe(true);
+  });
+
   // Project descriptions, award notes, and check-in summaries became documents
   // after v5. They were always plain textareas, so a leading "- " is a dash the
   // author typed, not a list they authored.

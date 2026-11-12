@@ -2,6 +2,8 @@
   // Awards (plan 12.10, 21). Optional module for the first MVP — a simple
   // status list; a status board can follow in Phase 9.
   import { app } from "../stores/app.svelte";
+  import { ui } from "../stores/ui.svelte";
+  import { awardFollowUpTask } from "../domain/rules/followUpTasks";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
@@ -116,6 +118,14 @@
         { actionType: "updated", summary: `Moved award "${a.title}" for ${who} back to ${before.status}` }
       );
     });
+  }
+
+  // Start a board card for the nomination from the open award. The dialog
+  // closes without saving; unsaved edits are asked about first, as with ✕.
+  function addTaskFor(a: AwardRecord) {
+    if (formSnapshot() !== openedSnapshot && !window.confirm("Discard unsaved changes to this award?")) return;
+    formOpen = false;
+    ui.openNewTask(awardFollowUpTask(a, app.employeeName(a.employeeId)));
   }
 
   function requestDelete(a: AwardRecord) {
@@ -273,6 +283,8 @@
       <div class="dialog-actions">
         {#if editing}
           <button type="button" class="icon-btn danger delete-action" aria-label="Delete award" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
+          <!-- Opens the new-task editor prefilled; nothing is created until it is saved. -->
+          <button type="button" onclick={() => addTaskFor(editing!)}>Add task</button>
         {/if}
         <button type="button" onclick={() => (formOpen = false)}>Cancel</button>
         <button type="submit" class="primary">Save</button>

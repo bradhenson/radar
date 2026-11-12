@@ -22,6 +22,7 @@ import type {
   PerformanceInput,
   Project,
   QuickNote,
+  RecurringTask,
   Task,
   TaskNote,
   TeleworkRecord,
@@ -49,6 +50,8 @@ import {
 import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
+import { planRecurringTasks, recurrenceInstanceKey } from "../domain/rules/recurrence";
+import { richTextFromPlainText } from "../utils/richTextDoc";
 import { statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 import { expiredActivityEntryIds } from "../domain/rules/activityRetention";
@@ -92,6 +95,7 @@ export class AppStore {
   boardColumns = $state<BoardColumnDefinition[]>([]);
   taskNotes = $state<TaskNote[]>([]);
   checklistItems = $state<ChecklistItem[]>([]);
+  recurringTasks = $state<RecurringTask[]>([]);
   performanceElements = $state<PerformanceElement[]>([]);
   evaluationCycles = $state<EvaluationCycle[]>([]);
   performanceInputs = $state<PerformanceInput[]>([]);
@@ -170,6 +174,7 @@ export class AppStore {
     this.tasks.length > 0 ||
     this.taskNotes.length > 0 ||
     this.checklistItems.length > 0 ||
+    this.recurringTasks.length > 0 ||
     this.performanceElements.length > 0 ||
     this.evaluationCycles.length > 0 ||
     this.performanceInputs.length > 0 ||
@@ -345,6 +350,7 @@ export class AppStore {
       await this.loadAll();
       this.detectRichTextMigration();
       await this.pruneActivityEntries();
+      await this.generateRecurringTasks();
       await this.refreshStoragePersistence();
       await this.refreshDesktopInfo();
       this.initialized = true;
@@ -379,7 +385,11 @@ export class AppStore {
     if (this.clockStarted) return;
     this.clockStarted = true;
     setInterval(() => {
-      this.today = todayIso();
+      const next = todayIso();
+      if (next === this.today) return;
+      this.today = next;
+      // A new day can bring recurring tasks into their create-ahead window.
+      if (this.initialized && !this.storageFault) void this.generateRecurringTasks();
     }, 60_000);
   }
 
@@ -527,6 +537,7 @@ export class AppStore {
     this.boardColumns = snapshot.collections.boardColumns;
     this.taskNotes = snapshot.collections.taskNotes;
     this.checklistItems = snapshot.collections.checklistItems;
+    this.recurringTasks = snapshot.collections.recurringTasks;
     this.performanceElements = snapshot.collections.performanceElements;
     this.evaluationCycles = snapshot.collections.evaluationCycles;
     this.performanceInputs = snapshot.collections.performanceInputs;
@@ -1054,6 +1065,105 @@ export class AppStore {
       this.toast(`Save failed: ${e instanceof Error ? e.message : String(e)}`, "error");
       throw e;
     }
+  }
+
+  // --- recurring tasks (plan section 23) ------------------------------------
+  private generatingRecurring = false;
+
+  /**
+   * Create the cards recurring tasks are due to produce (rules in
+   * domain/rules/recurrence.ts). Runs at startup, when the date rolls over,
+   * and after a recurring task is saved. Each recurring task commits in one
+   * atomic batch: its new cards, their activity entries, the backup counter,
+   * and the high-water mark that stops the same occurrence being made twice.
+   * Returns how many cards were created; never throws, so a failure here
+   * cannot stop the app from opening.
+   */
+  async generateRecurringTasks(): Promise<number> {
+    if (this.generatingRecurring) return 0;
+    this.generatingRecurring = true;
+    let created = 0;
+    try {
+      const existingKeys = new Set(
+        this.tasks.map((t) => t.recurrenceInstanceKey).filter((key): key is string => Boolean(key))
+      );
+      const boardColumnId = this.defaultBoardColumnId();
+      for (const item of planRecurringTasks(this.recurringTasks, existingKeys, this.today)) {
+        const source = item.recurringTask;
+        // A person or project deleted since the schedule was written is dropped, not carried as a dangling id.
+        const employeeId = this.employees.some((e) => e.id === source.employeeId && e.activeStatus === "active")
+          ? source.employeeId
+          : undefined;
+        const projectId = this.projects.some((p) => p.id === source.projectId && !p.isArchived)
+          ? source.projectId
+          : undefined;
+        const columnOrders = this.tasks
+          .filter((t) => this.taskBoardColumnId(t) === boardColumnId && !t.isArchived)
+          .map((t) => t.boardOrder);
+        const newTasks: Task[] = [];
+        for (const dueDate of item.dueDates) {
+          const task = this.createTask({
+            title: source.title,
+            description: source.description?.trim() ? richTextFromPlainText(source.description) : undefined,
+            priority: source.priority,
+            employeeId,
+            projectId,
+            tags: [...source.tags],
+            dueDate,
+            boardColumnId,
+            recurrenceTemplateId: source.id,
+            recurrenceInstanceKey: recurrenceInstanceKey(source.id, dueDate)
+          });
+          task.boardOrder = orderForAppend([...columnOrders, ...newTasks.map((t) => t.boardOrder)]);
+          newTasks.push(task);
+        }
+        const updatedSource: RecurringTask = {
+          ...this.plainRecord(source),
+          lastGeneratedDueDate: item.generatedThrough
+        };
+        const entries = newTasks.map((task) =>
+          this.buildActivityEntry(
+            "tasks",
+            task.id,
+            "created",
+            `Created recurring task "${task.title}" due ${formatDate(task.dueDate)}`
+          )
+        );
+        const nextMeta = newTasks.length > 0 ? this.bumpedMeta("created") : undefined;
+        const ops: MutationOp[] = [
+          ...newTasks.map((task) => putOp("tasks", this.plainRecord(task))),
+          putOp("recurringTasks", updatedSource),
+          ...entries.map((entry) => putOp("activityEntries", entry))
+        ];
+        if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+        this.saveStatus = "saving";
+        await this.store.mutate(ops);
+
+        this.tasks.push(...newTasks);
+        const idx = this.recurringTasks.findIndex((r) => r.id === source.id);
+        if (idx >= 0) this.recurringTasks[idx] = updatedSource;
+        this.activityEntries.push(...entries);
+        if (nextMeta) this.meta = nextMeta;
+        this.saveStatus = "saved";
+        created += newTasks.length;
+      }
+      if (created > 0) this.toast(`Added ${created} recurring task${created === 1 ? "" : "s"} to the board`, "info");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Recurring tasks could not be created: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      this.generatingRecurring = false;
+    }
+    return created;
+  }
+
+  /** Save a recurring task, then create any card its schedule already calls for. */
+  async saveRecurringTask(record: RecurringTask, isNew: boolean): Promise<void> {
+    await this.putRecord("recurringTasks", record, {
+      actionType: isNew ? "created" : "updated",
+      summary: `${isNew ? "Added" : "Updated"} recurring task "${record.title}"`
+    });
+    await this.generateRecurringTasks();
   }
 
   // --- task service -----------------------------------------------------------

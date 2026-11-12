@@ -8,6 +8,8 @@
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
+  import RecurringTasks from "../components/board/RecurringTasks.svelte";
+  import { recurrenceSummary } from "../domain/rules/recurrence";
   import { TASK_PRIORITIES, priorityLabel, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
   import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
@@ -35,6 +37,16 @@
       project: filterProject, priority: filterPriority, summary: summaryFilter,
       sortKey, sortDirection, compact, scrollLeft: horizontalPosition };
   });
+
+  // The Recurring view owns its form; the header's primary button opens it.
+  let recurringView: ReturnType<typeof RecurringTasks> | undefined = $state();
+
+  /** "Weekly on Friday" for a card made by a recurring task; empty for ordinary cards. */
+  function recurringLabel(task: Task): string {
+    if (!task.recurrenceTemplateId) return "";
+    const source = app.recurringTasks.find((r) => r.id === task.recurrenceTemplateId);
+    return source ? `Recurring: ${recurrenceSummary(source)}` : "Recurring task";
+  }
 
   function openTask(id: string) {
     // A focused/clicked card can scroll into view before a scroll event is
@@ -416,15 +428,17 @@
 
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
-<div class="page board-page" class:list-mode={view === "list"}>
-  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} titleMinWidth="11rem" section="Work">
+<div class="page board-page" class:list-mode={view !== "board"}>
+  <WorkspaceHeader title={view === "board" ? "Kanban Board" : view === "list" ? "Task List" : "Recurring Tasks"} titleMinWidth="11rem" section="Work">
     {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Task view">
         <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        <button type="button" class:active={view === "recurring"} aria-pressed={view === "recurring"} onclick={() => (view = "recurring")}>Recurring</button>
       </div>
     {/snippet}
     {#snippet filters()}
+    {#if view !== "recurring"}
     <div class="filter-pills board-stats" aria-label="Quick board filters">
       <button type="button" class:active={!summaryFilter} aria-pressed={!summaryFilter} onclick={() => (summaryFilter = "")}><strong>{boardStats.total}</strong> tasks</button>
       <button type="button" class:warn={boardStats.dueSoon > 0} class:active={summaryFilter === "due_soon"} aria-pressed={summaryFilter === "due_soon"} onclick={() => toggleSummaryFilter("due_soon")}><strong>{boardStats.dueSoon}</strong> due soon</button>
@@ -432,6 +446,7 @@
       <button type="button" class:active={summaryFilter === "waiting"} aria-pressed={summaryFilter === "waiting"} onclick={() => toggleSummaryFilter("waiting")}><strong>{boardStats.waiting}</strong> waiting</button>
       <button type="button" class:alert={boardStats.priority > 0} class:active={summaryFilter === "priority"} aria-pressed={summaryFilter === "priority"} onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button>
     </div>
+    {/if}
     {/snippet}
     {#snippet actions()}
       {#if view === "board"}
@@ -439,10 +454,17 @@
           {compact ? "✓ Compact cards" : "Compact cards"}
         </button>
       {/if}
-      <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
+      {#if view === "recurring"}
+        <button type="button" class="primary board-new-task" onclick={() => recurringView?.openForm()}>+ New Recurring Task</button>
+      {:else}
+        <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
+      {/if}
     {/snippet}
   </WorkspaceHeader>
 
+  {#if view === "recurring"}
+    <RecurringTasks bind:this={recurringView} />
+  {:else}
   <div class="board-toolbar" aria-label="Board filters">
     <div class="search-field">
       <Icon name="search" size={15} />
@@ -703,12 +725,20 @@
                 <!-- An unassigned card says nothing about its assignee: the
                      absence of a name is the signal, and "Unassigned" on most
                      cards was noise. The footer appears only when it has content. -->
-                {#if task.employeeId || (task.showOnCard === "checklist" && checklistProgress(task.id))}
+                {#if task.employeeId || task.recurrenceTemplateId || (task.showOnCard === "checklist" && checklistProgress(task.id))}
                   <div class="card-footer">
                     {#if task.employeeId}
                       <span class="assignee">
                         <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
                         <span>{app.employeeName(task.employeeId)}</span>
+                      </span>
+                    {/if}
+                    {#if task.recurrenceTemplateId}
+                      <!-- A mark, not a control: where the schedule lives is the Recurring view. -->
+                      <span class="recurring-mark" title={recurringLabel(task)}>
+                        <Icon name="review" size={12} />
+                        <span>Repeats</span>
+                        <span class="sr-only">. {recurringLabel(task)}</span>
                       </span>
                     {/if}
                     {#if task.showOnCard === "checklist" && checklistProgress(task.id)}
@@ -736,6 +766,7 @@
         </section>
       {/each}
     </div>
+  {/if}
   {/if}
 </div>
 
@@ -1071,6 +1102,15 @@
   }
   .checklist-badge::before {
     content: "☑ ";
+  }
+  .recurring-mark {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 600;
   }
   .card-footer {
     display: flex;

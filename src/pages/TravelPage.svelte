@@ -3,6 +3,8 @@
   // state around each trip (IPT concurrence, authorization, voucher due).
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import { app } from "../stores/app.svelte";
+  import { ui } from "../stores/ui.svelte";
+  import { travelFollowUpTask } from "../domain/rules/followUpTasks";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Dialog from "../components/common/Dialog.svelte";
@@ -592,6 +594,13 @@
                       </dl>
                       <div class="detail-footer">
                         <button type="button" onclick={() => openForm(t)}>Edit</button>
+                        {#if travelFollowUpTask(t, app.employeeName(t.employeeId), app.today)}
+                          <!-- Opens the new-task editor prefilled; nothing is created until it is saved. -->
+                          <button
+                            type="button"
+                            onclick={() => ui.openNewTask(travelFollowUpTask(t, app.employeeName(t.employeeId), app.today))}
+                          >Add task</button>
+                        {/if}
                         {#if cancelled}
                           <button type="button" onclick={() => void reinstateTrip(t)}>Reinstate trip</button>
                         {:else}

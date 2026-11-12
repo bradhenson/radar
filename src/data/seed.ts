@@ -14,7 +14,7 @@ import {
   type TeleworkStatus,
   type TrainingRequirement
 } from "../domain/models";
-import { addDays, nowTimestamp, todayIso } from "../utils/dates";
+import { addDays, addMonths, daysBetween, nowTimestamp, startOfWeek, todayIso } from "../utils/dates";
 import { newId } from "../utils/ids";
 import { ORDER_GAP } from "../domain/rules/boardOrder";
 import { payPeriodStartFor, PAY_PERIOD_DAYS } from "../domain/rules/telework";
@@ -336,6 +336,58 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     meeting("Customer reporting modernization sync", "Customer", 3, projects.reporting, [12, 13, 31, 32]),
     meeting("Telework request review", "Staff", 5, undefined, [10, 11, 27, 33]),
     meeting("Knowledge base refresh planning", "Project", 8, projects.knowledge, [17, 34, 37, 39])
+  );
+
+  // Recurring schedules. Each first due date sits beyond its create-ahead
+  // window, so loading sample data shows the schedules without also adding
+  // cards to the board; the first cards appear a few days later.
+  const FRIDAY = 5;
+  /** The first date on or after `from` that falls on the given weekday (0 = Sunday). */
+  const onWeekday = (from: string, weekday: number): string => {
+    let date = from;
+    while (daysBetween(startOfWeek(date), date) !== weekday) date = addDays(date, 1);
+    return date;
+  };
+  c.recurringTasks.push(
+    {
+      id: newId(),
+      title: "Certify team timecards",
+      description: "Review exceptions, then certify before the pay period closes.",
+      priority: "high",
+      tags: [],
+      unit: "weeks",
+      interval: 2,
+      firstDueDate: onWeekday(addDays(today, 10), FRIDAY),
+      advanceCreateDays: 7,
+      active: true,
+      ...stamp
+    },
+    {
+      id: newId(),
+      title: "Send weekly status rollup",
+      priority: "normal",
+      projectId: projects.workforce.id,
+      tags: [],
+      unit: "weeks",
+      interval: 1,
+      firstDueDate: onWeekday(addDays(today, 8), FRIDAY),
+      advanceCreateDays: 4,
+      active: true,
+      ...stamp
+    },
+    {
+      id: newId(),
+      title: "Review training compliance",
+      priority: "normal",
+      tags: [],
+      unit: "months",
+      interval: 1,
+      // The 1st of the month after the one ten days from now.
+      firstDueDate: addMonths(`${addDays(today, 10).slice(0, 7)}-01`, 1),
+      advanceCreateDays: 7,
+      active: true,
+      ...stamp
+    }
   );
 
   c.quickNotes.push(

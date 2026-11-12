@@ -148,6 +148,39 @@ export interface Task {
   isArchived: boolean;
 }
 
+export type RecurrenceUnit = "days" | "weeks" | "months";
+
+/**
+ * A task that comes back on a schedule (plan section 23). It is a template,
+ * not a card: the app creates an ordinary task from it shortly before each
+ * due date (see domain/rules/recurrence.ts), stamped with this record's id in
+ * `Task.recurrenceTemplateId`.
+ */
+export interface RecurringTask {
+  id: Id;
+  title: string;
+  /** Plain text copied into each generated task's description. */
+  description?: string;
+  priority: TaskPriority;
+  employeeId?: Id;
+  projectId?: Id;
+  tags: string[];
+  /** The schedule: every `interval` units, counted from `firstDueDate`. */
+  unit: RecurrenceUnit;
+  interval: number;
+  firstDueDate: IsoDate;
+  /** Daily schedules only: no Saturday or Sunday occurrences. */
+  weekdaysOnly?: boolean;
+  /** How many days before its due date a card is created. */
+  advanceCreateDays: number;
+  /** Paused schedules create nothing until resumed. */
+  active: boolean;
+  /** Due date of the latest occurrence already handled; later ones are still to come. */
+  lastGeneratedDueDate?: IsoDate;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
+}
+
 export type NoteType = "general" | "status" | "decision" | "completion" | "verification";
 
 export interface TaskNote {

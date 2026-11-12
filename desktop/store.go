@@ -30,6 +30,7 @@ var collectionNames = []string{
 	"boardColumns",
 	"taskNotes",
 	"checklistItems",
+	"recurringTasks",
 	"performanceElements",
 	"evaluationCycles",
 	"performanceInputs",
