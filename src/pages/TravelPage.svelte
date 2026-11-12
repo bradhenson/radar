@@ -25,11 +25,13 @@
     TRAVEL_PHASE_LABELS,
     travelPhase,
     travelPhaseRank,
+    travelStepAdvance,
     travelSteps,
     travelVoucherDueDate,
     voucherStatusOf,
     voucherUrgency,
     type TravelPhase,
+    type TravelStep,
     type TravelSummaryFilter
   } from "../domain/rules/travel";
   import TravelSteps from "../components/cues/TravelSteps.svelte";
@@ -393,6 +395,22 @@
     app.toast(message, "success", undo);
   }
 
+  // One click on a tracker step moves that step forward (IPT concurred, DTS
+  // created then approved, voucher submitted). The rule for what "forward"
+  // means lives in domain/rules/travel.ts.
+  async function advanceStep(t: TravelRecord, key: TravelStep["key"]) {
+    const move = travelStepAdvance(t, key, app.today);
+    if (!move) return;
+    const who = `${app.employeeName(t.employeeId)} (${t.destination})`;
+    const done = move.label.replace(/^Mark /, "");
+    const undo = await writeTrip(
+      { ...t, ...move.changes, updatedAt: nowTimestamp() },
+      `Travel for ${who}: ${done}`,
+      `Reverted "${done}" on travel for ${who}`
+    );
+    app.toast(`${done[0]!.toUpperCase()}${done.slice(1)} for ${app.employeeName(t.employeeId)}`, "success", undo);
+  }
+
   async function cancelTrip(t: TravelRecord) {
     const who = `${app.employeeName(t.employeeId)} (${t.destination})`;
     const next: TravelRecord = {
@@ -481,7 +499,7 @@
     {#if rows.length === 0}
       <EmptyState message={search || filterEmployee || summaryFilter ? "No trips match this view." : "No travel records."} hint={search || filterEmployee || summaryFilter ? "Clear filters to see the other trips." : "Add a trip to track who's away, DTS status, and voucher due dates."} />
     {:else}
-      <p class="section-hint">Progress runs IPT → DTS → Trip → Voucher: ✓ done · ◉ in progress · ! needs attention · – not required. Hover a step for details.</p>
+      <p class="section-hint">Progress runs IPT → DTS → Trip → Voucher: ✓ done · ◉ in progress · ! needs attention · – not required. Click an open step to move it forward; hover for details.</p>
       <!-- Keyboard focus lets the arrow keys scroll wide tables. -->
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="table-scroll" role="region" aria-label="Travel records" tabindex="0">
@@ -535,7 +553,11 @@
                   {#if cancelled}
                     <span class="muted">Cancelled</span>
                   {:else}
-                    <TravelSteps steps={travelSteps(t, app.today)} />
+                    <TravelSteps
+                      steps={travelSteps(t, app.today)}
+                      who={app.employeeName(t.employeeId)}
+                      onadvance={(key) => void advanceStep(t, key)}
+                    />
                   {/if}
                 </td>
                 <td class="voucher-cell">

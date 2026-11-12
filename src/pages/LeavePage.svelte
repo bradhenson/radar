@@ -126,6 +126,25 @@
     formOpen = false;
   }
 
+  // Approve a requested absence straight from the list, with Undo.
+  async function approve(l: LeaveRecord) {
+    const before = { ...l };
+    const who = app.employeeName(l.employeeId);
+    const dates = `${l.startDate} to ${l.endDate}`;
+    await app.putRecord(
+      "leaveRecords",
+      { ...l, status: "approved", updatedAt: nowTimestamp() },
+      { actionType: "updated", summary: `Approved leave for ${who} (${dates})` }
+    );
+    app.toast(`Approved leave for ${who}`, "success", () => {
+      void app.putRecord(
+        "leaveRecords",
+        { ...before, updatedAt: nowTimestamp() },
+        { actionType: "updated", summary: `Reverted leave approval for ${who} (${dates})` }
+      );
+    });
+  }
+
   let rows = $derived.by(() => {
     return app.leaveRecords
       .filter((l) => showPast || compareDates(l.endDate, app.today) >= 0)
@@ -227,7 +246,7 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="table-scroll" role="region" aria-label="Leave records" tabindex="0">
       <table class="data leave-table">
-        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th></tr></thead>
+        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th><th class="row-action-cell" aria-label="Decision"></th></tr></thead>
         <tbody>
           {#each rows as l (l.id)}
             <!-- Row click is a mouse convenience; the employee button is the keyboard path. -->
@@ -247,7 +266,26 @@
               <td class="date-cell">{formatDate(l.endDate)}</td>
               <td>{l.leaveType ?? ""}</td>
               <td>{l.hours ?? ""}</td>
-              <td><span class="badge leave-status" class:success={l.status === "approved"} class:warning={l.status === "requested"}>{l.status}</span></td>
+              <td>
+                <!-- Approved is the normal state, so it stays plain text; only the
+                     statuses that differ carry a badge. -->
+                {#if l.status === "approved"}
+                  <span class="muted leave-status">{l.status}</span>
+                {:else}
+                  <span class="badge leave-status" class:warning={l.status === "requested"}>{l.status}</span>
+                {/if}
+              </td>
+              <td class="row-action-cell">
+                {#if l.status === "requested"}
+                  <button
+                    type="button"
+                    aria-label={`Approve leave for ${app.employeeName(l.employeeId)}`}
+                    onclick={(ev) => {
+                      ev.stopPropagation();
+                      void approve(l);
+                    }}>Approve</button>
+                {/if}
+              </td>
             </tr>
           {/each}
         </tbody>

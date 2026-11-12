@@ -131,6 +131,62 @@ export interface TravelStep {
   label: string;
   state: TravelStepState;
   detail: string;
+  /** What one click on this step would do, when it can be advanced from the list. */
+  action?: string;
+}
+
+type TripStepFields = TripLifecycleFields & Pick<TravelRecord, "iptConcurrence" | "dtsAuthorizationStatus">;
+
+export interface TravelStepAdvance {
+  /** Button wording, e.g. "Mark IPT concurred". */
+  label: string;
+  /** The fields to change on the trip. */
+  changes: Partial<
+    Pick<TravelRecord, "iptConcurrence" | "dtsAuthorizationStatus" | "voucherStatus" | "voucherSubmittedDate">
+  >;
+}
+
+/**
+ * The single next move for one step of the tracker, or undefined when the
+ * step has nothing left to do from the list: IPT pending → concurred; DTS not
+ * started → created → approved; voucher owed → submitted. The trip step itself
+ * follows the dates and is never clicked, and a voucher cannot be submitted
+ * before the traveler is back.
+ */
+export function travelStepAdvance(
+  trip: TripStepFields,
+  key: TravelStep["key"],
+  today: IsoDate
+): TravelStepAdvance | undefined {
+  if (isTripCancelled(trip)) return undefined;
+  if (key === "ipt") {
+    return trip.iptConcurrence === "pending"
+      ? { label: "Mark IPT concurred", changes: { iptConcurrence: "concurred" } }
+      : undefined;
+  }
+  if (key === "dts") {
+    if (trip.dtsAuthorizationStatus === "approved") return undefined;
+    return trip.dtsAuthorizationStatus === "created"
+      ? { label: "Mark DTS authorization approved", changes: { dtsAuthorizationStatus: "approved" } }
+      : { label: "Mark DTS authorization created", changes: { dtsAuthorizationStatus: "created" } };
+  }
+  if (key === "voucher") {
+    return travelPhase(trip, today) === "voucher_due"
+      ? { label: "Mark voucher submitted", changes: { voucherStatus: "submitted", voucherSubmittedDate: today } }
+      : undefined;
+  }
+  return undefined;
+}
+
+/**
+ * Whether a trip is waiting on the supervisor: `late` when any step reads as
+ * late (paperwork still open after departure, voucher past due), `due` when
+ * the traveler is back and still owes a voucher, otherwise nothing.
+ */
+export function travelActionLevel(trip: TripStepFields, today: IsoDate): "late" | "due" | "" {
+  if (isTripCancelled(trip)) return "";
+  if (travelSteps(trip, today).some((step) => step.state === "late")) return "late";
+  return isVoucherOwed(trip, today) ? "due" : "";
 }
 
 /**
@@ -139,10 +195,7 @@ export interface TravelStep {
  * the trip has started, and a voucher past its due date, read as late.
  * Cancelled trips have no tracker (returns an empty list).
  */
-export function travelSteps(
-  trip: TripLifecycleFields & Pick<TravelRecord, "iptConcurrence" | "dtsAuthorizationStatus">,
-  today: IsoDate
-): TravelStep[] {
+export function travelSteps(trip: TripStepFields, today: IsoDate): TravelStep[] {
   const phase = travelPhase(trip, today);
   if (phase === "cancelled") return [];
   const started = phase !== "upcoming";
@@ -183,5 +236,8 @@ export function travelSteps(
             }
           : { key: "voucher", label: "Voucher", state: "todo", detail: "Voucher after return" };
 
-  return [ipt, dts, tripStep, voucher];
+  return [ipt, dts, tripStep, voucher].map((step) => {
+    const action = travelStepAdvance(trip, step.key, today)?.label;
+    return action ? { ...step, action } : step;
+  });
 }

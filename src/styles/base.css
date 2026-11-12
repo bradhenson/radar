@@ -265,7 +265,8 @@ button.link:hover { text-decoration: underline; background: none; }
 /* Subtle row-title link: reads as text, reveals it's clickable on hover.
    Used for the name/title cell in data tables where the row itself is already
    clickable, or where the row carries its own Open control (Today page). */
-button.link.cell-link { color: var(--text); }
+/* Left-aligned so a name or title that wraps in a narrow table lines up with its column. */
+button.link.cell-link { color: var(--text); text-align: left; }
 button.link.cell-link:hover { color: var(--accent); }
 
 button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
@@ -718,6 +719,13 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
    keyboard-accessible name/title button instead. Open disclosure rows pin the
    accent tick and merge visually with their detail row. */
 table.data tr.row-clickable { cursor: pointer; }
+/* Row-level actions (Approve, Deny, Move to ...): compact buttons in the last
+   cell, so a routine decision does not need the edit form. */
+table.data th.row-action-cell,
+table.data td.row-action-cell { white-space: nowrap; text-align: right; }
+/* Short enough that a row with buttons is no taller than one without. */
+table.data td.row-action-cell button { font-size: .78rem; padding: .1rem .55rem; min-height: 1.7rem; }
+table.data td.row-action-cell button + button { margin-left: .3rem; }
 table.data .disclosure {
   display: inline-flex;
   align-items: center;

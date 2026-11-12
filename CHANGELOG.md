@@ -2,6 +2,20 @@
 
 ## Unreleased
 
+### Decisions from the list, and counts in the sidebar
+
+- **Sidebar counts.** A number now sits beside any page that has something waiting on you, so it shows from whichever page is open: overdue tasks on Tasks, overdue training records on Training, leave requests awaiting approval on Leave, telework requests awaiting your decision (and expired agreements) on Telework, trips with a late step or paperwork still open on Travel, and overdue nominations on Awards. A neutral count is an open decision; a red one is already late. Hovering the page name says what the number means, and screen readers hear the same words. A page with nothing waiting shows no number. In a narrow window the counts roll up onto the More button.
+- **Telework:** pending situational requests have Approve and Deny buttons on their row, so a routine decision no longer needs the edit form. The pay period count updates at once.
+- **Leave:** a requested absence has an Approve button on its row.
+- **Travel:** an open step in the IPT → DTS → Trip → Voucher tracker can be clicked (or focused and activated with Enter) to move it forward: IPT pending to concurred, DTS not started to created to approved, and a voucher to submitted once the traveler is back. Steps you can click have a dotted underline. The Trip step follows the dates and is not clickable.
+- **Awards:** a nomination still being worked has a "Move to …" button for its next stage (Idea, Gathering input, Drafting, Ready for review, Submitted). Moving to Submitted records today as the submitted date. Decisions after that (Approved, Not selected) stay in the edit form.
+- Every one of these row actions writes an activity entry and shows an Undo toast that restores the record as it was.
+- **Quieter normal states.** "Current" in the Employees training column, "Approved" on Leave, and "Yes" under Meeting action items are now plain text instead of colored badges, so the rows that differ stand out. Task cards no longer say "Unassigned"; a card with no name on it is unassigned.
+
+### Fixed
+
+- Today: in a mid-width window the Item column was squeezed to one word per line and ran under the Severity column. The fixed columns now narrow with the window, and the table scrolls sideways inside its own area before the Item column gets too tight.
+
 ### Compact page headers and filters
 
 - Training opens directly onto the requirements table, without its extra heading and instruction lines; the matrix keeps its status details on each cell. Travel, Leave, Telework, and Performance place their view toggles beside their titles like the Board.

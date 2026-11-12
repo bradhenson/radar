@@ -15,6 +15,7 @@
     allowanceDots,
     allowanceState,
     countsTowardTeleworkLimit,
+    isPendingRequest,
     isSituationalRequest,
     isWithinTeleworkWindow,
     payPeriodFor,
@@ -204,6 +205,27 @@
       summary: `${editing ? "Updated" : "Added"} situational telework request for ${app.employeeName(fEmployee)}`
     });
     formOpen = false;
+  }
+
+  // Approve or deny straight from the list. An ordinary status edit: it writes
+  // an activity entry and offers Undo, which restores the request as it was.
+  async function decide(t: TeleworkRecord, status: "approved" | "denied") {
+    const before = { ...t };
+    const who = app.employeeName(t.employeeId);
+    const dates = `${t.effectiveDate ?? "no start"} to ${requestEndDate(t) ?? "no end"}`;
+    const verb = status === "approved" ? "Approved" : "Denied";
+    await app.putRecord(
+      "teleworkRecords",
+      { ...t, status, updatedAt: nowTimestamp() },
+      { actionType: "updated", summary: `${verb} situational telework request for ${who} (${dates})` }
+    );
+    app.toast(`${verb} telework request for ${who}`, "success", () => {
+      void app.putRecord(
+        "teleworkRecords",
+        { ...before, updatedAt: nowTimestamp() },
+        { actionType: "updated", summary: `Reverted telework decision for ${who} (${dates})` }
+      );
+    });
   }
 
   function openAgreementForm(t?: TeleworkRecord) {
@@ -489,12 +511,13 @@
         <thead>
           <tr>
             <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Pay period use</th>
+            <th class="row-action-cell" aria-label="Decision"></th>
           </tr>
         </thead>
         <tbody>
           {#each requestGroups as group (group.periodStart)}
             <tr class="group-row">
-              <td colspan="6">
+              <td colspan="7">
                 {group.label}
                 {#if group.isCurrent}<span class="current-tag">This pay period</span>{/if}
                 <span>({group.rows.length})</span>
@@ -541,6 +564,24 @@
                     <span class="muted" title={`A ${statusLabel(t.status).toLowerCase()} request uses none of the pay period allowance`}>Not counted</span>
                   {:else}
                     <span class="muted">—</span>
+                  {/if}
+                </td>
+                <td class="row-action-cell">
+                  {#if isPendingRequest(t)}
+                    <button
+                      type="button"
+                      aria-label={`Approve telework request for ${app.employeeName(t.employeeId)}`}
+                      onclick={(ev) => {
+                        ev.stopPropagation();
+                        void decide(t, "approved");
+                      }}>Approve</button>
+                    <button
+                      type="button"
+                      aria-label={`Deny telework request for ${app.employeeName(t.employeeId)}`}
+                      onclick={(ev) => {
+                        ev.stopPropagation();
+                        void decide(t, "denied");
+                      }}>Deny</button>
                   {/if}
                 </td>
               </tr>

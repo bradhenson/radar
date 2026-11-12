@@ -33,6 +33,7 @@
   import { daysSinceTimestamp, formatTimestamp } from "../utils/dates";
   import { backupFilename, downloadJson } from "../utils/download";
   import { performanceInputPrefillFromTask } from "../domain/rules/performanceImport";
+  import { navBadges, type NavBadge } from "../domain/rules/navBadges";
   import { DEFAULT_SETTINGS } from "../domain/models";
   import { isWailsHost, toggleMaximiseDesktopWindow } from "../data/wailsBridge";
 
@@ -78,6 +79,23 @@
     { page: "settings", label: "Settings", icon: "settings" }
   ];
 
+  // Count badges beside the destinations that have something waiting, so it
+  // shows from whichever page is open. The number always comes with words
+  // (tooltip and screen-reader description), never color alone.
+  let badges = $derived(
+    navBadges({
+      today: app.today,
+      attention: app.attention,
+      leaveRecords: app.leaveRecords,
+      travelRecords: app.travelRecords,
+      // Same roster the Training page reads, so the two counts cannot disagree.
+      trainingOverdue: app.trainingStatusList.filter((r) => r.status.state === "overdue" || r.status.state === "expired").length
+    })
+  );
+  function badgeFor(page: string): NavBadge | undefined {
+    return (badges as Record<string, NavBadge | undefined>)[page];
+  }
+
   let isDark = $derived(
     app.settings.theme === "dark" ||
       (app.settings.theme === "system" &&
@@ -94,6 +112,9 @@
   let moreOpen = $state(false);
   let moreWrap: HTMLDivElement | undefined = $state();
   let moreIsActive = $derived(moreNavItems.some((i) => i.page === router.current.page));
+  // The narrow layout folds most destinations into More, so their counts roll up onto it.
+  let moreBadgeCount = $derived(moreNavItems.reduce((sum, i) => sum + (badgeFor(i.page)?.count ?? 0), 0));
+  let moreBadgeAlert = $derived(moreNavItems.some((i) => badgeFor(i.page)?.tone === "alert"));
 
   $effect(() => {
     const mq = window.matchMedia("(max-width: 700px)");
@@ -252,6 +273,13 @@
   );
 </script>
 
+{#snippet navCount(badge: NavBadge | undefined)}
+  <!-- The count is for the eye; its words live in the link's description. -->
+  {#if badge}
+    <span class="nav-count" class:alert={badge.tone === "alert"} aria-hidden="true">{badge.count > 99 ? "99+" : badge.count}</span>
+  {/if}
+{/snippet}
+
 <svelte:window onkeydown={globalKeydown} onclick={closeMoreOnOutsideClick} />
 
 {#if desktopHost && !app.initialized}
@@ -382,14 +410,19 @@
       {#if isNarrow}
         <nav class="compactnav" aria-label="Main navigation">
           {#each primaryNavItems as item (item.page)}
+            {@const badge = badgeFor(item.page)}
             <a
               href={"#/" + item.page}
               class:active={router.current.page === item.page}
               aria-current={router.current.page === item.page ? "page" : undefined}
+              aria-describedby={badge ? `nav-badge-${item.page}` : undefined}
+              title={badge?.description}
             >
               <span class="nav-icon"><Icon name={item.icon} size={16} /></span>
               <span>{item.label}</span>
+              {@render navCount(badge)}
             </a>
+            {#if badge}<span class="sr-only" id={`nav-badge-${item.page}`}>{badge.description}</span>{/if}
           {/each}
           <div class="more-wrap" bind:this={moreWrap}>
             <button
@@ -401,20 +434,29 @@
               onclick={() => (moreOpen = !moreOpen)}
             >
               More ▾
+              {#if moreBadgeCount > 0}
+                <span class="nav-count" class:alert={moreBadgeAlert} aria-hidden="true">{moreBadgeCount > 99 ? "99+" : moreBadgeCount}</span>
+                <span class="sr-only">, {moreBadgeCount} item{moreBadgeCount === 1 ? "" : "s"} need attention</span>
+              {/if}
             </button>
             {#if moreOpen}
               <div class="more-menu" role="menu" aria-label="More destinations">
                 {#each moreNavItems as item (item.page)}
+                  {@const badge = badgeFor(item.page)}
                   <a
                     role="menuitem"
                     href={"#/" + item.page}
                     class:active={router.current.page === item.page}
                     aria-current={router.current.page === item.page ? "page" : undefined}
+                    aria-describedby={badge ? `nav-badge-${item.page}` : undefined}
+                    title={badge?.description}
                     onclick={() => (moreOpen = false)}
                   >
                     <span class="nav-icon"><Icon name={item.icon} size={16} /></span>
                     <span>{item.label}</span>
+                    {@render navCount(badge)}
                   </a>
+                  {#if badge}<span class="sr-only" id={`nav-badge-${item.page}`}>{badge.description}</span>{/if}
                 {/each}
               </div>
             {/if}
@@ -423,15 +465,20 @@
       {:else}
         <nav class="sidenav" aria-label="Main navigation">
           {#each NAV as item (item.page)}
+            {@const badge = badgeFor(item.page)}
             {#if item.section}<div class="section">{item.section}</div>{/if}
             <a
               href={"#/" + item.page}
               class:active={router.current.page === item.page}
               aria-current={router.current.page === item.page ? "page" : undefined}
+              aria-describedby={badge ? `nav-badge-${item.page}` : undefined}
+              title={badge?.description}
             >
               <span class="nav-icon"><Icon name={item.icon} size={17} /></span>
               <span>{item.label}</span>
+              {@render navCount(badge)}
             </a>
+            {#if badge}<span class="sr-only" id={`nav-badge-${item.page}`}>{badge.description}</span>{/if}
           {/each}
           <div class="sidenav-footer">
             <button
@@ -798,6 +845,28 @@
     opacity: .85;
   }
   .sidenav a.active .nav-icon { opacity: 1; }
+  /* Count badge: a neutral pill for an open decision, the overdue colors for
+     something already late. Pushed to the row's right edge in the sidebar. */
+  .nav-count {
+    margin-left: auto;
+    min-width: 1.3rem;
+    padding: .05rem .4rem;
+    border-radius: 999px;
+    border: 1px solid var(--border-strong);
+    background: var(--surface-2);
+    color: var(--text);
+    font-size: .68rem;
+    font-weight: 700;
+    line-height: 1.35;
+    text-align: center;
+    font-variant-numeric: tabular-nums;
+  }
+  .nav-count.alert {
+    border-color: transparent;
+    background: var(--overdue-bg);
+    color: var(--overdue-fg);
+  }
+  .compactnav .nav-count { margin-left: .35rem; }
   .sidenav .section {
     font-size: .66rem;
     text-transform: uppercase;

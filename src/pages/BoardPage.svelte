@@ -700,19 +700,22 @@
                     {/if}
                   {/if}
                 {/if}
-                <div class="card-footer">
-                  {#if task.employeeId}
-                    <span class="assignee">
-                      <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
-                      <span>{app.employeeName(task.employeeId)}</span>
-                    </span>
-                  {:else}
-                    <span class="muted small">Unassigned</span>
-                  {/if}
-                  {#if task.showOnCard === "checklist" && checklistProgress(task.id)}
-                    <span class="badge checklist-badge" style="margin-left:auto">{checklistProgress(task.id)}</span>
-                  {/if}
-                </div>
+                <!-- An unassigned card says nothing about its assignee: the
+                     absence of a name is the signal, and "Unassigned" on most
+                     cards was noise. The footer appears only when it has content. -->
+                {#if task.employeeId || (task.showOnCard === "checklist" && checklistProgress(task.id))}
+                  <div class="card-footer">
+                    {#if task.employeeId}
+                      <span class="assignee">
+                        <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
+                        <span>{app.employeeName(task.employeeId)}</span>
+                      </span>
+                    {/if}
+                    {#if task.showOnCard === "checklist" && checklistProgress(task.id)}
+                      <span class="badge checklist-badge" style="margin-left:auto">{checklistProgress(task.id)}</span>
+                    {/if}
+                  </div>
+                {/if}
                 <div class="card-actions">
                   <button
                     type="button"

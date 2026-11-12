@@ -11,7 +11,7 @@
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
-  import { awardTypeOptions, filterAwards } from "../domain/rules/awards";
+  import { awardTypeOptions, filterAwards, nextAwardStatus } from "../domain/rules/awards";
   import { mergeAwardEdit } from "../domain/rules/editMerge";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
@@ -92,6 +92,32 @@
     formOpen = false;
   }
 
+  // Move an award one stage along its pipeline from the list, with Undo.
+  // Reaching Submitted stamps the submitted date, as the stage implies.
+  async function advance(a: AwardRecord) {
+    const next = nextAwardStatus(a.status);
+    if (!next) return;
+    const before = { ...a };
+    const who = app.employeeName(a.employeeId);
+    await app.putRecord(
+      "awardRecords",
+      {
+        ...a,
+        status: next,
+        submittedDate: next === "Submitted" ? (a.submittedDate ?? app.today) : a.submittedDate,
+        updatedAt: nowTimestamp()
+      },
+      { actionType: "updated", summary: `Moved award "${a.title}" for ${who} from ${a.status} to ${next}` }
+    );
+    app.toast(`Award moved to ${next}`, "success", () => {
+      void app.putRecord(
+        "awardRecords",
+        { ...before, updatedAt: nowTimestamp() },
+        { actionType: "updated", summary: `Moved award "${a.title}" for ${who} back to ${before.status}` }
+      );
+    });
+  }
+
   function requestDelete(a: AwardRecord) {
     pendingDelete = a;
   }
@@ -167,7 +193,7 @@
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="table-scroll" role="region" aria-label="Award records" tabindex="0">
     <table class="data">
-      <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th></tr></thead>
+      <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th><th class="row-action-cell" aria-label="Next stage"></th></tr></thead>
       <tbody>
         {#each rows as a (a.id)}
           <!-- Row click is a mouse convenience; the title button is the keyboard path. -->
@@ -187,6 +213,17 @@
             <td>{a.awardType ?? ""}</td>
             <td><span class="badge" class:success={a.status === "Approved" || a.status === "Complete"}>{a.status}</span></td>
             <td class="date-cell">{formatDate(a.nominationDueDate)}</td>
+            <td class="row-action-cell">
+              {#if nextAwardStatus(a.status)}
+                <button
+                  type="button"
+                  aria-label={`Move award ${a.title} to ${nextAwardStatus(a.status)}`}
+                  onclick={(ev) => {
+                    ev.stopPropagation();
+                    void advance(a);
+                  }}>Move to {nextAwardStatus(a.status)}</button>
+              {/if}
+            </td>
           </tr>
         {/each}
       </tbody>

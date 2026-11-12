@@ -50,3 +50,16 @@ export function awardTypeOptions(records: AwardRecord[]): string[] {
   }
   return [...types].sort((a, b) => a.localeCompare(b));
 }
+
+/**
+ * The working stages a nomination moves through in order. Everything after
+ * Submitted is a decision (Approved, Not selected) or a close-out, which is a
+ * choice rather than a next step, so it stays in the edit form.
+ */
+export const AWARD_PIPELINE = ["Idea", "Gathering input", "Drafting", "Ready for review", "Submitted"] as const;
+
+/** The stage one click would move an award to, or undefined once it is submitted or closed. */
+export function nextAwardStatus(status: string): string | undefined {
+  const index = (AWARD_PIPELINE as readonly string[]).indexOf(status);
+  return index >= 0 && index < AWARD_PIPELINE.length - 1 ? AWARD_PIPELINE[index + 1] : undefined;
+}

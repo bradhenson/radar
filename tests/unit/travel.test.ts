@@ -6,7 +6,9 @@ import {
   isVoucherSettled,
   matchesTravelSummaryFilter,
   travelPhase,
+  travelActionLevel,
   travelPhaseRank,
+  travelStepAdvance,
   travelSteps,
   travelVoucherDueDate,
   voucherStatusOf,
@@ -172,5 +174,74 @@ describe("travelSteps", () => {
 
   it("has no tracker for a cancelled trip", () => {
     expect(travelSteps(trip({ tripStatus: "cancelled" }), TODAY)).toEqual([]);
+  });
+});
+
+describe("travelStepAdvance", () => {
+  const upcoming = (overrides: Partial<TravelRecord> = {}) =>
+    trip({ startDate: "2026-08-03", endDate: "2026-08-05", voucherDueDate: "2026-08-10", ...overrides });
+
+  it("moves pending IPT concurrence to concurred, and offers nothing once settled", () => {
+    expect(travelStepAdvance(upcoming({ iptConcurrence: "pending" }), "ipt", TODAY)).toEqual({
+      label: "Mark IPT concurred",
+      changes: { iptConcurrence: "concurred" }
+    });
+    expect(travelStepAdvance(upcoming({ iptConcurrence: "concurred" }), "ipt", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(upcoming({ iptConcurrence: "not_required" }), "ipt", TODAY)).toBeUndefined();
+  });
+
+  it("walks DTS authorization one stage at a time: not started, created, approved", () => {
+    expect(travelStepAdvance(upcoming({ dtsAuthorizationStatus: "not_started" }), "dts", TODAY)?.changes).toEqual({
+      dtsAuthorizationStatus: "created"
+    });
+    expect(travelStepAdvance(upcoming({ dtsAuthorizationStatus: "created" }), "dts", TODAY)?.changes).toEqual({
+      dtsAuthorizationStatus: "approved"
+    });
+    expect(travelStepAdvance(upcoming({ dtsAuthorizationStatus: "approved" }), "dts", TODAY)).toBeUndefined();
+  });
+
+  it("submits the voucher only once the traveler is back and still owes one", () => {
+    expect(travelStepAdvance(trip(), "voucher", TODAY)).toEqual({
+      label: "Mark voucher submitted",
+      changes: { voucherStatus: "submitted", voucherSubmittedDate: TODAY }
+    });
+    expect(travelStepAdvance(upcoming(), "voucher", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(trip({ startDate: "2026-07-19", endDate: "2026-07-22" }), "voucher", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(trip({ voucherStatus: "submitted" }), "voucher", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(trip({ voucherStatus: "not_required" }), "voucher", TODAY)).toBeUndefined();
+  });
+
+  it("never advances the trip step or anything on a cancelled trip", () => {
+    expect(travelStepAdvance(trip(), "trip", TODAY)).toBeUndefined();
+    const cancelled = trip({ tripStatus: "cancelled", iptConcurrence: "pending", dtsAuthorizationStatus: "not_started" });
+    expect(travelStepAdvance(cancelled, "ipt", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(cancelled, "dts", TODAY)).toBeUndefined();
+    expect(travelStepAdvance(cancelled, "voucher", TODAY)).toBeUndefined();
+  });
+
+  it("labels exactly the tracker steps that can be advanced", () => {
+    const actions = (t: TravelRecord) => travelSteps(t, TODAY).map((s) => `${s.key}:${s.action ?? "-"}`).join(" | ");
+    expect(actions(upcoming({ iptConcurrence: "pending", dtsAuthorizationStatus: "created" }))).toBe(
+      "ipt:Mark IPT concurred | dts:Mark DTS authorization approved | trip:- | voucher:-"
+    );
+    expect(actions(trip())).toBe("ipt:- | dts:- | trip:- | voucher:Mark voucher submitted");
+    expect(actions(trip({ voucherStatus: "submitted" }))).toBe("ipt:- | dts:- | trip:- | voucher:-");
+  });
+});
+
+describe("travelActionLevel", () => {
+  it("is late when paperwork is open after departure or the voucher is past due", () => {
+    expect(travelActionLevel(trip({ startDate: "2026-07-19", endDate: "2026-07-22", iptConcurrence: "pending" }), TODAY)).toBe("late");
+    expect(travelActionLevel(trip({ voucherDueDate: "2026-07-15" }), TODAY)).toBe("late");
+  });
+
+  it("is due when the traveler is back and the voucher is not yet past due", () => {
+    expect(travelActionLevel(trip({ voucherDueDate: "2026-07-22" }), TODAY)).toBe("due");
+  });
+
+  it("is nothing for upcoming, settled, and cancelled trips", () => {
+    expect(travelActionLevel(trip({ startDate: "2026-08-03", endDate: "2026-08-05", iptConcurrence: "pending" }), TODAY)).toBe("");
+    expect(travelActionLevel(trip({ voucherStatus: "submitted" }), TODAY)).toBe("");
+    expect(travelActionLevel(trip({ tripStatus: "cancelled", iptConcurrence: "pending" }), TODAY)).toBe("");
   });
 });
