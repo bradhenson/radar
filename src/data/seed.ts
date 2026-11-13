@@ -184,12 +184,14 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       dueDate: addDays(today, 5),
       projectId: projects.workforce.id,
       description: "Pull project, training, leave, and telework highlights into one weekly summary.",
-      showOnCard: "description"
+      showOnCard: "description",
+      tags: ["weekly", "report"]
     }),
     task("Update branch staffing summary", "inbox", "high", {
       dueDate: addDays(today, 8),
       projectId: projects.workforce.id,
-      description: "Refresh staffing changes, vacancies, and upcoming availability constraints."
+      description: "Refresh staffing changes, vacancies, and upcoming availability constraints.",
+      tags: ["staffing"]
     }),
     task("Reconcile pending telework requests", "inbox", "normal", {
       dueDate: addDays(today, 1),
@@ -214,11 +216,15 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       showOnCard: "checklist"
     }),
     task("Draft onboarding checklist for incoming employees", "inbox", "normal", {
-      dueDate: addDays(today, 14)
+      dueDate: addDays(today, 14),
+      tags: ["onboarding"],
+      columnEnteredAt: atNoon(addDays(today, -34))
     }),
     task("Review project risk register", "inbox", "normal", {
       projectId: projects.lighthouse.id,
-      dueDate: addDays(today, 10)
+      dueDate: addDays(today, 10),
+      tags: ["risk"],
+      columnEnteredAt: atNoon(addDays(today, -45))
     }),
     task("Archive completed meeting notes", "inbox", "low", {
       dueDate: addDays(today, 12)
@@ -246,7 +252,8 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       projectId: projects.lighthouse.id,
       competencyId: employees[0]!.competencyId,
       dueDate: addDays(today, 7),
-      showOnCard: "checklist"
+      showOnCard: "checklist",
+      tags: ["testing", "schedule", "milestone", "customer"]
     }),
     task("Complete recognition package draft", "in_progress", "normal", {
       employeeId: employees[7]!.id,

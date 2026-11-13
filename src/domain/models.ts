@@ -137,6 +137,8 @@ export interface Task {
   lastVerifiedDate?: IsoDate;
   verificationStatus?: VerificationStatus;
   waitingSince?: IsoTimestamp;
+  /** When the card last landed in its current board column; absent on tasks saved before this was recorded. */
+  columnEnteredAt?: IsoTimestamp;
   recurrenceTemplateId?: Id;
   recurrenceInstanceKey?: string;
   performanceInputCreated: boolean;
@@ -481,6 +483,8 @@ export interface SavedBoardView {
   project: string;
   priority: string;
   summary: "" | "due_soon" | "overdue" | "waiting" | "priority";
+  /** Project or competency work; "" (and views saved before this existed) means both. */
+  workType: "" | "project" | "competency";
 }
 
 export interface AppSettings {

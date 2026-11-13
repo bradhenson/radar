@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../src/domain/models";
 import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../../src/domain/rules/boardFilters";
+import { matchesWorkType } from "../../src/domain/rules/boardFilters";
 
 const TODAY = "2026-07-20";
 const DUE_SOON_DAYS = 7;
@@ -44,5 +45,23 @@ describe("board summary filters", () => {
     expect(matches(task({ priority: "high" }), "priority")).toBe(true);
     expect(matches(task({ priority: "critical" }), "priority")).toBe(true);
     expect(matches(task({ priority: "normal" }), "priority")).toBe(false);
+  });
+});
+
+describe("matchesWorkType", () => {
+  it("treats any task with a project as project work", () => {
+    expect(matchesWorkType({ projectId: "p1" }, "project")).toBe(true);
+    expect(matchesWorkType({ projectId: "p1" }, "competency")).toBe(false);
+  });
+
+  it("treats a task without a project as competency work", () => {
+    expect(matchesWorkType({}, "competency")).toBe(true);
+    expect(matchesWorkType({ projectId: "" }, "competency")).toBe(true);
+    expect(matchesWorkType({}, "project")).toBe(false);
+  });
+
+  it("matches everything when the filter is empty", () => {
+    expect(matchesWorkType({}, "")).toBe(true);
+    expect(matchesWorkType({ projectId: "p1" }, "")).toBe(true);
   });
 });

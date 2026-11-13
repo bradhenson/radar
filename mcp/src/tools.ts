@@ -288,6 +288,7 @@ function createTaskInTx(db: RadarDb, args: Parameters<typeof createTask>[1]) {
     description: args.description?.trim() ? richTextFromPlainText(args.description.trim()) : undefined,
     status: column.mapsToStatus === "waiting" ? "waiting" : "open",
     boardColumnId: column.id,
+    columnEnteredAt: now,
     priority: args.priority ?? "normal",
     employeeId: employee?.id,
     projectId: project?.id,
@@ -355,6 +356,7 @@ function updateTaskInTx(db: RadarDb, args: Parameters<typeof updateTask>[1]) {
   // Column and status are kept in sync by the same pure rules the board uses.
   if (args.column !== undefined) {
     const column = resolveColumn(columns, args.column);
+    if (taskColumnId(existing, columns) !== column.id) next.columnEnteredAt = now;
     next.boardColumnId = column.id;
     const change = statusChangeForLaneMove(next, column, now);
     if (change) next = { ...next, ...change };

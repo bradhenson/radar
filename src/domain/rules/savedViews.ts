@@ -9,6 +9,7 @@ export const SAVED_VIEW_NAME_MAX = 60;
 
 const SUMMARY_FILTERS = new Set(["", "due_soon", "overdue", "waiting", "priority"]);
 const PRIORITIES = new Set(["", "low", "normal", "high", "critical"]);
+const WORK_TYPES = new Set(["", "project", "competency"]);
 
 /** The filter fields a view stores, in the shape the Tasks page holds them. */
 export type BoardViewFilters = Omit<SavedBoardView, "id" | "name">;
@@ -19,7 +20,8 @@ export const EMPTY_BOARD_FILTERS: BoardViewFilters = {
   competency: "",
   project: "",
   priority: "",
-  summary: ""
+  summary: "",
+  workType: ""
 };
 
 function text(value: unknown, max: number): string {
@@ -40,6 +42,7 @@ export function normalizeSavedBoardViews(raw: unknown): SavedBoardView[] {
     if (!id || !name || ids.has(id) || names.has(name.toLowerCase())) continue;
     const summary = text(src.summary, 20);
     const priority = text(src.priority, 20);
+    const workType = text(src.workType, 20);
     ids.add(id);
     names.add(name.toLowerCase());
     views.push({
@@ -50,7 +53,8 @@ export function normalizeSavedBoardViews(raw: unknown): SavedBoardView[] {
       competency: text(src.competency, 100),
       project: text(src.project, 100),
       priority: PRIORITIES.has(priority) ? priority : "",
-      summary: (SUMMARY_FILTERS.has(summary) ? summary : "") as SavedBoardView["summary"]
+      summary: (SUMMARY_FILTERS.has(summary) ? summary : "") as SavedBoardView["summary"],
+      workType: (WORK_TYPES.has(workType) ? workType : "") as SavedBoardView["workType"]
     });
     if (views.length >= MAX_SAVED_VIEWS) break;
   }
@@ -96,6 +100,7 @@ export function filtersForView(
     competency: existing.competencies.has(view.competency) ? view.competency : "",
     project: existing.projects.has(view.project) ? view.project : "",
     priority: view.priority,
-    summary: view.summary
+    summary: view.summary,
+    workType: view.workType ?? ""
   };
 }

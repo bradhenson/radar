@@ -65,6 +65,7 @@ import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
 import { planRecurringTasks, recurrenceInstanceKey } from "../domain/rules/recurrence";
+import { withColumnEntry } from "../domain/rules/columnAge";
 import { applyBulkTaskChange, bulkChangeAction, bulkChangePhrase, type BulkTaskChange } from "../domain/rules/bulkTasks";
 import { priorityLabel } from "../domain/models";
 import { richTextFromPlainText } from "../utils/richTextDoc";
@@ -908,7 +909,7 @@ export class AppStore {
   ): Promise<void> {
     this.saveStatus = "saving";
     try {
-      const persisted = this.plainRecord(record);
+      const persisted = name === "tasks" ? this.stampColumnEntry(this.plainRecord(record) as Task) as CollectionTypes[K] : this.plainRecord(record);
       const entry = activity
         ? this.buildActivityEntry(activity.entityType ?? name, persisted.id, activity.actionType, activity.summary)
         : undefined;
@@ -1325,6 +1326,7 @@ export class AppStore {
       id: newId(),
       status,
       boardColumnId,
+      columnEnteredAt: now,
       priority: "normal",
       performanceInputCreated: false,
       tags: [],
@@ -1409,10 +1411,23 @@ export class AppStore {
     return n;
   }
 
+  /** Stamps `columnEnteredAt` when a task is new or changes board column (rule in domain/rules/columnAge.ts). */
+  private stampColumnEntry(task: Task): Task {
+    const previous = this.tasks.find((t) => t.id === task.id);
+    return withColumnEntry(
+      previous,
+      previous ? this.taskBoardColumnId(previous) : undefined,
+      task,
+      this.taskBoardColumnId(task),
+      nowTimestamp()
+    );
+  }
+
   /** Writes several tasks with their activity entries and one backup-counter bump, atomically. */
   private async putTaskBatch(items: { task: Task; actionType: string; summary: string }[]): Promise<void> {
     this.saveStatus = "saving";
     try {
+      items = items.map((item) => ({ ...item, task: this.stampColumnEntry(this.plainRecord(item.task)) }));
       const entries = items.map((item) => this.buildActivityEntry("tasks", item.task.id, item.actionType, item.summary));
       const nextMeta = this.bumpedMeta("updated");
       const ops: MutationOp[] = [
