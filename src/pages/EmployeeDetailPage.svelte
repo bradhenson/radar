@@ -19,14 +19,16 @@
   import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { teleworkStatusLabel } from "../domain/rules/telework";
+  import { employeeOverview, type OverviewAbsence } from "../domain/rules/employeeOverview";
+  import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { compareDates, daysBetween, formatDate, formatDateRange, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
-  import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
+  import { emptyRichText, isRichTextEmpty, normalizeRichText, richTextDocToPlainText } from "../utils/richTextDoc";
 
   let { employeeId }: { employeeId: string } = $props();
 
   let employee = $derived(app.employees.find((e) => e.id === employeeId));
-  let tab = $state<"profile" | "checkins" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("profile");
+  let tab = $state<"overview" | "profile" | "checkins" | "tasks" | "performance" | "meetings" | "training" | "leave" | "telework" | "travel" | "awards" | "activity">("overview");
   let editOpen = $state(false);
   let confirmDeleteOpen = $state(false);
   let profileOpen = $state(false);
@@ -108,6 +110,42 @@
       )
       .sort((a, b) => (a.timestamp < b.timestamp ? 1 : -1))
       .slice(0, 30)
+  );
+
+  // Overview: what is current, then what changed since the last check-in.
+  let overview = $derived(
+    employeeOverview({
+      today: app.today,
+      lookaheadDays: app.settings.leaveLookaheadDays,
+      inputReminderDays: app.settings.performanceInputReminderDays,
+      lastCheckInDate: employee?.lastCheckInDate,
+      tasks: app.tasks.filter((t) => t.employeeId === employeeId),
+      leave,
+      telework,
+      travel,
+      training: training.map((r) => ({ requirementId: r.requirement.id, name: r.requirement.name, status: r.status })),
+      awards,
+      inputs,
+      checkIns,
+      meetings: meetingNotes,
+      notes: employeeNotes
+    })
+  );
+  let sinceCount = $derived(
+    overview.since.tasksCompleted.length + overview.since.tasksAdded.length + overview.since.meetings.length +
+      overview.since.notes.length + overview.since.inputs.length
+  );
+
+  function openAbsence(a: OverviewAbsence) {
+    router.go(a.kind, a.id);
+  }
+
+  // Profile shows only the fields that hold something; the rest are counted.
+  function filledFields(sectionId: string): EmployeeProfileField[] {
+    return fieldsForProfileSection(sectionId).filter((field) => Boolean(employee && formattedProfileValue(employee, field)));
+  }
+  let emptyFieldCount = $derived(
+    employee ? profileFields.filter((field) => !formattedProfileValue(employee!, field)).length : 0
   );
 
   function teleworkRange(t: { effectiveDate?: string; expirationDate?: string }): string {
@@ -264,6 +302,7 @@
   }
 
   const TABS = [
+    ["overview", "Overview"],
     ["profile", "Profile"],
     ["checkins", "Check-ins"],
     ["tasks", "Tasks"],
@@ -331,7 +370,178 @@
     </div>
 
     <div id="emp-tabpanel" role="tabpanel" aria-labelledby={`emp-tab-${tab}`}>
-    {#if tab === "profile"}
+    {#if tab === "overview"}
+      <div class="overview-grid">
+        <section class="card overview-card" aria-labelledby="ov-tasks">
+          <div class="overview-head">
+            <h2 id="ov-tasks">Open tasks</h2>
+            <span class="muted small">{overview.openTaskCount} open{#if overview.overdueTaskCount} · <span class="overdue-text">{overview.overdueTaskCount} overdue</span>{/if}</span>
+          </div>
+          {#if overview.openTasks.length === 0}
+            <p class="muted small quiet">Nothing open.</p>
+          {:else}
+            <ul class="overview-list">
+              {#each overview.openTasks as t (t.id)}
+                {@const ds = dueState(t, app.today, app.settings.dueSoonDays)}
+                <li>
+                  <button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button>
+                  {#if ds === "overdue" || ds === "due_today" || ds === "due_soon"}
+                    <span class="badge {ds}">{DUE_STATE_LABELS[ds]} {formatDate(t.dueDate)}</span>
+                  {:else if t.dueDate}
+                    <span class="muted small">Due {formatDate(t.dueDate)}</span>
+                  {/if}
+                </li>
+              {/each}
+            </ul>
+            {#if overview.openTaskCount > overview.openTasks.length}
+              <button type="button" class="link more-link" onclick={() => (tab = "tasks")}>All {overview.openTaskCount} tasks</button>
+            {/if}
+          {/if}
+        </section>
+
+        <section class="card overview-card" aria-labelledby="ov-away">
+          <div class="overview-head">
+            <h2 id="ov-away">Away</h2>
+            <span class="muted small">Next {app.settings.leaveLookaheadDays} days</span>
+          </div>
+          {#if overview.absences.length === 0}
+            <p class="muted small quiet">No leave, telework, or travel coming up.</p>
+          {:else}
+            <ul class="overview-list">
+              {#each overview.absences as a (a.kind + a.id)}
+                <li>
+                  <button type="button" class="link" onclick={() => openAbsence(a)}>{a.label}</button>
+                  <span class="small">{formatDateRange(a.start, a.end)}</span>
+                  {#if a.current}<span class="badge success">Now</span>{/if}
+                  {#if a.pending}<span class="badge warning">Pending</span>{/if}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        </section>
+
+        <section class="card overview-card" aria-labelledby="ov-dev">
+          <div class="overview-head"><h2 id="ov-dev">Development</h2></div>
+          <dl class="overview-facts">
+            <div>
+              <dt>Last performance input</dt>
+              <dd>
+                {#if overview.lastInput}
+                  {formatDate(overview.lastInput.input.inputDate)}
+                  <span class="muted small">({overview.lastInput.daysAgo === 0 ? "today" : `${overview.lastInput.daysAgo} days ago`})</span>
+                  {#if overview.lastInput.stale}<span class="badge warning">Due for one</span>{/if}
+                {:else}
+                  <span class="muted">None yet</span> <span class="badge warning">Due for one</span>
+                {/if}
+              </dd>
+            </div>
+            <div>
+              <dt>Training needing action</dt>
+              <dd>
+                {#if overview.training.length === 0}
+                  <span class="muted">None</span>
+                {:else}
+                  <ul class="overview-list tight">
+                    {#each overview.training as r (r.requirementId)}
+                      <li>
+                        <button type="button" class="link" onclick={() => router.go("training", `${employeeId}~${r.requirementId}`)}>{r.name}</button>
+                        <span class="badge" class:overdue={r.status.state === "overdue" || r.status.state === "expired"} class:warning={r.status.state === "due_soon" || r.status.state === "expiring"}>{TRAINING_STATE_LABELS[r.status.state]}{r.status.dueDate ? ` ${formatDate(r.status.dueDate)}` : ""}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </dd>
+            </div>
+            <div>
+              <dt>Awards in progress</dt>
+              <dd>
+                {#if overview.awardsInProgress.length === 0}
+                  <span class="muted">None</span>
+                {:else}
+                  <ul class="overview-list tight">
+                    {#each overview.awardsInProgress as a (a.id)}
+                      <li>
+                        <button type="button" class="link" onclick={() => router.go("awards", a.id)}>{a.title}</button>
+                        <span class="muted small">{a.status}{a.nominationDueDate ? ` · due ${formatDate(a.nominationDueDate)}` : ""}</span>
+                      </li>
+                    {/each}
+                  </ul>
+                {/if}
+              </dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="card overview-card" aria-labelledby="ov-since">
+          <div class="overview-head">
+            <h2 id="ov-since">{overview.since.from ? `Since last check-in, ${formatDate(overview.since.from)}` : "No check-in recorded yet"}</h2>
+            <button type="button" class="primary" onclick={() => openCheckIn()}>Record Check-in</button>
+          </div>
+          {#if overview.followUpOpen && overview.lastCheckIn}
+            <div class="follow-up">
+              <span class="badge warning">Follow-up from last check-in</span>
+              {#if !isRichTextEmpty(overview.lastCheckIn.summary)}<RichTextView value={overview.lastCheckIn.summary} compact />{/if}
+            </div>
+          {/if}
+          {#if sinceCount === 0}
+            <p class="muted small quiet">{overview.since.from ? "Nothing new recorded since then." : "Nothing recorded for this person yet."}</p>
+          {:else}
+            <div class="since-groups">
+              {#if overview.since.tasksCompleted.length}
+                <div>
+                  <h3>Tasks completed ({overview.since.tasksCompleted.length})</h3>
+                  <ul class="overview-list tight">
+                    {#each overview.since.tasksCompleted.slice(0, 5) as t (t.id)}
+                      <li><button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button> <span class="muted small">{formatDate(t.completedDate)}</span></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+              {#if overview.since.tasksAdded.length}
+                <div>
+                  <h3>Tasks added ({overview.since.tasksAdded.length})</h3>
+                  <ul class="overview-list tight">
+                    {#each overview.since.tasksAdded.slice(0, 5) as t (t.id)}
+                      <li><button type="button" class="link" onclick={() => ui.openTaskDetail(t.id)}>{t.title}</button></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+              {#if overview.since.inputs.length}
+                <div>
+                  <h3>Performance inputs ({overview.since.inputs.length})</h3>
+                  <ul class="overview-list tight">
+                    {#each overview.since.inputs.slice(0, 5) as p (p.id)}
+                      <li><span class="small">{formatDate(p.inputDate)}</span> <span class="input-text">{richTextDocToPlainText(p.actionOrAccomplishment)}</span></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+              {#if overview.since.meetings.length}
+                <div>
+                  <h3>Meetings ({overview.since.meetings.length})</h3>
+                  <ul class="overview-list tight">
+                    {#each overview.since.meetings.slice(0, 5) as m (m.id)}
+                      <li><button type="button" class="link" onclick={() => (editingMeetingNote = m)}>{m.title}</button> <span class="muted small">{formatDate(m.meetingDate)}</span></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+              {#if overview.since.notes.length}
+                <div>
+                  <h3>Notes ({overview.since.notes.length})</h3>
+                  <ul class="overview-list tight">
+                    {#each overview.since.notes.slice(0, 3) as n (n.id)}
+                      <li class="note-line"><RichTextView value={n.noteText} compact /></li>
+                    {/each}
+                  </ul>
+                </div>
+              {/if}
+            </div>
+          {/if}
+        </section>
+      </div>
+    {:else if tab === "profile"}
       <div class="notes-header">
         <h2>Notes</h2>
         {#if !noteFormOpen}
@@ -376,9 +586,15 @@
         <button type="button" class="icon-btn" aria-label="Edit profile" title="Edit profile" onclick={() => (profileOpen = true)}><Icon name="edit" size={17} /></button>
       </div>
 
+      {#if emptyFieldCount > 0}
+        <p class="muted small empty-fields-line">
+          {emptyFieldCount} {emptyFieldCount === 1 ? "field is" : "fields are"} not filled in and hidden here.
+          <button type="button" class="link" onclick={() => (profileOpen = true)}>Edit profile</button>
+        </p>
+      {/if}
       <div class="profile-detail-grid">
         {#each profileSections as section (section.id)}
-          {@const sectionFields = fieldsForProfileSection(section.id)}
+          {@const sectionFields = filledFields(section.id)}
           {#if sectionFields.length}
             <section class="profile-group">
               <h3>{section.label}</h3>
@@ -685,10 +901,45 @@
     color: var(--text-muted);
   }
   .multiline-value { white-space: pre-wrap; }
+  .empty-fields-line { margin: -.3rem 0 .8rem; }
+  .overview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: .9rem;
+    align-items: start;
+  }
+  .overview-card { min-width: 0; }
+  .since-card { grid-column: 1 / -1; }
+  .overview-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: .35rem .75rem;
+    margin-bottom: .55rem;
+  }
+  .overview-head h2 { margin: 0 auto 0 0; font-size: .98rem; }
+  .overview-head button { align-self: center; }
+  .overview-list { list-style: none; margin: 0; padding: 0; display: grid; gap: .35rem; }
+  .overview-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: .2rem .5rem; min-width: 0; }
+  .overview-list.tight { gap: .2rem; }
+  .overview-list .link { text-align: left; padding: 0; overflow-wrap: anywhere; }
+  .more-link { margin-top: .5rem; padding: 0; }
+  .quiet { margin: 0; }
+  .overdue-text { color: var(--overdue-fg); font-weight: 600; }
+  .overview-facts { margin: 0; display: grid; gap: .6rem; }
+  .overview-facts dt { color: var(--text-muted); font-size: .78rem; font-weight: 500; margin-bottom: .1rem; }
+  .overview-facts dd { margin: 0; display: flex; flex-wrap: wrap; align-items: baseline; gap: .3rem .5rem; }
+  .overview-facts dd > ul { flex: 1 1 100%; }
+  .follow-up { display: grid; gap: .3rem; padding: .55rem .7rem; margin-bottom: .7rem; border-left: 3px solid var(--duesoon-fg); background: var(--duesoon-bg); border-radius: var(--radius); }
+  .since-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(15rem, 1fr)); gap: .8rem 1.2rem; }
+  .since-groups h3 { font-size: .78rem; font-weight: 600; color: var(--text-muted); margin: 0 0 .3rem; }
+  .note-line { display: block; }
+  .input-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 10rem; }
   .activity-list { list-style: none; padding: 0; }
   .activity-list li { padding: .2rem 0; border-bottom: 1px solid var(--border); }
   @media (max-width: 900px) {
     .profile-detail-grid { grid-template-columns: 1fr; }
+    .overview-grid { grid-template-columns: 1fr; }
   }
   @media (max-width: 560px) {
     .profile-group dl > div { grid-template-columns: 1fr; gap: .1rem; }

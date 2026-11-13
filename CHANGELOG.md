@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Employee Overview, for 1:1 prep
+
+- **Employee pages open on Overview.** A new first tab shows what is current for the person: open tasks (overdue first, up to five, each opening the task), time away in the leave lookahead window (leave, situational telework, and travel, marked Now or Pending), training that needs action, nominations still being worked, and the last performance input, marked "Due for one" once it is older than the performance input reminder.
+- **Since last check-in.** Below that is everything since the last check-in: tasks completed and added, performance inputs, meetings they attended, and notes, plus the summary of the last check-in when it asked for a follow-up. Record Check-in sits beside it, so you can prepare for and record the conversation in one place. The starting point is the later of the last recorded check-in and the last check-in date on the employee record. Records dated in the future are not counted.
+- **Profile hides empty fields.** The Profile tab lists only the fields that hold something, and a single line ("20 fields are not filled in and hidden here. Edit profile") replaces the rows of dashes. Sections with nothing in them are left out. Editing is unchanged.
+
 ### Look and feel: density, lighter type, short date ranges, and a Settings sidebar
 
 - **Density.** Settings → Appearance has a Density choice. Comfortable is the layout you have now. Compact tightens table rows, cards, board cards, toolbars, headers, tabs, and controls throughout, so a table row is about 20% shorter and more fits on screen. The board's own Compact cards button still separately hides card previews. Density is a setting, so it travels with backups.
