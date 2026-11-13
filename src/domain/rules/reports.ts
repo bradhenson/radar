@@ -12,7 +12,7 @@ import type {
   TeleworkRecord,
   TravelRecord
 } from "../models";
-import { addDays, compareDates, daysBetween, formatDate } from "../../utils/dates";
+import { addDays, compareDates, daysBetween, formatDate, formatDateRange } from "../../utils/dates";
 import { toCsv } from "../../utils/csv";
 import { richTextDocToPlainText } from "../../utils/richTextDoc";
 import { cycleLabel, inputsInCycle } from "./evaluationCycles";
@@ -65,11 +65,7 @@ type NameLookup = (employeeId: string) => string;
 
 /** "Nov 16", "Nov 16–18", "Nov 28 – Dec 1", or with years when they differ. */
 export function shortDateRange(start: IsoDate, end: IsoDate): string {
-  const short = (date: IsoDate) => formatDate(date).replace(/, \d{4}$/, "");
-  if (start === end || compareDates(end, start) < 0) return short(start);
-  if (start.slice(0, 4) !== end.slice(0, 4)) return `${formatDate(start)} – ${formatDate(end)}`;
-  if (start.slice(0, 7) === end.slice(0, 7)) return `${short(start)}–${Number(end.slice(8, 10))}`;
-  return `${short(start)} – ${short(end)}`;
+  return formatDateRange(start, end, { withYear: false });
 }
 
 function byName(a: string, b: string): number {

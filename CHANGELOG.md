@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Look and feel: density, lighter type, short date ranges, and a Settings sidebar
+
+- **Density.** Settings → Appearance has a Density choice. Comfortable is the layout you have now. Compact tightens table rows, cards, board cards, toolbars, headers, tabs, and controls throughout, so a table row is about 20% shorter and more fits on screen. The board's own Compact cards button still separately hides card previews. Density is a setting, so it travels with backups.
+- **Lighter type.** Buttons, field labels, and table headers use a medium weight instead of semibold, and board card titles are lighter. Names in the first column of a table, page and section headings, the main button on a page, and status badges keep their weight, so each row has one thing that stands out. On the board, text at semibold or heavier fell from about 70% to about 27%.
+- **Short date ranges.** Where a start and end date are written together, they are shortened: "Nov 21–23, 2026" or "Nov 28 – Dec 2, 2026" instead of the two dates in full. This covers the Employees list's upcoming leave and travel, telework ranges on an employee page, calendar tooltips and day details, attention items, and evaluation cycle names. Pages with separate Start and End columns are unchanged.
+- **Settings sidebar.** In a window at least 1100px wide, the list of Settings sections sits in a sidebar beside the cards and stays in view while you scroll. The section you are reading is highlighted (with a bar and background, not color alone), and choosing one scrolls to it and moves keyboard focus to its heading. Narrower windows keep the row of section links at the top. The Competencies, Board columns, Evaluation cycles, and Performance elements tables now scroll sideways on their own when the window is too narrow for them, instead of widening the page.
+
 ### Tasks board: project or competency work, tags, and time in a column
 
 - **Project or competency work.** The Tasks page has an All · Project · Competency switch at the start of the filters. Project shows tasks linked to a project; Competency shows the rest. It works with the other filters, on both the board and the list, and saved views remember it. Picking a project in the project filter switches to Project, and choosing Competency clears the project filter. Views saved before this show both, as they did.

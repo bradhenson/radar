@@ -12,7 +12,7 @@
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { teleworkStatusLabel } from "../domain/rules/telework";
   import { awardDueMap, leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap, travelDayMap } from "../domain/rules/calendar";
-  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
+  import { addDays, addMonths, compareDates, formatDate, formatDateRange, isValidIsoDate, nowTimestamp } from "../utils/dates";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -161,7 +161,7 @@
     const start = record.effectiveDate;
     const end = record.expirationDate ?? record.effectiveDate;
     if (!start) return "";
-    return start === end ? formatDate(start) : `${formatDate(start)} to ${formatDate(end)}`;
+    return formatDateRange(start, end);
   }
 
   // --- drag to reschedule (keyboard alternative: bracket/brace keys or the
@@ -353,7 +353,7 @@
                 <button
                   type="button"
                   class="chip kind-chip kind-leave"
-                  title={`${app.employeeName(leave.employeeId)} — ${leave.leaveType ?? "Leave"} (${leave.status}), ${formatDate(leave.startDate)} to ${formatDate(leave.endDate)}. Opens the Leave page.`}
+                  title={`${app.employeeName(leave.employeeId)} — ${leave.leaveType ?? "Leave"} (${leave.status}), ${formatDateRange(leave.startDate, leave.endDate)}. Opens the Leave page.`}
                   onclick={() => router.go("leave")}
                 >
                   <span class="chip-text">Leave · {app.employeeName(leave.employeeId)}</span>
@@ -373,7 +373,7 @@
                 <button
                   type="button"
                   class="chip kind-chip kind-travel"
-                  title={`${app.employeeName(trip.employeeId)} — travel to ${trip.destination}, ${formatDate(trip.startDate)} to ${formatDate(trip.endDate)}. Opens the record.`}
+                  title={`${app.employeeName(trip.employeeId)} — travel to ${trip.destination}, ${formatDateRange(trip.startDate, trip.endDate)}. Opens the record.`}
                   onclick={() => router.go("travel", trip.id)}
                 >
                   <span class="chip-text">Travel · {app.employeeName(trip.employeeId)}</span>

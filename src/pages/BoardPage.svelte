@@ -1301,7 +1301,7 @@
   }
   .card-title {
     display: block;
-    font-weight: 650;
+    font-weight: 550;
     line-height: 1.45;
     margin-bottom: .45rem;
     padding-right: 2.8rem;
@@ -1327,6 +1327,10 @@
   }
   .card-tag.more { background: transparent; border: 1px dashed var(--border-strong); }
   .work-type { justify-self: start; }
+  :global(:root[data-density="compact"]) .task-card { padding: .45rem .55rem .4rem; margin-bottom: .35rem; }
+  :global(:root[data-density="compact"]) .card-context { margin-bottom: .25rem; }
+  :global(:root[data-density="compact"]) .card-tags { margin-bottom: .25rem; }
+  :global(:root[data-density="compact"]) .board-toolbar { padding: .45rem; margin-bottom: .55rem; }
   .saved-views select { width: 8.5rem; }
   .work-type button { white-space: nowrap; }
   .card-context {

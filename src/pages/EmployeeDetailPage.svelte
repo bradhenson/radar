@@ -19,7 +19,7 @@
   import { activeProfileFields, activeProfileSections, formattedProfileValue, profileFieldHref } from "../domain/employeeProfile";
   import { TRAINING_STATE_LABELS, trainingStatus } from "../domain/rules/training";
   import { teleworkStatusLabel } from "../domain/rules/telework";
-  import { compareDates, daysBetween, formatDate, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
+  import { compareDates, daysBetween, formatDate, formatDateRange, formatTimestamp, isValidIsoDate, nowTimestamp, todayIso } from "../utils/dates";
   import { newId } from "../utils/ids";
   import { emptyRichText, isRichTextEmpty, normalizeRichText } from "../utils/richTextDoc";
 
@@ -113,7 +113,7 @@
   function teleworkRange(t: { effectiveDate?: string; expirationDate?: string }): string {
     const end = t.expirationDate || t.effectiveDate;
     if (!t.effectiveDate && !end) return "";
-    if (t.effectiveDate && end && t.effectiveDate !== end) return `${formatDate(t.effectiveDate)} - ${formatDate(end)}`;
+    if (t.effectiveDate && end && t.effectiveDate !== end) return formatDateRange(t.effectiveDate, end);
     return formatDate(t.effectiveDate ?? end);
   }
 
@@ -633,6 +633,8 @@
 <style>
   .tabs { display: flex; gap: .25rem; flex-wrap: wrap; margin-bottom: 1rem; border-bottom: 1px solid var(--border); }
   .tabs button { border: none; background: none; border-bottom: 2px solid transparent; border-radius: 0; padding: .4rem .7rem; }
+  :global(:root[data-density="compact"]) .tabs { margin-bottom: .6rem; }
+  :global(:root[data-density="compact"]) .tabs button { padding: .25rem .6rem; }
   .tabs button.active { border-bottom-color: var(--accent); font-weight: 700; color: var(--accent); }
   .tab-title-row { display: flex; align-items: center; gap: .75rem; margin-bottom: .8rem; }
   .notes-header { display: flex; align-items: center; gap: .75rem; margin-bottom: .5rem; }

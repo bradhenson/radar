@@ -216,7 +216,7 @@ a:hover { text-decoration: underline; }
 
 button {
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border-strong);
@@ -241,6 +241,7 @@ textarea:focus-visible, [tabindex]:focus-visible {
 }
 
 button.primary {
+  font-weight: 600;
   background: var(--accent);
   color: var(--accent-text);
   border-color: transparent;
@@ -258,7 +259,7 @@ button.link {
   color: var(--accent);
   padding: .1rem .25rem;
   min-height: 0;
-  font-weight: 600;
+  font-weight: 500;
 }
 button.link:hover { text-decoration: underline; background: none; }
 
@@ -329,7 +330,7 @@ textarea { resize: vertical; line-height: 1.45; }
 input[type="checkbox"] { min-height: 0; accent-color: var(--accent); width: 1rem; height: 1rem; }
 input[type="date"] { font-variant-numeric: tabular-nums; }
 
-label { display: block; font-weight: 600; margin: .65rem 0 .2rem; font-size: .85rem; }
+label { display: block; font-weight: 500; margin: .65rem 0 .2rem; font-size: .85rem; }
 label .req { color: var(--danger); }
 .field-hint { color: var(--text-muted); font-size: .78rem; font-weight: 400; }
 .field-error { color: var(--danger); font-size: .85rem; margin-top: .2rem; }
@@ -354,7 +355,7 @@ table.data th, table.data td {
 }
 table.data th {
   font-size: .75rem;
-  font-weight: 600;
+  font-weight: 500;
   text-transform: none;
   letter-spacing: 0;
   color: var(--text-muted);
@@ -388,7 +389,7 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
   align-items: center;
   gap: .25rem;
   font-size: .72rem;
-  font-weight: 650;
+  font-weight: 600;
   padding: .12rem .5rem;
   border-radius: 4px;
   border: 1px solid transparent;
@@ -775,7 +776,7 @@ table.data tr.detail-row:hover td:first-child { box-shadow: none; }
 .detail-grid dt {
   color: var(--text-muted);
   font-size: .72rem;
-  font-weight: 700;
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: .06em;
 }
@@ -940,3 +941,22 @@ button.group-toggle:hover { background: none; color: var(--accent); }
   .workspace-actions, .record-toolbar { display: none !important; }
   .table-scroll { overflow: visible; }
 }
+
+/* ---------- compact density (Settings → Appearance → Density) ----------
+   Tightens vertical rhythm everywhere: table rows, cards, toolbars, headers,
+   and controls. Horizontal page padding is left to the width breakpoints. */
+:root[data-density="compact"] .page { padding-top: 1rem; padding-bottom: 1.25rem; }
+:root[data-density="compact"] .card { padding: .65rem .85rem; }
+:root[data-density="compact"] table.data th,
+:root[data-density="compact"] table.data td { padding-top: .32rem; padding-bottom: .32rem; }
+:root[data-density="compact"] .page table.data td { padding: .38rem .7rem; }
+:root[data-density="compact"] .page table.data th { padding: .38rem .7rem; }
+:root[data-density="compact"] .page table.data .group-row td { padding-top: .3rem; padding-bottom: .3rem; }
+:root[data-density="compact"] .page .record-toolbar { padding: .45rem .6rem; margin-bottom: .8rem; gap: .5rem; }
+:root[data-density="compact"] .page-header { margin-bottom: .7rem; }
+:root[data-density="compact"] .filter-pills button { min-height: 1.75rem; padding: .18rem .55rem; }
+:root[data-density="compact"] button { min-height: 1.85rem; padding-top: .22rem; padding-bottom: .22rem; }
+:root[data-density="compact"] input,
+:root[data-density="compact"] select { min-height: 1.85rem; padding-top: .24rem; padding-bottom: .24rem; }
+:root[data-density="compact"] .view-toggle button { min-height: 1.6rem; }
+:root[data-density="compact"] .section-heading { margin-top: 1rem; }

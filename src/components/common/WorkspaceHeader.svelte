@@ -37,6 +37,7 @@
     margin-bottom: .8rem;
     flex-shrink: 0;
   }
+  :global(:root[data-density="compact"]) .workspace-header { margin-bottom: .5rem; }
   .workspace-heading { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem .7rem; min-width: 0; }
   .workspace-back { color: var(--text-muted); font-size: .8rem; white-space: nowrap; }
   .workspace-back:hover { color: var(--accent); text-decoration: none; }
