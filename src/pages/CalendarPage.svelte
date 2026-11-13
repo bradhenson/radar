@@ -5,11 +5,14 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
+  import { calendarEvents, toIcs } from "../domain/rules/icsExport";
+  import { backupFilename, downloadText } from "../utils/download";
   import type { AwardRecord, IsoDate, LeaveRecord, Task, TeleworkRecord, TravelRecord } from "../domain/models";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { teleworkStatusLabel } from "../domain/rules/telework";
   import { awardDueMap, leaveDayMap, monthGrid, monthOf, monthTitle, taskDueMap, teleworkDayMap, travelDayMap } from "../domain/rules/calendar";
-  import { addDays, addMonths, formatDate } from "../utils/dates";
+  import { addDays, addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
   const MONTHS_ABBR = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -22,6 +25,60 @@
   let showTravel = $state(false);
   let showAwards = $state(false);
   let hideComplete = $state(false);
+
+  // --- calendar file export --------------------------------------------------
+  // Exports what the calendar is showing (the layers switched on and the
+  // employee filter) for a date range, as a file Outlook can import.
+  let icsOpen = $state(false);
+  let icsFrom = $state("");
+  let icsTo = $state("");
+  let icsRangeValid = $derived(isValidIsoDate(icsFrom) && isValidIsoDate(icsTo) && compareDates(icsTo, icsFrom) >= 0);
+  let icsLayers = $derived(
+    [
+      showTasks ? "task due dates" : "",
+      showLeave ? "leave" : "",
+      showTelework ? "telework" : "",
+      showTravel ? "travel" : "",
+      showAwards ? "award deadlines" : ""
+    ].filter(Boolean)
+  );
+  let icsEvents = $derived(
+    icsOpen && icsRangeValid
+      ? calendarEvents({
+          from: icsFrom,
+          to: icsTo,
+          layers: { tasks: showTasks, leave: showLeave, telework: showTelework, travel: showTravel, awards: showAwards },
+          employeeId: filterEmployee || undefined,
+          tasks: app.tasks,
+          leaveRecords: app.leaveRecords,
+          teleworkRecords: app.teleworkRecords,
+          travelRecords: app.travelRecords,
+          awardRecords: app.awardRecords,
+          employeeName: (id) => (id ? app.employeeName(id) : "")
+        })
+      : []
+  );
+
+  function openIcsExport() {
+    // The month on screen and the two after it.
+    const firstOfMonth = `${anchor.slice(0, 7)}-01`;
+    icsFrom = firstOfMonth;
+    icsTo = addDays(addMonths(firstOfMonth, 3), -1);
+    icsOpen = true;
+  }
+
+  async function exportIcs() {
+    if (icsEvents.length === 0) return;
+    try {
+      const saved = await downloadText(backupFilename("RADAR_Calendar", "ics"), toIcs(icsEvents, nowTimestamp()), "text/calendar");
+      if (!saved) return;
+      const count = icsEvents.length;
+      icsOpen = false;
+      app.toast(`Calendar file saved with ${count} event${count === 1 ? "" : "s"}`, "success");
+    } catch {
+      app.toast("Calendar export failed", "error");
+    }
+  }
 
   let ym = $derived(monthOf(anchor));
   let weeks = $derived(monthGrid(ym.year, ym.month));
@@ -197,6 +254,7 @@
         <button type="button" onclick={() => shiftMonth(1)} aria-label="Next month">&rsaquo;</button>
         <button type="button" onclick={() => (anchor = app.today)}>Today</button>
       </div>
+      <button type="button" onclick={openIcsExport} title="Save what the calendar shows as a file Outlook can import">Export calendar file</button>
       <button type="button" class="primary" onclick={() => ui.openNewTask()}>+ New Task</button>
     {/snippet}
   </WorkspaceHeader>
@@ -381,7 +439,57 @@
   {/if}
 </div>
 
+{#if icsOpen}
+  <Dialog title="Export Calendar File" onclose={() => (icsOpen = false)}>
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        void exportIcs();
+      }}
+    >
+      <p class="small muted">
+        Saves an .ics file that Outlook and other calendars can import. It is a one-time copy: later changes in RADAR do
+        not update it, though importing a newer file updates the same events.
+      </p>
+      <div class="form-grid">
+        <div>
+          <label for="ics-from">From</label>
+          <input id="ics-from" type="date" bind:value={icsFrom} style="width:100%" />
+        </div>
+        <div>
+          <label for="ics-to">To</label>
+          <input id="ics-to" type="date" bind:value={icsTo} style="width:100%" />
+        </div>
+      </div>
+      <p class="small" aria-live="polite">
+        {#if !icsRangeValid}
+          Choose a From date on or before the To date.
+        {:else if icsLayers.length === 0}
+          Nothing is switched on. Turn on Tasks, Leave, Telework, Travel, or Awards on the calendar first.
+        {:else}
+          <strong>{icsEvents.length} event{icsEvents.length === 1 ? "" : "s"}</strong>: {icsLayers.join(", ")}{filterEmployee
+            ? ` for ${app.employeeName(filterEmployee)}`
+            : ""}. Each is an all-day entry that does not mark you busy.
+        {/if}
+      </p>
+      <p class="small muted">
+        The file contains names and dates. Import it only into a calendar where you are allowed to keep that information.
+      </p>
+      <div class="ics-actions">
+        <button type="button" onclick={() => (icsOpen = false)}>Cancel</button>
+        <button type="submit" class="primary" disabled={icsEvents.length === 0}>Export</button>
+      </div>
+    </form>
+  </Dialog>
+{/if}
+
 <style>
+  .ics-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
   .calendar-page {
     max-width: none;
     padding-bottom: 3.5rem;

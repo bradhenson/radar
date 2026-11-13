@@ -745,6 +745,7 @@ const SETTING_NUMBER_FIELDS: (keyof AppSettings)[] = [
   "completedVisibleDays",
   "backupReminderDays",
   "backupChangeThreshold",
+  "autoBackupKeepDays",
   "trainingWarningDays",
   "leaveLookaheadDays",
   "teleworkLookbackDays",
@@ -789,6 +790,15 @@ function validateSettings(raw: unknown, errors: string[]): void {
   }
   if (settings.look !== undefined && !["standard", "glass", "glass_strong"].includes(String(settings.look))) {
     errors.push("settings.look is not recognized.");
+  }
+  if (settings.savedBoardViews !== undefined) {
+    const views = settings.savedBoardViews;
+    if (!Array.isArray(views) || views.length > 200 || views.some((v) => typeof v !== "object" || v === null || Array.isArray(v))) {
+      errors.push("settings.savedBoardViews must be a list of at most 200 saved views.");
+    }
+  }
+  if (settings.autoBackupEnabled !== undefined && typeof settings.autoBackupEnabled !== "boolean") {
+    errors.push("settings.autoBackupEnabled must be true or false.");
   }
   if (settings.enableSingleKeyShortcuts !== undefined && typeof settings.enableSingleKeyShortcuts !== "boolean") {
     errors.push("settings.enableSingleKeyShortcuts must be true or false.");

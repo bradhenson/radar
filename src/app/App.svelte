@@ -27,6 +27,7 @@
   import TravelPage from "../pages/TravelPage.svelte";
   import AwardsPage from "../pages/AwardsPage.svelte";
   import ActivityPage from "../pages/ActivityPage.svelte";
+  import ReportsPage from "../pages/ReportsPage.svelte";
   import ArchivePage from "../pages/ArchivePage.svelte";
   import SettingsPage from "../pages/SettingsPage.svelte";
   import CommandPalette from "../components/common/CommandPalette.svelte";
@@ -74,7 +75,8 @@
     { page: "telework", label: "Telework", icon: "telework" },
     { page: "travel", label: "Travel", icon: "travel" },
     { page: "awards", label: "Awards", icon: "awards" },
-    { page: "activity", label: "Activity", icon: "activity", section: "System" },
+    { page: "reports", label: "Reports", icon: "reports", section: "System" },
+    { page: "activity", label: "Activity", icon: "activity" },
     { page: "archive", label: "Archive", icon: "archive" },
     { page: "settings", label: "Settings", icon: "settings" }
   ];
@@ -550,6 +552,8 @@
           <TravelPage />
         {:else if router.current.page === "awards"}
           <AwardsPage />
+        {:else if router.current.page === "reports"}
+          <ReportsPage />
         {:else if router.current.page === "activity"}
           <ActivityPage />
         {:else if router.current.page === "archive"}

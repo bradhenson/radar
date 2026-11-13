@@ -41,11 +41,40 @@ export interface AppBindings {
   OpenDatabaseFolder(): Promise<void>;
 }
 
+/** What desktop/autobackup.go reports about the automatic backup folder. */
+export interface AutoBackupInfo {
+  folder: string;
+  /** True for the built-in folder beside the database. */
+  isDefault: boolean;
+  /** Automatic backup files in the folder. */
+  count: number;
+  /** Newest automatic backup, "" when there are none. */
+  latestName: string;
+  /** ISO timestamp the newest file was written, "" when there are none. */
+  latestModified: string;
+  /** After a write: whether the day's file was new rather than replaced. */
+  created: boolean;
+}
+
+/**
+ * Automatic backup bindings (desktop/autobackup.go). Each returns
+ * AutoBackupInfo as JSON. The folder is chosen only through the native
+ * dialog; the frontend supplies a filename and content, never a path.
+ */
+export interface AutoBackupBindings {
+  GetAutoBackupInfo(): Promise<string>;
+  WriteAutoBackup(name: string, content: string, keepDays: number): Promise<string>;
+  /** Returns "" when the folder dialog is cancelled. */
+  ChooseAutoBackupFolder(): Promise<string>;
+  ResetAutoBackupFolder(): Promise<string>;
+  OpenAutoBackupFolder(): Promise<void>;
+}
+
 interface WailsWindow {
   go?: {
     main?: {
       Store?: Partial<StoreBindings>;
-      App?: Partial<AppBindings>;
+      App?: Partial<AppBindings & AutoBackupBindings>;
     };
   };
   runtime?: {
@@ -76,6 +105,14 @@ export function wailsStoreBindings(): StoreBindings | undefined {
 export function wailsAppBindings(): AppBindings | undefined {
   const app = wailsGlobals()?.main?.App;
   return typeof app?.SaveTextFile === "function" ? (app as AppBindings) : undefined;
+}
+
+/** Undefined in the browser build and under a desktop shell too old to have the feature. */
+export function wailsAutoBackupBindings(): AutoBackupBindings | undefined {
+  const app = wailsGlobals()?.main?.App;
+  return typeof app?.WriteAutoBackup === "function" && typeof app?.GetAutoBackupInfo === "function"
+    ? (app as AutoBackupBindings)
+    : undefined;
 }
 
 export function isWailsHost(): boolean {

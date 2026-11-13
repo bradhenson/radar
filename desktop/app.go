@@ -160,6 +160,8 @@ func filterFor(filename string) runtime.FileFilter {
 		return runtime.FileFilter{DisplayName: "CSV files (*.csv)", Pattern: "*.csv"}
 	case ".txt":
 		return runtime.FileFilter{DisplayName: "Text files (*.txt)", Pattern: "*.txt"}
+	case ".ics":
+		return runtime.FileFilter{DisplayName: "Calendar files (*.ics)", Pattern: "*.ics"}
 	default:
 		return runtime.FileFilter{DisplayName: "All files (*.*)", Pattern: "*.*"}
 	}

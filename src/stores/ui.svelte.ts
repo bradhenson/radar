@@ -17,6 +17,15 @@ class UiState {
     compact: false,
     scrollLeft: 0
   };
+  /** Session-only: the report and options last shown on the Reports page. */
+  reportView = {
+    kind: "availability" as "availability" | "telework" | "training" | "workload" | "writeup",
+    weeks: 4,
+    employeeId: "",
+    cycleId: ""
+  };
+  /** One-shot request from another page to open a specific report. */
+  reportRequest: { kind: "writeup"; employeeId: string; cycleId: string } | undefined = undefined;
   newTaskOpen = $state(false);
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */

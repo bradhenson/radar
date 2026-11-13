@@ -505,7 +505,24 @@ table.data tbody tr:hover td:first-child { box-shadow: inset 3px 0 0 var(--accen
    Printable pages render as content only: navigation, toolbars, and
    on-screen controls disappear; tables flatten to plain bordered rows. */
 @media print {
-  .topbar, .sidenav, .compactnav, .toolbar, .no-print { display: none !important; }
+  /* Paper is white whatever theme is on screen: print dark text on it. */
+  /* !important because the dark theme and the glass looks set these same
+     variables from more specific selectors further down the file. */
+  :root {
+    --bg: #fff !important;
+    --surface: #fff !important;
+    --surface-2: #f2f2f2 !important;
+    --surface-elevated: #fff !important;
+    --bucket-bg: #f2f2f2 !important;
+    --border: #bdbdbd !important;
+    --border-strong: #8a8a8a !important;
+    --text: #111 !important;
+    --text-muted: #444 !important;
+    color-scheme: light;
+  }
+  .topbar, .sidenav, .compactnav, .toolbar, .toasts, .no-print { display: none !important; }
+  table.data, table.data th, table.data td { background: #fff !important; box-shadow: none !important; }
+  table.data th { border-bottom: 1px solid #8a8a8a; }
   body { background: #fff; }
   main { overflow: visible; }
   table.data { box-shadow: none; border-radius: 0; }

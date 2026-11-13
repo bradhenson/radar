@@ -6,6 +6,7 @@
   import { app } from "../stores/app.svelte";
   import { ui } from "../stores/ui.svelte";
   import { trainingFollowUpTask } from "../domain/rules/followUpTasks";
+  import { parseCompletionPaste, readyCompletions } from "../domain/rules/trainingImport";
   import { router } from "../app/router.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
@@ -209,6 +210,51 @@
     checkedIds = [];
   }
 
+  // --- pasted completions ----------------------------------------------------
+  // Text copied from a spreadsheet or report, one person per line. Nothing is
+  // recorded until the preview has been read and Apply is chosen.
+  let pasteOpen = $state(false);
+  let pasteText = $state("");
+  let pasteLines = $derived.by(() => {
+    const req = selectedReq;
+    if (!pasteOpen || !req) return [];
+    return parseCompletionPaste(pasteText, {
+      employees: app.activeEmployees,
+      applicableIds: new Set(app.trainingStatusList.filter((r) => r.requirement.id === req.id).map((r) => r.employee.id)),
+      defaultDate: isValidIsoDate(completeDate) ? completeDate : todayIso(),
+      today: app.today
+    });
+  });
+  let pasteReady = $derived(readyCompletions(pasteLines));
+
+  function openPaste() {
+    pasteText = "";
+    pasteOpen = true;
+  }
+
+  async function applyPaste() {
+    const req = selectedReq;
+    const ready = pasteReady;
+    if (!req || ready.length === 0) return;
+    const undos: { employeeId: string; before: EmployeeTrainingRecord | undefined }[] = [];
+    for (const line of ready) {
+      const employee = app.activeEmployees.find((e) => e.id === line.employeeId);
+      if (!employee) continue;
+      const before = await app.markTrainingComplete(employee, req, line.date);
+      undos.push({ employeeId: employee.id, before });
+    }
+    pasteOpen = false;
+    const n = undos.length;
+    app.toast(`Recorded ${req.name} complete for ${n} employee${n === 1 ? "" : "s"}`, "success", async () => {
+      for (const u of undos) {
+        const current = app.employeeTrainingRecords.find(
+          (r) => r.employeeId === u.employeeId && r.trainingRequirementId === req.id
+        );
+        if (current) await app.undoTrainingComplete(req, current, u.before);
+      }
+    });
+  }
+
   function toggleChecked(id: string) {
     checkedIds = checkedIds.includes(id) ? checkedIds.filter((x) => x !== id) : [...checkedIds, id];
   }
@@ -354,6 +400,7 @@
                     <button type="button" class="primary" disabled={checkedIds.length === 0} onclick={() => void markComplete(checkedIds)}>
                       Mark {checkedIds.length || "selected"} complete
                     </button>
+                    <button type="button" onclick={openPaste}>Paste completions...</button>
                     <span class="spacer"></span>
                     <!-- Opens the new-task editor prefilled; nothing is created until it is saved. -->
                     <button type="button" onclick={() => ui.openNewTask(trainingFollowUpTask(selectedReq!, s.overdue, app.today))}>Add task</button>
@@ -535,6 +582,60 @@
   </Dialog>
 {/if}
 
+{#if pasteOpen && selectedReq}
+  <Dialog title={`Paste Completions: ${selectedReq.name}`} onclose={() => (pasteOpen = false)} wide unsavedGuard={() => pasteText.trim() !== ""}>
+    <p class="small muted">
+      Paste one person per line, copied from a spreadsheet or a report. A date on the line is used as that person's
+      completion date; lines without one use {formatDate(isValidIsoDate(completeDate) ? completeDate : todayIso())}, the
+      Completion date set on the roster. Names can be "First Last" or "Last, First".
+    </p>
+    <label for="paste-completions">Completions</label>
+    <textarea
+      id="paste-completions"
+      bind:value={pasteText}
+      rows="7"
+      style="width:100%; font-family:inherit"
+      placeholder={"Avery Brooks\t7/14/2026\nChen, Riley\t2026-07-15"}
+    ></textarea>
+    {#if pasteLines.length > 0}
+      <p class="small" aria-live="polite">
+        <strong>{pasteReady.length} of {pasteLines.length}</strong> line{pasteLines.length === 1 ? "" : "s"} can be recorded.
+        {#if pasteReady.length < pasteLines.length}The rest are skipped for the reason shown.{/if}
+      </p>
+      <!-- Keyboard focus lets the arrow keys scroll the preview. -->
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="paste-preview" role="region" aria-label="Preview of pasted completions" tabindex="0">
+        <table class="data">
+          <thead><tr><th>Line</th><th>Pasted name</th><th>Employee</th><th>Completed</th><th>Result</th></tr></thead>
+          <tbody>
+            {#each pasteLines as line (line.lineNumber)}
+              <tr class:skipped={Boolean(line.problem)}>
+                <td>{line.lineNumber}</td>
+                <td>{line.name || "—"}</td>
+                <td>{line.employeeName ?? "—"}</td>
+                <td class="date-cell">{isValidIsoDate(line.date) ? formatDate(line.date) : "—"}{#if !line.dateFromLine && !line.problem}<span class="muted small default-mark">(default)</span>{/if}</td>
+                <td>
+                  {#if line.problem}
+                    <span class="badge warning">Skipped</span> {line.problem}
+                  {:else}
+                    <span class="muted">Will be recorded</span>
+                  {/if}
+                </td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    {/if}
+    <div class="paste-actions">
+      <button type="button" onclick={() => (pasteOpen = false)}>Cancel</button>
+      <button type="button" class="primary" disabled={pasteReady.length === 0} onclick={() => void applyPaste()}>
+        Record {pasteReady.length || ""} completion{pasteReady.length === 1 ? "" : "s"}
+      </button>
+    </div>
+  </Dialog>
+{/if}
+
 {#if recordDialog}
   <Dialog title={`${recordDialog.req.name} — ${app.employeeName(recordDialog.employeeId)}`} onclose={() => (recordDialog = undefined)}>
     <form
@@ -575,6 +676,24 @@
 {/if}
 
 <style>
+  .paste-preview {
+    max-height: 16rem;
+    overflow: auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .default-mark {
+    margin-left: .35rem;
+  }
+  .paste-preview tr.skipped td {
+    color: var(--text-muted);
+  }
+  .paste-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
   .cell-btn {
     min-height: 0;
     border: none;
