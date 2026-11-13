@@ -3,13 +3,13 @@
 // them part of the untrusted import surface and they are normalized on load.
 
 import type { SavedBoardView } from "../models";
+import { ANY_PROJECT, NO_PROJECT } from "./boardFilters";
 
 export const MAX_SAVED_VIEWS = 30;
 export const SAVED_VIEW_NAME_MAX = 60;
 
 const SUMMARY_FILTERS = new Set(["", "due_soon", "overdue", "waiting", "priority"]);
 const PRIORITIES = new Set(["", "low", "normal", "high", "critical"]);
-const WORK_TYPES = new Set(["", "project", "competency"]);
 
 /** The filter fields a view stores, in the shape the Tasks page holds them. */
 export type BoardViewFilters = Omit<SavedBoardView, "id" | "name">;
@@ -20,8 +20,7 @@ export const EMPTY_BOARD_FILTERS: BoardViewFilters = {
   competency: "",
   project: "",
   priority: "",
-  summary: "",
-  workType: ""
+  summary: ""
 };
 
 function text(value: unknown, max: number): string {
@@ -42,7 +41,12 @@ export function normalizeSavedBoardViews(raw: unknown): SavedBoardView[] {
     if (!id || !name || ids.has(id) || names.has(name.toLowerCase())) continue;
     const summary = text(src.summary, 20);
     const priority = text(src.priority, 20);
-    const workType = text(src.workType, 20);
+    // Views saved with the short-lived Project/Competency switch keep their
+    // meaning through the project filter's Any project / No project choices.
+    const legacyWorkType = text(src.workType, 20);
+    let project = text(src.project, 100);
+    if (!project && legacyWorkType === "project") project = ANY_PROJECT;
+    if (!project && legacyWorkType === "competency") project = NO_PROJECT;
     ids.add(id);
     names.add(name.toLowerCase());
     views.push({
@@ -51,10 +55,9 @@ export function normalizeSavedBoardViews(raw: unknown): SavedBoardView[] {
       search: text(src.search, 200),
       employee: text(src.employee, 100),
       competency: text(src.competency, 100),
-      project: text(src.project, 100),
+      project,
       priority: PRIORITIES.has(priority) ? priority : "",
-      summary: (SUMMARY_FILTERS.has(summary) ? summary : "") as SavedBoardView["summary"],
-      workType: (WORK_TYPES.has(workType) ? workType : "") as SavedBoardView["workType"]
+      summary: (SUMMARY_FILTERS.has(summary) ? summary : "") as SavedBoardView["summary"]
     });
     if (views.length >= MAX_SAVED_VIEWS) break;
   }
@@ -98,9 +101,8 @@ export function filtersForView(
     search: view.search,
     employee: existing.employees.has(view.employee) ? view.employee : "",
     competency: existing.competencies.has(view.competency) ? view.competency : "",
-    project: existing.projects.has(view.project) ? view.project : "",
+    project: view.project === ANY_PROJECT || view.project === NO_PROJECT || existing.projects.has(view.project) ? view.project : "",
     priority: view.priority,
-    summary: view.summary,
-    workType: view.workType ?? ""
+    summary: view.summary
   };
 }

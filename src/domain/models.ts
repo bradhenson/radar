@@ -481,14 +481,12 @@ export interface SavedBoardView {
   id: Id;
   name: string;
   search: string;
-  /** Employee, competency, and project ids; "" means no filter. */
+  /** Employee, competency, and project ids; "" means no filter. The project may also be "Any project" or "No project" (boardFilters.ts). */
   employee: string;
   competency: string;
   project: string;
   priority: string;
   summary: "" | "due_soon" | "overdue" | "waiting" | "priority";
-  /** Project or competency work; "" (and views saved before this existed) means both. */
-  workType: "" | "project" | "competency";
 }
 
 export interface AppSettings {
