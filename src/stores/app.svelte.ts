@@ -1636,15 +1636,16 @@ export class AppStore {
       meetingAttendances: this.meetingNotes.filter((n) => n.attendeeEmployeeIds.includes(employeeId)).length,
       quickNoteLinks: this.quickNotes.filter((n) => n.employeeId === employeeId).length,
       projectLeads: this.projects.filter((p) => p.leadEmployeeId === employeeId).length,
-      trainingAssignments: this.trainingRequirements.filter((r) => r.assignedEmployeeIds?.includes(employeeId)).length
+      trainingAssignments: this.trainingRequirements.filter((r) => r.assignedEmployeeIds?.includes(employeeId)).length,
+      recurringSchedules: this.recurringTasks.filter((r) => r.employeeId === employeeId).length
     };
   }
 
   /**
    * Permanently delete an employee together with the records that only exist
    * for them (performance inputs, training, leave, telework, awards, check-ins,
-   * notes). Shared records survive: tasks and meeting notes are unlinked, and
-   * project lead / training-requirement assignments are cleared.
+   * notes). Shared records survive: tasks, meeting notes, and recurring task
+   * schedules are unlinked, and project lead / training-requirement assignments are cleared.
    */
   async deleteEmployee(employeeOrId: Employee | string): Promise<void> {
     const employee =
@@ -1709,6 +1710,11 @@ export class AppStore {
         .filter((r) => r.assignedEmployeeIds?.includes(id))
         .map((r) => ({ ...r, assignedEmployeeIds: r.assignedEmployeeIds!.filter((e) => e !== id), updatedAt }));
 
+      // Schedules keep running, unassigned, like the tasks they already made.
+      const updatedRecurring = this.recurringTasks
+        .filter((r) => r.employeeId === id)
+        .map((r) => ({ ...r, employeeId: undefined, updatedAt }));
+
       const entry = this.buildActivityEntry("employees", id, "deleted", `Deleted employee ${name} and their linked records`);
       const nextMeta = this.bumpedMeta("deleted");
       const ops: MutationOp[] = [
@@ -1726,6 +1732,7 @@ export class AppStore {
         ...updatedQuickNotes.map((n) => putOp("quickNotes", this.plainRecord(n))),
         ...updatedProjects.map((p) => putOp("projects", this.plainRecord(p))),
         ...updatedRequirements.map((r) => putOp("trainingRequirements", this.plainRecord(r))),
+        ...updatedRecurring.map((r) => putOp("recurringTasks", this.plainRecord(r))),
         deleteOp("employees", id),
         putOp("activityEntries", entry)
       ];
@@ -1749,6 +1756,7 @@ export class AppStore {
       this.trainingRequirements = this.trainingRequirements.map(
         (r) => updatedRequirements.find((u) => u.id === r.id) ?? r
       );
+      this.recurringTasks = this.recurringTasks.map((r) => updatedRecurring.find((u) => u.id === r.id) ?? r);
       this.employees = this.employees.filter((e) => e.id !== id);
 
       this.activityEntries.push(entry);
@@ -1769,13 +1777,14 @@ export class AppStore {
       tasks: this.tasks.filter((t) => t.projectId === projectId).length,
       meetingNotes: this.meetingNotes.filter((n) => n.projectId === projectId).length,
       quickNotes: this.quickNotes.filter((n) => n.projectId === projectId).length,
-      performanceInputs: this.performanceInputs.filter((p) => p.projectId === projectId).length
+      performanceInputs: this.performanceInputs.filter((p) => p.projectId === projectId).length,
+      recurringSchedules: this.recurringTasks.filter((r) => r.projectId === projectId).length
     };
   }
 
   /**
-   * Permanently delete a project. Tasks, meeting notes, and performance inputs
-   * that referenced it survive but are unlinked (their projectId is cleared),
+   * Permanently delete a project. Tasks, meeting notes, performance inputs, and
+   * recurring task schedules that referenced it survive but are unlinked (their projectId is cleared),
    * so nothing is left pointing at a project that no longer exists.
    */
   async deleteProject(projectOrId: Project | string): Promise<void> {
@@ -1801,6 +1810,10 @@ export class AppStore {
         .filter((n) => n.projectId === id)
         .map((n) => ({ ...n, projectId: undefined, updatedAt }));
 
+      const updatedRecurring = this.recurringTasks
+        .filter((r) => r.projectId === id)
+        .map((r) => ({ ...r, projectId: undefined, updatedAt }));
+
       const entry = this.buildActivityEntry("projects", id, "deleted", `Deleted project ${name}`);
       const nextMeta = this.bumpedMeta("deleted");
       const ops: MutationOp[] = [
@@ -1808,6 +1821,7 @@ export class AppStore {
         ...updatedMeetings.map((n) => putOp("meetingNotes", this.plainRecord(n))),
         ...updatedInputs.map((p) => putOp("performanceInputs", this.plainRecord(p))),
         ...updatedQuickNotes.map((n) => putOp("quickNotes", this.plainRecord(n))),
+        ...updatedRecurring.map((r) => putOp("recurringTasks", this.plainRecord(r))),
         deleteOp("projects", id),
         putOp("activityEntries", entry)
       ];
@@ -1818,6 +1832,7 @@ export class AppStore {
       this.meetingNotes = this.meetingNotes.map((n) => updatedMeetings.find((u) => u.id === n.id) ?? n);
       this.performanceInputs = this.performanceInputs.map((p) => updatedInputs.find((u) => u.id === p.id) ?? p);
       this.quickNotes = this.quickNotes.map((n) => updatedQuickNotes.find((u) => u.id === n.id) ?? n);
+      this.recurringTasks = this.recurringTasks.map((r) => updatedRecurring.find((u) => u.id === r.id) ?? r);
       this.projects = this.projects.filter((p) => p.id !== id);
 
       this.activityEntries.push(entry);

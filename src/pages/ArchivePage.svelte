@@ -121,7 +121,8 @@
       [counts.meetingAttendances, "meeting attendee link(s)"],
       [counts.quickNoteLinks, "general note link(s)"],
       [counts.projectLeads, "project lead assignment(s)"],
-      [counts.trainingAssignments, "training assignment(s)"]
+      [counts.trainingAssignments, "training assignment(s)"],
+      [counts.recurringSchedules, "recurring task schedule(s)"]
     ];
     const unlinkedParts = unlinked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
     if (unlinkedParts.length) message += ` The following will be kept but unlinked: ${unlinkedParts.join(", ")}.`;

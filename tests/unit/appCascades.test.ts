@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AppStore } from "../../src/stores/app.svelte";
 import { InMemoryDataStore } from "../../src/data/InMemoryDataStore";
 import { emptyCollections, type DatabaseSnapshot, type MutationOp } from "../../src/data/DataStore";
-import { DEFAULT_SETTINGS, type Employee, type LeaveRecord, type PerformanceInput, type Project, type QuickNote, type Task, type TaskNote } from "../../src/domain/models";
+import { DEFAULT_SETTINGS, type Employee, type LeaveRecord, type PerformanceInput, type Project, type QuickNote, type RecurringTask, type Task, type TaskNote } from "../../src/domain/models";
 
 const NOW = "2026-01-01T00:00:00.000Z";
 
@@ -95,6 +95,24 @@ function makeQuickNote(id: string, partial: Partial<QuickNote> = {}): QuickNote 
   };
 }
 
+// Paused, so startup generation leaves the board and backup counter alone.
+function makeRecurring(id: string, partial: Partial<RecurringTask> = {}): RecurringTask {
+  return {
+    id,
+    title: `Schedule ${id}`,
+    priority: "normal",
+    tags: [],
+    unit: "weeks",
+    interval: 1,
+    firstDueDate: "2026-01-05",
+    advanceCreateDays: 3,
+    active: false,
+    createdAt: NOW,
+    updatedAt: NOW,
+    ...partial
+  };
+}
+
 /** InMemory store whose next mutate() call fails before applying anything. */
 class FailingMutateStore extends InMemoryDataStore {
   failNextMutate = false;
@@ -119,6 +137,7 @@ function baseSnapshot(): DatabaseSnapshot {
   collections.performanceInputs = [makeInput("pi1", "e1", { relatedTaskId: "t1", projectId: "p1" })];
   collections.leaveRecords = [makeLeave("l1", "e1", { relatedTaskId: "t1" })];
   collections.quickNotes = [makeQuickNote("qn1", { employeeId: "e1", projectId: "p1", taskId: "t1" })];
+  collections.recurringTasks = [makeRecurring("r1", { employeeId: "e1", projectId: "p1" }), makeRecurring("r2")];
   return {
     collections,
     settings: { ...DEFAULT_SETTINGS },
@@ -157,6 +176,12 @@ describe("deleteEmployee cascade", () => {
     expect(t1.employeeId).toBeUndefined();
     expect(t1.performanceInputCreated).toBe(false);
     expect(app.quickNotes[0]!.employeeId).toBeUndefined();
+    // Recurring schedules survive, unassigned, and keep their project.
+    const r1 = app.recurringTasks.find((r) => r.id === "r1")!;
+    expect(r1.employeeId).toBeUndefined();
+    expect(r1.projectId).toBe("p1");
+    expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.employeeId).toBeUndefined();
+    expect(app.recurringTasks.find((r) => r.id === "r2")!.updatedAt).toBe(NOW);
     // The audit trail landed in the same batch.
     expect(app.activityEntries.some((a) => a.actionType === "deleted" && a.entityType === "employees")).toBe(true);
     expect(app.meta.changesSinceBackup).toBe(1);
@@ -176,9 +201,11 @@ describe("deleteEmployee cascade", () => {
     expect(app.leaveRecords).toHaveLength(1);
     expect(app.tasks.find((t) => t.id === "t1")!.employeeId).toBe("e1");
     expect(app.quickNotes[0]!.employeeId).toBe("e1");
+    expect(app.recurringTasks.find((r) => r.id === "r1")!.employeeId).toBe("e1");
     expect(app.meta.changesSinceBackup).toBe(0);
     expect(app.saveStatus).toBe("error");
     expect(await store.getAll("employees")).toHaveLength(1);
+    expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.employeeId).toBe("e1");
     expect(await store.getAll("performanceInputs")).toHaveLength(1);
     expect((await store.getAll("activityEntries")).some((a) => a.actionType === "deleted")).toBe(false);
   });
@@ -222,6 +249,10 @@ describe("deleteProject cascade", () => {
     expect(app.tasks.every((t) => t.projectId === undefined)).toBe(true);
     expect(app.performanceInputs[0]!.projectId).toBeUndefined();
     expect(app.quickNotes[0]!.projectId).toBeUndefined();
+    const r1 = app.recurringTasks.find((r) => r.id === "r1")!;
+    expect(r1.projectId).toBeUndefined();
+    expect(r1.employeeId).toBe("e1");
+    expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.projectId).toBeUndefined();
     expect(await store.getAll("projects")).toHaveLength(0);
   });
 
@@ -235,7 +266,9 @@ describe("deleteProject cascade", () => {
     expect(app.tasks.filter((t) => t.projectId === "p1")).toHaveLength(2);
     expect(app.performanceInputs[0]!.projectId).toBe("p1");
     expect(app.quickNotes[0]!.projectId).toBe("p1");
+    expect(app.recurringTasks.find((r) => r.id === "r1")!.projectId).toBe("p1");
     expect(await store.getAll("projects")).toHaveLength(1);
+    expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.projectId).toBe("p1");
   });
 });
 

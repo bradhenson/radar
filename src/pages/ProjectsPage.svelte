@@ -140,7 +140,8 @@
       [counts.tasks, "task(s)"],
       [counts.meetingNotes, "meeting note(s)"],
       [counts.quickNotes, "general note(s)"],
-      [counts.performanceInputs, "performance input(s)"]
+      [counts.performanceInputs, "performance input(s)"],
+      [counts.recurringSchedules, "recurring task schedule(s)"]
     ];
     const parts = linked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
     let message = `Permanently delete project "${p.name}"?`;
