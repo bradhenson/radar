@@ -589,13 +589,12 @@
         <thead>
           <tr>
             <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Pay period use</th>
-            <th class="row-action-cell" aria-label="Decision"></th>
           </tr>
         </thead>
         <tbody>
           {#each requestGroups as group (group.periodStart)}
             <tr class="group-row">
-              <td colspan="7">
+              <td colspan="6">
                 {group.label}
                 {#if group.isCurrent}<span class="current-tag">This pay period</span>{/if}
                 <span>({group.rows.length})</span>
@@ -620,7 +619,28 @@
                     }}>{app.employeeName(t.employeeId)}</button
                   >
                 </td>
-                <td><span class="badge status-{t.status}">{statusLabel(t.status)}</span></td>
+                <td class="status-cell">
+                  <span class="badge status-{t.status}">{statusLabel(t.status)}</span>
+                  <!-- Beside the status they change, so they stay in view when a narrow window scrolls the table. -->
+                  {#if isPendingRequest(t)}
+                    <div class="decision">
+                      <button
+                        type="button"
+                        aria-label={`Approve telework request for ${app.employeeName(t.employeeId)}`}
+                        onclick={(ev) => {
+                          ev.stopPropagation();
+                          void decide(t, "approved");
+                        }}>Approve</button>
+                      <button
+                        type="button"
+                        aria-label={`Deny telework request for ${app.employeeName(t.employeeId)}`}
+                        onclick={(ev) => {
+                          ev.stopPropagation();
+                          void decide(t, "denied");
+                        }}>Deny</button>
+                    </div>
+                  {/if}
+                </td>
                 <td class="date-cell">{formatDate(t.requestDate)}</td>
                 <td class="date-cell">{formatDate(t.effectiveDate)}</td>
                 <td class="date-cell">{formatDate(requestEndDate(t))}</td>
@@ -642,24 +662,6 @@
                     <span class="muted" title={`A ${statusLabel(t.status).toLowerCase()} request uses none of the pay period allowance`}>Not counted</span>
                   {:else}
                     <span class="muted">—</span>
-                  {/if}
-                </td>
-                <td class="row-action-cell">
-                  {#if isPendingRequest(t)}
-                    <button
-                      type="button"
-                      aria-label={`Approve telework request for ${app.employeeName(t.employeeId)}`}
-                      onclick={(ev) => {
-                        ev.stopPropagation();
-                        void decide(t, "approved");
-                      }}>Approve</button>
-                    <button
-                      type="button"
-                      aria-label={`Deny telework request for ${app.employeeName(t.employeeId)}`}
-                      onclick={(ev) => {
-                        ev.stopPropagation();
-                        void decide(t, "denied");
-                      }}>Deny</button>
                   {/if}
                 </td>
               </tr>
@@ -1168,6 +1170,18 @@
   .usage-cell .small {
     margin-left: .35rem;
     font-size: .72rem;
+  }
+  /* Same compact size as the shared row-action buttons, stacked under the badge. */
+  .status-cell { white-space: nowrap; }
+  .decision {
+    display: flex;
+    gap: .3rem;
+    margin-top: .35rem;
+  }
+  .decision button {
+    font-size: .78rem;
+    padding: .1rem .55rem;
+    min-height: 1.7rem;
   }
   @media (max-width: 900px) {
     .form-grid {
