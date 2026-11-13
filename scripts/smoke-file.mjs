@@ -50,7 +50,7 @@ try {
   await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
 
   const navCount = await page.locator("nav a").count();
-  if (navCount !== 16) throw new Error(`Expected 16 navigation destinations, found ${navCount}.`);
+  if (navCount !== 17) throw new Error(`Expected 17 navigation destinations, found ${navCount}.`);
 
   const title = `File smoke task ${Date.now()}`;
   await page.getByRole("button", { name: /new task/i }).click();

@@ -1,5 +1,6 @@
 // Core entity model. See PRODUCT_PLAN.txt section 27.
 // Calendar dates are ISO date strings (YYYY-MM-DD); timestamps are UTC ISO strings.
+import { normalizeSavedBoardViews } from "./rules/savedViews";
 import type { RichTextValue } from "../utils/richTextDoc";
 
 export type Id = string;
@@ -146,6 +147,39 @@ export interface Task {
   createdAt: IsoTimestamp;
   updatedAt: IsoTimestamp;
   isArchived: boolean;
+}
+
+export type RecurrenceUnit = "days" | "weeks" | "months";
+
+/**
+ * A task that comes back on a schedule (plan section 23). It is a template,
+ * not a card: the app creates an ordinary task from it shortly before each
+ * due date (see domain/rules/recurrence.ts), stamped with this record's id in
+ * `Task.recurrenceTemplateId`.
+ */
+export interface RecurringTask {
+  id: Id;
+  title: string;
+  /** Plain text copied into each generated task's description. */
+  description?: string;
+  priority: TaskPriority;
+  employeeId?: Id;
+  projectId?: Id;
+  tags: string[];
+  /** The schedule: every `interval` units, counted from `firstDueDate`. */
+  unit: RecurrenceUnit;
+  interval: number;
+  firstDueDate: IsoDate;
+  /** Daily schedules only: no Saturday or Sunday occurrences. */
+  weekdaysOnly?: boolean;
+  /** How many days before its due date a card is created. */
+  advanceCreateDays: number;
+  /** Paused schedules create nothing until resumed. */
+  active: boolean;
+  /** Due date of the latest occurrence already handled; later ones are still to come. */
+  lastGeneratedDueDate?: IsoDate;
+  createdAt: IsoTimestamp;
+  updatedAt: IsoTimestamp;
 }
 
 export type NoteType = "general" | "status" | "decision" | "completion" | "verification";
@@ -436,6 +470,19 @@ export interface AttentionSnooze {
   snoozeReason?: string;
 }
 
+/** A named set of Tasks-page filters (see domain/rules/savedViews.ts). */
+export interface SavedBoardView {
+  id: Id;
+  name: string;
+  search: string;
+  /** Employee, competency, and project ids; "" means no filter. */
+  employee: string;
+  competency: string;
+  project: string;
+  priority: string;
+  summary: "" | "due_soon" | "overdue" | "waiting" | "priority";
+}
+
 export interface AppSettings {
   schemaVersion: number;
   applicationName: string;
@@ -448,6 +495,14 @@ export interface AppSettings {
   completedVisibleDays: number;
   backupReminderDays: number;
   backupChangeThreshold: number;
+  /**
+   * Desktop app only: save a JSON backup to the backup folder automatically.
+   * The folder itself is a per-machine preference kept by the desktop shell,
+   * not a setting, so it never travels inside a backup.
+   */
+  autoBackupEnabled: boolean;
+  /** How many daily automatic backup files to keep. */
+  autoBackupKeepDays: number;
   /** Activity entries older than this are pruned at startup; 0 keeps forever. */
   activityRetentionDays: number;
   trainingWarningDays: number;
@@ -466,6 +521,8 @@ export interface AppSettings {
   enableSingleKeyShortcuts: boolean;
   employeeProfileSections: EmployeeProfileSection[];
   employeeProfileFields: EmployeeProfileField[];
+  /** Saved filter combinations for the Tasks page. */
+  savedBoardViews: SavedBoardView[];
 }
 
 export type EmployeeProfileFieldType = "text" | "multiline" | "date" | "boolean" | "email" | "phone" | "url" | "choice" | "multi_choice";
@@ -541,6 +598,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
   completedVisibleDays: 7,
   backupReminderDays: 1,
   backupChangeThreshold: 10,
+  autoBackupEnabled: true,
+  autoBackupKeepDays: 14,
   activityRetentionDays: 365,
   trainingWarningDays: 30,
   leaveLookaheadDays: 14,
@@ -555,6 +614,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   colorTheme: "default",
   look: "glass",
   enableSingleKeyShortcuts: true,
+  savedBoardViews: [],
   employeeProfileSections: [
     { id: "identity", label: "Identity", sortOrder: 0, isArchived: false },
     { id: "contact", label: "Location and contact", sortOrder: 1, isArchived: false },
@@ -754,7 +814,8 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
   const out: AppSettings = {
     ...DEFAULT_SETTINGS,
     employeeProfileSections: defaultProfileSections(),
-    employeeProfileFields: defaultProfileFields()
+    employeeProfileFields: defaultProfileFields(),
+    savedBoardViews: []
   };
   if (typeof raw !== "object" || raw === null) return out;
 
@@ -773,6 +834,7 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
   if (out.teleworkDaysPerPayPeriod < 1) out.teleworkDaysPerPayPeriod = DEFAULT_SETTINGS.teleworkDaysPerPayPeriod;
   out.employeeProfileSections = normalizeProfileSections(src.employeeProfileSections);
   out.employeeProfileFields = normalizeProfileFields(src.employeeProfileFields, out.employeeProfileSections);
+  out.savedBoardViews = normalizeSavedBoardViews(src.savedBoardViews);
 
   if (LEGACY_DEFAULT_APPLICATION_NAMES.has(out.applicationName)) {
     out.applicationName = DEFAULT_SETTINGS.applicationName;

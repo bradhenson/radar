@@ -257,7 +257,7 @@
               <td class="title-cell"><strong>{note.title}</strong></td>
               <td>{#if note.projectId}{app.projectName(note.projectId)}{:else}<span class="muted">—</span>{/if}</td>
               <td class="attendees-cell">{#if note.attendeeEmployeeIds.length}{employeeNames(note.attendeeEmployeeIds)}{:else}<span class="muted">—</span>{/if}</td>
-              <td>{#if note.actionItems}<span class="badge action-mark"><Icon name="check" size={12} /> Yes</span>{:else}<span class="muted">—</span>{/if}</td>
+              <td>{#if note.actionItems}<span class="muted action-mark"><Icon name="check" size={12} /> Yes</span>{:else}<span class="muted">—</span>{/if}</td>
               <td class="actions-cell">
                 <div class="row-actions">
                   <button
@@ -358,7 +358,7 @@
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  .action-mark { background: var(--accent-soft); color: var(--accent); }
+  .action-mark { display: inline-flex; align-items: center; gap: .25rem; }
   .detail-attendees { display: grid; gap: .2rem; }
   .detail-label { color: var(--text-muted); font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; }
   .meeting-sections {

@@ -1,6 +1,7 @@
 <script lang="ts">
   // Settings, backup/restore, data maintenance (plan 12.13, 26, 31).
   import { app } from "../stores/app.svelte";
+  import PerformanceSetup from "../components/settings/PerformanceSetup.svelte";
   import Dialog from "../components/common/Dialog.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
   import Icon from "../components/common/Icon.svelte";
@@ -393,6 +394,7 @@
       <button type="button" class="link" onclick={() => jumpTo("settings-appearance")}>Appearance</button>
       <button type="button" class="link" onclick={() => jumpTo("employee-profile-fields")}>Profile fields</button>
       <button type="button" class="link" onclick={() => jumpTo("settings-competencies")}>Competencies</button>
+      <button type="button" class="link" onclick={() => jumpTo("settings-performance")}>Performance</button>
       <button type="button" class="link" onclick={() => jumpTo("settings-board")}>Board columns</button>
       <button type="button" class="link" onclick={() => jumpTo("settings-health")}>Database health</button>
       <button type="button" class="link" onclick={() => jumpTo("settings-maintenance")}>Maintenance</button>
@@ -437,6 +439,68 @@
         <strong>Browser persistence:</strong> {persistenceLabel}. {storageEstimate}. Persistent storage can reduce normal
         browser eviction, but enterprise cleanup or profile policy can still remove site data.
       </p>
+    {/if}
+    {#if app.autoBackupInfo}
+      <!-- Desktop app only: the browser build has no folder it may write to. -->
+      <div class="auto-backup" id="settings-auto-backup">
+        <h3>Automatic backups</h3>
+        <label class="inline-toggle">
+          <input
+            type="checkbox"
+            checked={app.settings.autoBackupEnabled}
+            onchange={(e) => void updateSetting("autoBackupEnabled", (e.currentTarget as HTMLInputElement).checked)}
+          />
+          Save a backup automatically
+        </label>
+        <p class="small muted">
+          RADAR saves a backup when it opens and about every half hour while records are changing. There is one file
+          per day, in the same format as Export backup, so Import backup restores it.
+        </p>
+        <label class="keep-days">
+          Keep
+          <input
+            type="number"
+            min="1"
+            max="365"
+            value={app.settings.autoBackupKeepDays}
+            onchange={(e) => {
+              const v = parseInt((e.currentTarget as HTMLInputElement).value, 10);
+              if (Number.isFinite(v) && v >= 1 && v <= 365) void updateSetting("autoBackupKeepDays", v);
+            }}
+          />
+          days of backups
+        </label>
+        <p class="small">
+          <strong>Folder:</strong> {app.autoBackupInfo.folder}
+          {#if app.autoBackupInfo.isDefault}<span class="muted">(default, beside the database)</span>{/if}
+        </p>
+        <p class="small">
+          <strong>Newest:</strong>
+          {#if app.autoBackupInfo.latestName}
+            {app.autoBackupInfo.latestName}, saved {formatTimestamp(app.autoBackupInfo.latestModified)}
+            · {app.autoBackupInfo.count} file{app.autoBackupInfo.count === 1 ? "" : "s"} in the folder
+          {:else}
+            none yet
+          {/if}
+        </p>
+        {#if app.autoBackupError}
+          <p class="field-error" role="alert">The last automatic backup failed: {app.autoBackupError}</p>
+        {/if}
+        {#if app.autoBackupInfo.isDefault}
+          <p class="small muted">
+            The default folder is on the same drive as the database. It protects against a damaged database or a
+            mistake, not against losing the computer. Choose a network or synced folder to cover that too.
+          </p>
+        {/if}
+        <div style="display:flex; gap:.5rem; flex-wrap:wrap">
+          <button type="button" onclick={() => void app.runAutoBackup("manual")} disabled={!app.hasOperatorData}>Back up now</button>
+          <button type="button" onclick={() => void app.chooseAutoBackupFolder()}>Change folder...</button>
+          {#if !app.autoBackupInfo.isDefault}
+            <button type="button" onclick={() => void app.resetAutoBackupFolder()}>Use default folder</button>
+          {/if}
+          <button type="button" onclick={() => void app.openAutoBackupFolder()}>Open Backup Folder</button>
+        </div>
+      </div>
     {/if}
     <div style="display:flex; gap:.5rem; flex-wrap:wrap">
       <button type="button" class="primary" onclick={() => void exportBackup()}>Export backup (JSON)</button>
@@ -753,6 +817,8 @@
     {/if}
   </section>
 
+  <PerformanceSetup />
+
   <section class="card settings-section" id="settings-board">
     <h2>Board columns</h2>
     <p class="small muted">
@@ -957,6 +1023,29 @@
 {/if}
 
 <style>
+  .auto-backup {
+    margin: .9rem 0;
+    padding: .8rem .9rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .auto-backup h3 {
+    margin: 0 0 .5rem;
+    font-size: .95rem;
+  }
+  .auto-backup p {
+    margin: .45rem 0;
+    overflow-wrap: anywhere;
+  }
+  .auto-backup .keep-days {
+    display: flex;
+    align-items: center;
+    gap: .45rem;
+    margin: .5rem 0;
+  }
+  .auto-backup .keep-days input {
+    width: 5rem;
+  }
   .settings-jump {
     display: flex;
     flex-wrap: wrap;

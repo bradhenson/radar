@@ -15,6 +15,7 @@
     allowanceDots,
     allowanceState,
     countsTowardTeleworkLimit,
+    isPendingRequest,
     isSituationalRequest,
     isWithinTeleworkWindow,
     payPeriodFor,
@@ -65,6 +66,9 @@
   let fEndDate = $state("");
   let fNotes = $state("");
   let fError = $state("");
+  // New requests only: one entry for several people (a closure day, say).
+  let fMulti = $state(false);
+  let fEmployees = $state<string[]>([]);
   // Agreement form (telework agreements, renewals, modifications).
   let agreementFormOpen = $state(false);
   let editingAgreement = $state<TeleworkRecord | undefined>(undefined);
@@ -120,7 +124,7 @@
   // Snapshots of the values each form opened with, for the unsaved-changes guards.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fStatus, fRequestDate, fStartDate, fEndDate, fNotes]);
+    return JSON.stringify([fEmployee, fStatus, fRequestDate, fStartDate, fEndDate, fNotes, fMulti, fEmployees]);
   }
   let openedAgreementSnapshot = $state("");
   function agreementSnapshot(): string {
@@ -139,9 +143,48 @@
     fEndDate = t?.expirationDate ?? defaults.expirationDate ?? "";
     fNotes = t?.notes ?? "";
     fError = "";
+    fMulti = false;
+    fEmployees = [];
     openedSnapshot = formSnapshot();
     formOpen = true;
   }
+
+  function toggleFormEmployee(id: string) {
+    fEmployees = fEmployees.includes(id) ? fEmployees.filter((x) => x !== id) : [...fEmployees, id];
+    fError = "";
+  }
+
+  // What this request would do to the person's pay period count, shown while
+  // it is being entered rather than only in the list afterwards.
+  let draftUsage = $derived.by(() => {
+    if (!formOpen || fMulti || !fEmployee || !isValidIsoDate(fStartDate)) return undefined;
+    const end = fEndDate && isValidIsoDate(fEndDate) && fEndDate >= fStartDate ? fEndDate : fStartDate;
+    const draft: TeleworkRecord = {
+      id: editing?.id ?? "draft",
+      employeeId: fEmployee,
+      recordType: SITUATIONAL_TYPE,
+      status: fStatus,
+      effectiveDate: fStartDate,
+      expirationDate: end,
+      createdAt: "",
+      updatedAt: ""
+    };
+    if (!countsTowardTeleworkLimit(draft)) {
+      return { counted: false as const, text: `A ${statusLabel(fStatus).toLowerCase()} request does not count toward the pay period allowance.` };
+    }
+    const periodStart = requestPayPeriodStart(draft, app.settings.payPeriodAnchorDate);
+    if (!periodStart) return undefined;
+    const others = app.teleworkRecords.filter((r) => r.id !== editing?.id);
+    const usage = teleworkUsageByPayPeriod([...others, draft], app.settings.payPeriodAnchorDate).get(usageKey(fEmployee, periodStart));
+    if (!usage) return undefined;
+    const period = payPeriodLabel(payPeriodFor(periodStart, app.settings.payPeriodAnchorDate));
+    const state = allowanceState(usage.totalDays, teleworkLimit);
+    return {
+      counted: true as const,
+      state,
+      text: `With this request, ${app.employeeName(fEmployee)} has ${usage.totalDays} of ${teleworkLimit} telework day${teleworkLimit === 1 ? "" : "s"} in the pay period ${period}${state === "over" ? `, ${usage.totalDays - teleworkLimit} over the allowance` : ""}.`
+    };
+  });
 
   function openFormForDate(date: string) {
     openForm(undefined, {
@@ -165,8 +208,9 @@
   }
 
   async function save() {
-    if (!fEmployee) {
-      fError = "Employee is required.";
+    const several = !editing && fMulti;
+    if (several ? fEmployees.length === 0 : !fEmployee) {
+      fError = several ? "Choose at least one employee." : "Employee is required.";
       return;
     }
     if (!fStartDate) {
@@ -182,6 +226,41 @@
     const endDate = fEndDate || fStartDate;
     if (endDate < fStartDate) {
       fError = "Telework end date must be on or after the start date.";
+      return;
+    }
+    if (several) {
+      // One request per person, each with its own activity entry; Undo removes them all.
+      const created: TeleworkRecord[] = [];
+      for (const employeeId of fEmployees) {
+        const one = mergeTeleworkEdit(
+          undefined,
+          {
+            employeeId,
+            recordType: SITUATIONAL_TYPE,
+            status: fStatus,
+            requestDate: fRequestDate,
+            effectiveDate: fStartDate,
+            expirationDate: endDate,
+            notes: fNotes
+          },
+          { id: newId(), now: nowTimestamp() }
+        );
+        await app.putRecord("teleworkRecords", one, {
+          actionType: "created",
+          summary: `Added situational telework request for ${app.employeeName(employeeId)}`
+        });
+        created.push(one);
+      }
+      formOpen = false;
+      app.toast(`Added telework requests for ${created.length} people`, "success", async () => {
+        for (const one of created) {
+          await app.deleteRecord(
+            "teleworkRecords",
+            one.id,
+            `Removed situational telework request for ${app.employeeName(one.employeeId)} (undo of a group entry)`
+          );
+        }
+      });
       return;
     }
     // Merge over the existing record so unexposed fields (schedule summary,
@@ -204,6 +283,27 @@
       summary: `${editing ? "Updated" : "Added"} situational telework request for ${app.employeeName(fEmployee)}`
     });
     formOpen = false;
+  }
+
+  // Approve or deny straight from the list. An ordinary status edit: it writes
+  // an activity entry and offers Undo, which restores the request as it was.
+  async function decide(t: TeleworkRecord, status: "approved" | "denied") {
+    const before = { ...t };
+    const who = app.employeeName(t.employeeId);
+    const dates = `${t.effectiveDate ?? "no start"} to ${requestEndDate(t) ?? "no end"}`;
+    const verb = status === "approved" ? "Approved" : "Denied";
+    await app.putRecord(
+      "teleworkRecords",
+      { ...t, status, updatedAt: nowTimestamp() },
+      { actionType: "updated", summary: `${verb} situational telework request for ${who} (${dates})` }
+    );
+    app.toast(`${verb} telework request for ${who}`, "success", () => {
+      void app.putRecord(
+        "teleworkRecords",
+        { ...before, updatedAt: nowTimestamp() },
+        { actionType: "updated", summary: `Reverted telework decision for ${who} (${dates})` }
+      );
+    });
   }
 
   function openAgreementForm(t?: TeleworkRecord) {
@@ -489,12 +589,13 @@
         <thead>
           <tr>
             <th>Employee</th><th>Status</th><th>Request received</th><th>Telework start</th><th>Telework end</th><th>Pay period use</th>
+            <th class="row-action-cell" aria-label="Decision"></th>
           </tr>
         </thead>
         <tbody>
           {#each requestGroups as group (group.periodStart)}
             <tr class="group-row">
-              <td colspan="6">
+              <td colspan="7">
                 {group.label}
                 {#if group.isCurrent}<span class="current-tag">This pay period</span>{/if}
                 <span>({group.rows.length})</span>
@@ -541,6 +642,24 @@
                     <span class="muted" title={`A ${statusLabel(t.status).toLowerCase()} request uses none of the pay period allowance`}>Not counted</span>
                   {:else}
                     <span class="muted">—</span>
+                  {/if}
+                </td>
+                <td class="row-action-cell">
+                  {#if isPendingRequest(t)}
+                    <button
+                      type="button"
+                      aria-label={`Approve telework request for ${app.employeeName(t.employeeId)}`}
+                      onclick={(ev) => {
+                        ev.stopPropagation();
+                        void decide(t, "approved");
+                      }}>Approve</button>
+                    <button
+                      type="button"
+                      aria-label={`Deny telework request for ${app.employeeName(t.employeeId)}`}
+                      onclick={(ev) => {
+                        ev.stopPropagation();
+                        void decide(t, "denied");
+                      }}>Deny</button>
                   {/if}
                 </td>
               </tr>
@@ -672,11 +791,35 @@
         void save();
       }}
     >
-      <label for="tw-emp">Employee <span class="req">*</span></label>
-      <select id="tw-emp" bind:value={fEmployee} style="width:100%">
-        <option value="">(select)</option>
-        {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
-      </select>
+      {#if !fMulti}
+        <label for="tw-emp">Employee <span class="req">*</span></label>
+        <select id="tw-emp" bind:value={fEmployee} style="width:100%">
+          <option value="">(select)</option>
+          {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+        </select>
+      {/if}
+      {#if !editing}
+        <label class="inline-toggle several-toggle">
+          <input type="checkbox" bind:checked={fMulti} /> Add for several people
+        </label>
+      {/if}
+      {#if fMulti}
+        <fieldset class="several">
+          <legend>Employees <span class="req">*</span> <span class="muted small">({fEmployees.length} chosen)</span></legend>
+          <div class="several-tools">
+            <button type="button" class="link small" onclick={() => (fEmployees = app.activeEmployees.map((e) => e.id))}>Select all</button>
+            <button type="button" class="link small" onclick={() => (fEmployees = [])}>Clear</button>
+          </div>
+          <div class="several-list">
+            {#each app.activeEmployees as e (e.id)}
+              <label class="inline-toggle">
+                <input type="checkbox" checked={fEmployees.includes(e.id)} onchange={() => toggleFormEmployee(e.id)} />
+                {e.displayName}
+              </label>
+            {/each}
+          </div>
+        </fieldset>
+      {/if}
       {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div class="form-grid">
         <div>
@@ -698,6 +841,12 @@
           <input id="tw-end" type="date" bind:value={fEndDate} style="width:100%" />
         </div>
       </div>
+      {#if draftUsage}
+        <p class="draft-usage small" class:over={draftUsage.counted && draftUsage.state === "over"} aria-live="polite">
+          {#if draftUsage.counted && draftUsage.state === "over"}<span class="badge overdue">Over allowance</span>{/if}
+          {draftUsage.text}
+        </p>
+      {/if}
       <label for="tw-notes">Notes</label>
       <textarea id="tw-notes" bind:value={fNotes} maxlength="2000" rows="3" style="width:100%"></textarea>
       <div class="dialog-actions">
@@ -1034,5 +1183,38 @@
       min-height: 5.5rem;
       padding-inline: .3rem;
     }
+  }
+  .several-toggle {
+    margin-top: .5rem;
+  }
+  .several {
+    margin: .5rem 0 0;
+    padding: .5rem .7rem .6rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .several legend {
+    padding: 0 .3rem;
+    font-weight: 600;
+    font-size: .85rem;
+  }
+  .several-tools {
+    display: flex;
+    gap: .8rem;
+    margin-bottom: .35rem;
+  }
+  .several-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+    gap: .15rem .8rem;
+    max-height: 11rem;
+    overflow-y: auto;
+  }
+  .draft-usage {
+    margin: .7rem 0 0;
+    color: var(--text-muted);
+  }
+  .draft-usage.over {
+    color: var(--text);
   }
 </style>

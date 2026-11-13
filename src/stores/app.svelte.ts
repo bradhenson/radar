@@ -22,6 +22,8 @@ import type {
   PerformanceInput,
   Project,
   QuickNote,
+  RecurringTask,
+  SavedBoardView,
   Task,
   TaskNote,
   TeleworkRecord,
@@ -34,7 +36,20 @@ import { COLLECTION_NAMES, deleteOp, putOp } from "../data/DataStore";
 import { IndexedDbDataStore, StorageBlockedError, StorageLockedError, type ConnectionLossReason } from "../data/IndexedDbDataStore";
 import { InMemoryDataStore } from "../data/InMemoryDataStore";
 import { WailsDataStore } from "../data/WailsDataStore";
-import { onDesktopDatabaseChanged, wailsAppBindings, wailsStoreBindings } from "../data/wailsBridge";
+import {
+  onDesktopDatabaseChanged,
+  wailsAppBindings,
+  wailsAutoBackupBindings,
+  wailsStoreBindings,
+  type AutoBackupInfo
+} from "../data/wailsBridge";
+import {
+  AUTO_BACKUP_INTERVAL_MINUTES,
+  autoBackupDue,
+  autoBackupFilename,
+  changesAfterBackup,
+  clampAutoBackupKeepDays
+} from "../domain/rules/autoBackup";
 import { createBackupPackage, snapshotFromBackup, type BackupPackage } from "../data/backup";
 import { createSampleSnapshot } from "../data/seed";
 import {
@@ -49,6 +64,10 @@ import {
 import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
+import { planRecurringTasks, recurrenceInstanceKey } from "../domain/rules/recurrence";
+import { applyBulkTaskChange, bulkChangeAction, bulkChangePhrase, type BulkTaskChange } from "../domain/rules/bulkTasks";
+import { priorityLabel } from "../domain/models";
+import { richTextFromPlainText } from "../utils/richTextDoc";
 import { statusChangeForLaneMove } from "../domain/rules/laneStatus";
 import { computeAttention, snoozeKey, type AttentionItem } from "../domain/rules/attention";
 import { expiredActivityEntryIds } from "../domain/rules/activityRetention";
@@ -92,6 +111,7 @@ export class AppStore {
   boardColumns = $state<BoardColumnDefinition[]>([]);
   taskNotes = $state<TaskNote[]>([]);
   checklistItems = $state<ChecklistItem[]>([]);
+  recurringTasks = $state<RecurringTask[]>([]);
   performanceElements = $state<PerformanceElement[]>([]);
   evaluationCycles = $state<EvaluationCycle[]>([]);
   performanceInputs = $state<PerformanceInput[]>([]);
@@ -117,6 +137,10 @@ export class AppStore {
     persistAvailable: false,
     estimateAvailable: false
   });
+  /** Where automatic backups go and what is there; undefined outside the desktop app. */
+  autoBackupInfo = $state<AutoBackupInfo | undefined>(undefined);
+  /** Why the most recent automatic backup failed, cleared by the next success. */
+  autoBackupError = $state<string | undefined>(undefined);
   /** Database file details when running in the desktop (Wails) shell. */
   desktopInfo = $state<{ path: string; sizeBytes: number } | undefined>(undefined);
   /**
@@ -170,6 +194,7 @@ export class AppStore {
     this.tasks.length > 0 ||
     this.taskNotes.length > 0 ||
     this.checklistItems.length > 0 ||
+    this.recurringTasks.length > 0 ||
     this.performanceElements.length > 0 ||
     this.evaluationCycles.length > 0 ||
     this.performanceInputs.length > 0 ||
@@ -345,9 +370,13 @@ export class AppStore {
       await this.loadAll();
       this.detectRichTextMigration();
       await this.pruneActivityEntries();
+      await this.generateRecurringTasks();
       await this.refreshStoragePersistence();
       await this.refreshDesktopInfo();
+      await this.refreshAutoBackupInfo();
       this.initialized = true;
+      // After the app is usable: building a backup must never delay startup.
+      void this.runAutoBackup("startup");
     } catch (e) {
       this.initError = e instanceof Error ? e.message : String(e);
     }
@@ -379,8 +408,15 @@ export class AppStore {
     if (this.clockStarted) return;
     this.clockStarted = true;
     setInterval(() => {
-      this.today = todayIso();
+      const next = todayIso();
+      if (next === this.today) return;
+      this.today = next;
+      // A new day can bring recurring tasks into their create-ahead window.
+      if (this.initialized && !this.storageFault) void this.generateRecurringTasks();
     }, 60_000);
+    setInterval(() => {
+      if (this.initialized && !this.storageFault) void this.runAutoBackup("interval");
+    }, AUTO_BACKUP_INTERVAL_MINUTES * 60_000);
   }
 
   /** Boot from an already-initialized store (unit tests, alternate hosts). */
@@ -456,6 +492,130 @@ export class AppStore {
     }
   }
 
+  // --- automatic backups (desktop app only) --------------------------------
+  private autoBackupRunning = false;
+
+  private async refreshAutoBackupInfo(): Promise<void> {
+    const bindings = wailsAutoBackupBindings();
+    if (!bindings) {
+      this.autoBackupInfo = undefined;
+      return;
+    }
+    try {
+      this.autoBackupInfo = JSON.parse(await bindings.GetAutoBackupInfo()) as AutoBackupInfo;
+    } catch {
+      this.autoBackupInfo = undefined;
+    }
+  }
+
+  /**
+   * Save an automatic backup if one is due (rules in domain/rules/autoBackup.ts).
+   * It is the same package a manual export writes, so Import backup restores
+   * it. A success counts as a backup: it resets the change counter and the
+   * reminder. Never throws; a failure is kept in `autoBackupError` and shown
+   * once as a toast rather than every half hour. Returns whether a file was
+   * written.
+   */
+  async runAutoBackup(trigger: "startup" | "interval" | "manual"): Promise<boolean> {
+    const bindings = wailsAutoBackupBindings();
+    if (!bindings || this.autoBackupRunning) return false;
+    const due =
+      trigger === "manual"
+        ? this.hasOperatorData
+        : autoBackupDue(
+            {
+              enabled: this.settings.autoBackupEnabled,
+              hasData: this.hasOperatorData,
+              changesSinceBackup: this.meta.changesSinceBackup,
+              existingFiles: this.autoBackupInfo?.count
+            },
+            trigger
+          );
+    if (!due) return false;
+    this.autoBackupRunning = true;
+    try {
+      const changesWhenBuilt = this.meta.changesSinceBackup;
+      const pkg = await this.buildBackup();
+      const info = JSON.parse(
+        await bindings.WriteAutoBackup(
+          autoBackupFilename(this.meta.databaseId, this.today),
+          JSON.stringify(pkg),
+          clampAutoBackupKeepDays(this.settings.autoBackupKeepDays)
+        )
+      ) as AutoBackupInfo;
+
+      const nextMeta: StoreMeta = {
+        ...($state.snapshot(this.meta) as StoreMeta),
+        lastBackupAt: pkg.exportedAt,
+        changesSinceBackup: changesAfterBackup(this.meta.changesSinceBackup, changesWhenBuilt)
+      };
+      const ops: MutationOp[] = [{ kind: "saveMeta", meta: nextMeta }];
+      // One activity line per day's file, not one per half-hourly refresh of it.
+      const entry = info.created
+        ? this.buildActivityEntry(
+            "system",
+            "backup",
+            "exported",
+            `Saved automatic backup ${info.latestName} with ${Object.values(pkg.integrity.recordCounts).reduce((a, b) => a + b, 0)} records`
+          )
+        : undefined;
+      if (entry) ops.push(putOp("activityEntries", entry));
+      await this.store.mutate(ops);
+      if (entry) this.activityEntries.push(entry);
+      this.meta = nextMeta;
+      this.autoBackupInfo = info;
+      this.autoBackupError = undefined;
+      if (trigger === "manual") this.toast(`Automatic backup saved: ${info.latestName}`, "success");
+      return true;
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (this.autoBackupError !== message || trigger === "manual") {
+        this.toast(`Automatic backup failed: ${message}`, "error");
+      }
+      this.autoBackupError = message;
+      return false;
+    } finally {
+      this.autoBackupRunning = false;
+    }
+  }
+
+  async chooseAutoBackupFolder(): Promise<void> {
+    const bindings = wailsAutoBackupBindings();
+    if (!bindings) return;
+    try {
+      const raw = await bindings.ChooseAutoBackupFolder();
+      if (raw === "") return;
+      this.autoBackupInfo = JSON.parse(raw) as AutoBackupInfo;
+      this.toast("Automatic backup folder changed", "success");
+      // A newly chosen folder gets a backup straight away so it is never empty.
+      await this.runAutoBackup("manual");
+    } catch (e) {
+      this.toast(`Could not change the backup folder: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async resetAutoBackupFolder(): Promise<void> {
+    const bindings = wailsAutoBackupBindings();
+    if (!bindings) return;
+    try {
+      this.autoBackupInfo = JSON.parse(await bindings.ResetAutoBackupFolder()) as AutoBackupInfo;
+      this.toast("Automatic backups return to the default folder", "success");
+      await this.runAutoBackup("manual");
+    } catch (e) {
+      this.toast(`Could not reset the backup folder: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
+  async openAutoBackupFolder(): Promise<void> {
+    const bindings = wailsAutoBackupBindings();
+    if (!bindings) return;
+    try {
+      await bindings.OpenAutoBackupFolder();
+    } catch (e) {
+      this.toast(`Could not open the backup folder: ${e instanceof Error ? e.message : String(e)}`, "error");
+    }
+  }
+
   async requestPersistentStorage(): Promise<void> {
     const storage = typeof navigator !== "undefined" ? navigator.storage : undefined;
     if (!storage || typeof storage.persist !== "function") {
@@ -527,6 +687,7 @@ export class AppStore {
     this.boardColumns = snapshot.collections.boardColumns;
     this.taskNotes = snapshot.collections.taskNotes;
     this.checklistItems = snapshot.collections.checklistItems;
+    this.recurringTasks = snapshot.collections.recurringTasks;
     this.performanceElements = snapshot.collections.performanceElements;
     this.evaluationCycles = snapshot.collections.evaluationCycles;
     this.performanceInputs = snapshot.collections.performanceInputs;
@@ -1056,6 +1217,105 @@ export class AppStore {
     }
   }
 
+  // --- recurring tasks (plan section 23) ------------------------------------
+  private generatingRecurring = false;
+
+  /**
+   * Create the cards recurring tasks are due to produce (rules in
+   * domain/rules/recurrence.ts). Runs at startup, when the date rolls over,
+   * and after a recurring task is saved. Each recurring task commits in one
+   * atomic batch: its new cards, their activity entries, the backup counter,
+   * and the high-water mark that stops the same occurrence being made twice.
+   * Returns how many cards were created; never throws, so a failure here
+   * cannot stop the app from opening.
+   */
+  async generateRecurringTasks(): Promise<number> {
+    if (this.generatingRecurring) return 0;
+    this.generatingRecurring = true;
+    let created = 0;
+    try {
+      const existingKeys = new Set(
+        this.tasks.map((t) => t.recurrenceInstanceKey).filter((key): key is string => Boolean(key))
+      );
+      const boardColumnId = this.defaultBoardColumnId();
+      for (const item of planRecurringTasks(this.recurringTasks, existingKeys, this.today)) {
+        const source = item.recurringTask;
+        // A person or project deleted since the schedule was written is dropped, not carried as a dangling id.
+        const employeeId = this.employees.some((e) => e.id === source.employeeId && e.activeStatus === "active")
+          ? source.employeeId
+          : undefined;
+        const projectId = this.projects.some((p) => p.id === source.projectId && !p.isArchived)
+          ? source.projectId
+          : undefined;
+        const columnOrders = this.tasks
+          .filter((t) => this.taskBoardColumnId(t) === boardColumnId && !t.isArchived)
+          .map((t) => t.boardOrder);
+        const newTasks: Task[] = [];
+        for (const dueDate of item.dueDates) {
+          const task = this.createTask({
+            title: source.title,
+            description: source.description?.trim() ? richTextFromPlainText(source.description) : undefined,
+            priority: source.priority,
+            employeeId,
+            projectId,
+            tags: [...source.tags],
+            dueDate,
+            boardColumnId,
+            recurrenceTemplateId: source.id,
+            recurrenceInstanceKey: recurrenceInstanceKey(source.id, dueDate)
+          });
+          task.boardOrder = orderForAppend([...columnOrders, ...newTasks.map((t) => t.boardOrder)]);
+          newTasks.push(task);
+        }
+        const updatedSource: RecurringTask = {
+          ...this.plainRecord(source),
+          lastGeneratedDueDate: item.generatedThrough
+        };
+        const entries = newTasks.map((task) =>
+          this.buildActivityEntry(
+            "tasks",
+            task.id,
+            "created",
+            `Created recurring task "${task.title}" due ${formatDate(task.dueDate)}`
+          )
+        );
+        const nextMeta = newTasks.length > 0 ? this.bumpedMeta("created") : undefined;
+        const ops: MutationOp[] = [
+          ...newTasks.map((task) => putOp("tasks", this.plainRecord(task))),
+          putOp("recurringTasks", updatedSource),
+          ...entries.map((entry) => putOp("activityEntries", entry))
+        ];
+        if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+        this.saveStatus = "saving";
+        await this.store.mutate(ops);
+
+        this.tasks.push(...newTasks);
+        const idx = this.recurringTasks.findIndex((r) => r.id === source.id);
+        if (idx >= 0) this.recurringTasks[idx] = updatedSource;
+        this.activityEntries.push(...entries);
+        if (nextMeta) this.meta = nextMeta;
+        this.saveStatus = "saved";
+        created += newTasks.length;
+      }
+      if (created > 0) this.toast(`Added ${created} recurring task${created === 1 ? "" : "s"} to the board`, "info");
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Recurring tasks could not be created: ${e instanceof Error ? e.message : String(e)}`, "error");
+    } finally {
+      this.generatingRecurring = false;
+    }
+    return created;
+  }
+
+  /** Save a recurring task, then create any card its schedule already calls for. */
+  async saveRecurringTask(record: RecurringTask, isNew: boolean): Promise<void> {
+    await this.putRecord("recurringTasks", record, {
+      actionType: isNew ? "created" : "updated",
+      summary: `${isNew ? "Added" : "Updated"} recurring task "${record.title}"`
+    });
+    await this.generateRecurringTasks();
+  }
+
   // --- task service -----------------------------------------------------------
   createTask(partial: Partial<Task> & { title: string }): Task {
     const now = nowTimestamp();
@@ -1086,6 +1346,99 @@ export class AppStore {
   async updateTask(task: Task, summary = `Updated task "${task.title}"`, actionType = "updated"): Promise<void> {
     const updated = { ...task, updatedAt: nowTimestamp() };
     await this.putRecord("tasks", updated, { actionType, summary });
+  }
+
+  /**
+   * Apply one change to many tasks (rules in domain/rules/bulkTasks.ts). Every
+   * changed task, its activity entry, and the backup counter commit in one
+   * atomic batch, so a bulk change either happens to all of them or to none.
+   * Tasks the change does not affect are left alone. Returns how many changed
+   * and offers an Undo that restores every one of them as it was.
+   */
+  async bulkUpdateTasks(taskIds: string[], change: BulkTaskChange): Promise<number> {
+    const wanted = new Set(taskIds);
+    const targets = this.tasks.filter((t) => wanted.has(t.id) && !t.isArchived);
+    if (targets.length === 0) return 0;
+    const now = nowTimestamp();
+    const ordersByColumn = new Map<string, number[]>();
+    for (const task of this.tasks) {
+      if (task.isArchived) continue;
+      const columnId = this.taskBoardColumnId(task);
+      ordersByColumn.set(columnId, [...(ordersByColumn.get(columnId) ?? []), task.boardOrder]);
+    }
+    const phrase = bulkChangePhrase(change, {
+      column: (id) => this.boardColumnLabel(id),
+      employee: (id) => this.employeeName(id),
+      priority: (p) => priorityLabel(p),
+      date: (d) => formatDate(d)
+    });
+
+    const changes: { before: Task; after: Task }[] = [];
+    // Board order first, so several cards moved into a lane keep their relative order.
+    for (const task of [...targets].sort((a, b) => a.boardOrder - b.boardOrder)) {
+      const after = applyBulkTaskChange(this.plainRecord(task), change, {
+        today: this.today,
+        now,
+        columns: this.plainRecords(this.activeBoardColumns),
+        columnIdOf: (t) => this.taskBoardColumnId(t),
+        orderForAppend,
+        ordersByColumn
+      });
+      if (after) changes.push({ before: this.plainRecord(task), after });
+    }
+    if (changes.length === 0) return 0;
+
+    await this.putTaskBatch(
+      changes.map(({ before, after }) => ({
+        task: after,
+        actionType: bulkChangeAction(change, before, after),
+        summary: `"${after.title}" ${phrase}`
+      }))
+    );
+    const n = changes.length;
+    this.toast(`${n} task${n === 1 ? "" : "s"} ${phrase}`, "success", async () => {
+      const restoredAt = nowTimestamp();
+      await this.putTaskBatch(
+        changes.map(({ before }) => ({
+          task: { ...before, updatedAt: restoredAt },
+          actionType: change.kind === "done" ? "reopened" : "updated",
+          summary: `Reverted bulk change to "${before.title}"`
+        }))
+      );
+    });
+    return n;
+  }
+
+  /** Writes several tasks with their activity entries and one backup-counter bump, atomically. */
+  private async putTaskBatch(items: { task: Task; actionType: string; summary: string }[]): Promise<void> {
+    this.saveStatus = "saving";
+    try {
+      const entries = items.map((item) => this.buildActivityEntry("tasks", item.task.id, item.actionType, item.summary));
+      const nextMeta = this.bumpedMeta("updated");
+      const ops: MutationOp[] = [
+        ...items.map((item) => putOp("tasks", this.plainRecord(item.task))),
+        ...entries.map((entry) => putOp("activityEntries", entry))
+      ];
+      if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+      await this.store.mutate(ops);
+      for (const item of items) {
+        const idx = this.tasks.findIndex((t) => t.id === item.task.id);
+        if (idx >= 0) this.tasks[idx] = item.task;
+        else this.tasks.push(item.task);
+      }
+      this.activityEntries.push(...entries);
+      if (nextMeta) this.meta = nextMeta;
+      this.saveStatus = "saved";
+    } catch (e) {
+      this.saveStatus = "error";
+      this.toast(`Save failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      throw e;
+    }
+  }
+
+  /** Replace the Tasks page's saved views (they live in settings, so they travel with backups). */
+  async saveBoardViews(views: SavedBoardView[]): Promise<void> {
+    await this.saveSettings({ ...this.plainRecord(this.settings), savedBoardViews: views });
   }
 
   /** Move a card to a lane, following only active Open/Waiting mappings. */

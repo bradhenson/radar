@@ -341,7 +341,8 @@
               {#if r.trainingDueCount}
                 <span class="badge warning">{r.trainingDueCount} due</span>
               {:else}
-                <span class="badge success">Current</span>
+                <!-- Current is the normal state: plain text, so "due" badges stand out. -->
+                <span class="muted">Current</span>
               {/if}
             </td>
             <td>

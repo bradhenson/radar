@@ -9,7 +9,7 @@ class UiState {
   // Session-only presentation state. Returning from a full-page task editor
   // restores the working view without adding preferences to operator backups.
   boardView = {
-    view: "board" as "board" | "list",
+    view: "board" as "board" | "list" | "recurring",
     search: "", employee: "", competency: "", project: "", priority: "",
     summary: "" as BoardSummaryFilter,
     sortKey: "column" as TaskListSortKey,
@@ -17,6 +17,15 @@ class UiState {
     compact: false,
     scrollLeft: 0
   };
+  /** Session-only: the report and options last shown on the Reports page. */
+  reportView = {
+    kind: "availability" as "availability" | "telework" | "training" | "workload" | "writeup",
+    weeks: 4,
+    employeeId: "",
+    cycleId: ""
+  };
+  /** One-shot request from another page to open a specific report. */
+  reportRequest: { kind: "writeup"; employeeId: string; cycleId: string } | undefined = undefined;
   newTaskOpen = $state(false);
   newTaskDefaults = $state<Partial<Task>>({});
   /** Title-first quick capture dialog (global). */

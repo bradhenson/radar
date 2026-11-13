@@ -349,8 +349,14 @@
   }
   .actions { display: flex; gap: .3rem; flex-wrap: wrap; }
   .actions button { font-size: .78rem; padding: .15rem .5rem; }
-  @media (max-width: 760px) {
-    .attention-table .reason-col { width: 12rem; }
-    .attention-table .actions-col { width: 12rem; }
+  /* The three fixed columns add up to 37.5rem, which left the Item column no
+     room in a mid-width window (one word per line, running under Severity).
+     Tighten them as the window narrows, and below that let the table scroll
+     sideways inside its own region rather than crush the column. */
+  .attention-table { min-width: 38rem; }
+  @media (max-width: 1100px) {
+    .attention-table .reason-col { width: 11rem; }
+    .attention-table .severity-col { width: 5rem; }
+    .attention-table .actions-col { width: 8.5rem; }
   }
 </style>

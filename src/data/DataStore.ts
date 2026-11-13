@@ -23,6 +23,7 @@ import type {
   PerformanceInput,
   Project,
   QuickNote,
+  RecurringTask,
   Task,
   TaskNote,
   TeleworkRecord,
@@ -38,6 +39,7 @@ export interface CollectionTypes {
   boardColumns: BoardColumnDefinition;
   taskNotes: TaskNote;
   checklistItems: ChecklistItem;
+  recurringTasks: RecurringTask;
   performanceElements: PerformanceElement;
   evaluationCycles: EvaluationCycle;
   performanceInputs: PerformanceInput;
@@ -65,6 +67,7 @@ export const COLLECTION_NAMES: CollectionName[] = [
   "boardColumns",
   "taskNotes",
   "checklistItems",
+  "recurringTasks",
   "performanceElements",
   "evaluationCycles",
   "performanceInputs",

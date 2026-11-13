@@ -7,6 +7,7 @@
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
   import MonthStrip from "../components/cues/MonthStrip.svelte";
   import { monthlyCounts } from "../domain/rules/performance";
+  import { cycleContains, cycleLabel, sortedCycles } from "../domain/rules/evaluationCycles";
   import RichTextView from "../components/common/RichTextView.svelte";
   import type { PerformanceInput, RichTextField } from "../domain/models";
   import { daysBetween, formatDate } from "../utils/dates";
@@ -24,6 +25,11 @@
   let filterEmployee = $state("");
   let filterStatus = $state("");
   let filterMissing = $state("");
+  // "" is every date; otherwise an evaluation cycle id. An input belongs to
+  // the cycle its date falls in.
+  let filterCycle = $state("");
+  let cycles = $derived(sortedCycles(app.evaluationCycles));
+  let selectedCycle = $derived(cycles.find((c) => c.id === filterCycle));
   let sortMode = $state<SortMode>("newest");
   let expanded = $state<Record<string, boolean>>({});
 
@@ -50,6 +56,7 @@
         if (filterEmployee && p.employeeId !== filterEmployee) return false;
         if (filterStatus && p.inputStatus !== filterStatus) return false;
         if (filterMissing === "result" && p.result) return false;
+        if (selectedCycle && !cycleContains(selectedCycle, p.inputDate)) return false;
         if (!needle) return true;
         return (
           includes(app.employeeName(p.employeeId), needle) ||
@@ -88,7 +95,9 @@
       .filter((employee) => !filterEmployee || employee.id === filterEmployee)
       .filter((employee) => !needle || employee.displayName.toLowerCase().includes(needle))
       .map((employee) => {
-        const list = app.performanceInputs.filter((p) => p.employeeId === employee.id && !p.isArchived);
+        const list = app.performanceInputs.filter(
+          (p) => p.employeeId === employee.id && !p.isArchived && (!selectedCycle || cycleContains(selectedCycle, p.inputDate))
+        );
         const last = list.map((p) => p.inputDate).sort().at(-1);
         return {
           employee,
@@ -116,6 +125,7 @@
     filterEmployee = "";
     filterStatus = "";
     filterMissing = "";
+    filterCycle = "";
     expanded[id] = true;
     router.go("performance");
     requestAnimationFrame(() => {
@@ -147,6 +157,13 @@
     } catch {
       app.toast("Performance export failed", "error");
     }
+  }
+
+  // The write-up is a report: one person's inputs for the selected cycle,
+  // grouped by performance element, ready to print or export.
+  function openWriteUp(employeeId: string) {
+    ui.reportRequest = { kind: "writeup", employeeId, cycleId: filterCycle };
+    router.go("reports");
   }
 
   async function setStatus(id: string, inputStatus: string) {
@@ -248,6 +265,12 @@
       <option value="">All employees</option>
       {#each app.activeEmployees as employee (employee.id)}<option value={employee.id}>{employee.displayName}</option>{/each}
     </select>
+    {#if cycles.length > 0}
+      <select bind:value={filterCycle} aria-label="Filter by evaluation cycle">
+        <option value="">All dates</option>
+        {#each cycles as cycle (cycle.id)}<option value={cycle.id}>{cycleLabel(cycle)}</option>{/each}
+      </select>
+    {/if}
     {#if viewMode !== "coverage"}
       <select bind:value={filterStatus} aria-label="Filter by status">
         <option value="">All statuses</option>
@@ -295,6 +318,7 @@
                 <td>
                   {#if row.count > 0}
                     <button type="button" onclick={() => { filterEmployee = row.employee.id; viewMode = "employees"; }}>View inputs</button>
+                    <button type="button" aria-label={`Write-up for ${row.employee.displayName}`} onclick={() => openWriteUp(row.employee.id)}>Write-up</button>
                   {:else}
                     <button type="button" onclick={() => (ui.performanceFormPrefill = { employeeId: row.employee.id })}>Add input</button>
                   {/if}
@@ -323,7 +347,12 @@
         <tbody>
           {#if viewMode === "employees"}
             {#each byEmployee as group (group.employeeId)}
-              <tr class="group-row"><td colspan="5">{group.name} <span>({group.list.length})</span></td></tr>
+              <tr class="group-row">
+                <td colspan="5">
+                  {group.name} <span>({group.list.length})</span>
+                  <button type="button" class="link small writeup-link" aria-label={`Write-up for ${group.name}`} onclick={() => openWriteUp(group.employeeId)}>Write-up</button>
+                </td>
+              </tr>
               {#each group.list as input (input.id)}
                 {@render inputRow(input, false)}
               {/each}
@@ -340,6 +369,9 @@
 </div>
 
 <style>
+  .writeup-link {
+    margin-left: .6rem;
+  }
   .employee-cell { white-space: nowrap; }
   .summary-cell { min-width: 16rem; }
   .summary-cell .clamp2 {

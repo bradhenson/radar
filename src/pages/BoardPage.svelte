@@ -8,7 +8,23 @@
   import { ui } from "../stores/ui.svelte";
   import EmptyState from "../components/common/EmptyState.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
-  import { TASK_PRIORITIES, priorityLabel, statusLabel, type BoardColumnDefinition, type Task } from "../domain/models";
+  import RecurringTasks from "../components/board/RecurringTasks.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
+  import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
+  import type { BulkTaskChange } from "../domain/rules/bulkTasks";
+  import { filtersForView, matchingView, savedViewNameError, type BoardViewFilters } from "../domain/rules/savedViews";
+  import { isValidIsoDate } from "../utils/dates";
+  import { newId } from "../utils/ids";
+  import { recurrenceSummary } from "../domain/rules/recurrence";
+  import {
+    TASK_PRIORITIES,
+    priorityLabel,
+    statusLabel,
+    type BoardColumnDefinition,
+    type SavedBoardView,
+    type Task,
+    type TaskPriority
+  } from "../domain/models";
   import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
@@ -35,6 +51,16 @@
       project: filterProject, priority: filterPriority, summary: summaryFilter,
       sortKey, sortDirection, compact, scrollLeft: horizontalPosition };
   });
+
+  // The Recurring view owns its form; the header's primary button opens it.
+  let recurringView: ReturnType<typeof RecurringTasks> | undefined = $state();
+
+  /** "Weekly on Friday" for a card made by a recurring task; empty for ordinary cards. */
+  function recurringLabel(task: Task): string {
+    if (!task.recurrenceTemplateId) return "";
+    const source = app.recurringTasks.find((r) => r.id === task.recurrenceTemplateId);
+    return source ? `Recurring: ${recurrenceSummary(source)}` : "Recurring task";
+  }
 
   function openTask(id: string) {
     // A focused/clicked card can scroll into view before a scroll event is
@@ -412,19 +438,111 @@
   let anyFilter = $derived(
     Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter)
   );
+
+  // --- saved views -----------------------------------------------------------
+  // A view is a named copy of the filters above. Picking one applies it; the
+  // menu shows a view as selected only while the filters still match it.
+  let currentFilters = $derived<BoardViewFilters>({
+    search,
+    employee: filterEmployee,
+    competency: filterCompetency,
+    project: filterProject,
+    priority: filterPriority,
+    summary: summaryFilter
+  });
+  let savedViews = $derived(app.settings.savedBoardViews ?? []);
+  let activeView = $derived(matchingView(savedViews, currentFilters));
+  let saveViewOpen = $state(false);
+  let viewName = $state("");
+  let viewError = $state("");
+  let pendingViewDelete = $state<SavedBoardView | undefined>(undefined);
+
+  function applyView(id: string) {
+    const picked = savedViews.find((v) => v.id === id);
+    if (!picked) return;
+    const filters = filtersForView(picked, {
+      employees: new Set(app.activeEmployees.map((e) => e.id)),
+      competencies: new Set(app.competencyList.map((c) => c.id)),
+      projects: new Set(app.activeProjects.map((p) => p.id))
+    });
+    search = filters.search;
+    filterEmployee = filters.employee;
+    filterCompetency = filters.competency;
+    filterProject = filters.project;
+    filterPriority = filters.priority;
+    summaryFilter = filters.summary;
+  }
+
+  function openSaveView() {
+    viewName = "";
+    viewError = "";
+    saveViewOpen = true;
+  }
+
+  async function saveView() {
+    const error = savedViewNameError(viewName, savedViews, currentFilters);
+    if (error) {
+      viewError = error;
+      return;
+    }
+    await app.saveBoardViews([...savedViews, { id: newId(), name: viewName.trim(), ...currentFilters }]);
+    saveViewOpen = false;
+    app.toast(`Saved view "${viewName.trim()}"`, "success");
+  }
+
+  async function deleteView(target: SavedBoardView) {
+    await app.saveBoardViews(savedViews.filter((v) => v.id !== target.id));
+    pendingViewDelete = undefined;
+    app.toast(`Deleted view "${target.name}". Your tasks are unchanged.`, "success");
+  }
+
+  // --- bulk actions (list view) ---------------------------------------------
+  // Selection only ever holds tasks that are on screen: filtering a selected
+  // task out of view also drops it from the selection, so a bulk change can
+  // never touch a row the user cannot see.
+  let selectedIds = $state<string[]>([]);
+  let bulkDueDate = $state("");
+  let visibleIds = $derived(new Set(visibleTasks.map((t) => t.id)));
+  let selection = $derived(selectedIds.filter((id) => visibleIds.has(id)));
+  let allSelected = $derived(listRows.length > 0 && selection.length === listRows.length);
+
+  function toggleSelected(id: string) {
+    selectedIds = selection.includes(id) ? selection.filter((x) => x !== id) : [...selection, id];
+  }
+
+  function toggleSelectAll() {
+    selectedIds = allSelected ? [] : listRows.map((row) => row.task.id);
+  }
+
+  async function bulk(change: BulkTaskChange) {
+    if (selection.length === 0) return;
+    await app.bulkUpdateTasks(selection, change);
+    // Tasks marked done leave the list; anything else stays selected for a follow-up change.
+    if (change.kind === "done") selectedIds = [];
+  }
+
+  /** Runs the change picked from a "Move to… / Assign to… / Priority…" menu, then resets the menu. */
+  function bulkFromMenu(e: Event, toChange: (value: string) => BulkTaskChange) {
+    const menu = e.currentTarget as HTMLSelectElement;
+    const value = menu.value;
+    menu.value = "";
+    if (value) void bulk(toChange(value));
+  }
 </script>
 
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
-<div class="page board-page" class:list-mode={view === "list"}>
-  <WorkspaceHeader title={view === "board" ? "Kanban Board" : "Task List"} titleMinWidth="11rem" section="Work">
+<div class="page board-page" class:list-mode={view !== "board"}>
+  <WorkspaceHeader title={view === "board" ? "Kanban Board" : view === "list" ? "Task List" : "Recurring Tasks"} titleMinWidth="11rem" section="Work">
     {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Task view">
         <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
         <button type="button" class:active={view === "list"} aria-pressed={view === "list"} onclick={() => (view = "list")}>List</button>
+        <button type="button" class:active={view === "recurring"} aria-pressed={view === "recurring"} onclick={() => (view = "recurring")}>Recurring</button>
       </div>
     {/snippet}
     {#snippet filters()}
+    {#if view !== "recurring"}
     <div class="filter-pills board-stats" aria-label="Quick board filters">
       <button type="button" class:active={!summaryFilter} aria-pressed={!summaryFilter} onclick={() => (summaryFilter = "")}><strong>{boardStats.total}</strong> tasks</button>
       <button type="button" class:warn={boardStats.dueSoon > 0} class:active={summaryFilter === "due_soon"} aria-pressed={summaryFilter === "due_soon"} onclick={() => toggleSummaryFilter("due_soon")}><strong>{boardStats.dueSoon}</strong> due soon</button>
@@ -432,6 +550,7 @@
       <button type="button" class:active={summaryFilter === "waiting"} aria-pressed={summaryFilter === "waiting"} onclick={() => toggleSummaryFilter("waiting")}><strong>{boardStats.waiting}</strong> waiting</button>
       <button type="button" class:alert={boardStats.priority > 0} class:active={summaryFilter === "priority"} aria-pressed={summaryFilter === "priority"} onclick={() => toggleSummaryFilter("priority")}><strong>{boardStats.priority}</strong> high priority</button>
     </div>
+    {/if}
     {/snippet}
     {#snippet actions()}
       {#if view === "board"}
@@ -439,10 +558,17 @@
           {compact ? "✓ Compact cards" : "Compact cards"}
         </button>
       {/if}
-      <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
+      {#if view === "recurring"}
+        <button type="button" class="primary board-new-task" onclick={() => recurringView?.openForm()}>+ New Recurring Task</button>
+      {:else}
+        <button type="button" class="primary board-new-task" onclick={() => ui.openNewTask()}>+ New Task</button>
+      {/if}
     {/snippet}
   </WorkspaceHeader>
 
+  {#if view === "recurring"}
+    <RecurringTasks bind:this={recurringView} />
+  {:else}
   <div class="board-toolbar" aria-label="Board filters">
     <div class="search-field">
       <Icon name="search" size={15} />
@@ -467,6 +593,23 @@
     {#if anyFilter}
       <button type="button" class="clear-filters" onclick={clearFilters}>Clear filters</button>
     {/if}
+    <div class="saved-views">
+      {#if savedViews.length > 0}
+        <select
+          aria-label="Saved views"
+          value={activeView?.id ?? ""}
+          onchange={(e) => applyView(e.currentTarget.value)}
+        >
+          <option value="">{activeView ? "Saved views" : "Saved views…"}</option>
+          {#each savedViews as v (v.id)}<option value={v.id}>{v.name}</option>{/each}
+        </select>
+      {/if}
+      {#if activeView}
+        <button type="button" class="clear-filters" onclick={() => (pendingViewDelete = activeView)}>Delete view</button>
+      {:else if anyFilter}
+        <button type="button" class="clear-filters" onclick={openSaveView}>Save view</button>
+      {/if}
+    </div>
   </div>
 
   {#if visibleTasks.length === 0 && anyFilter}
@@ -478,10 +621,45 @@
     {#if listRows.length === 0}
       <EmptyState message="No tasks yet." hint="Use + New Task to add the first one." />
     {:else}
+      {#if selection.length > 0}
+        <div class="bulk-bar" role="group" aria-label="Bulk actions">
+          <strong>{selection.length} selected</strong>
+          <select aria-label="Move selected tasks to a column" onchange={(e) => bulkFromMenu(e, (columnId) => ({ kind: "column", columnId }))}>
+            <option value="">Move to…</option>
+            {#each app.activeBoardColumns as column (column.id)}<option value={column.id}>{column.label}</option>{/each}
+          </select>
+          <select
+            aria-label="Assign selected tasks"
+            onchange={(e) => bulkFromMenu(e, (value) => ({ kind: "assign", employeeId: value === "__none" ? undefined : value }))}
+          >
+            <option value="">Assign to…</option>
+            <option value="__none">(nobody)</option>
+            {#each app.activeEmployees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+          </select>
+          <select
+            aria-label="Set priority of selected tasks"
+            onchange={(e) => bulkFromMenu(e, (priority) => ({ kind: "priority", priority: priority as TaskPriority }))}
+          >
+            <option value="">Priority…</option>
+            {#each TASK_PRIORITIES as p (p.value)}<option value={p.value}>{p.label}</option>{/each}
+          </select>
+          <span class="bulk-due">
+            <input type="date" bind:value={bulkDueDate} aria-label="Due date for selected tasks" />
+            <button type="button" disabled={!isValidIsoDate(bulkDueDate)} onclick={() => void bulk({ kind: "due", dueDate: bulkDueDate })}>Set due date</button>
+            <button type="button" onclick={() => void bulk({ kind: "due", dueDate: undefined })}>Clear due date</button>
+          </span>
+          <button type="button" title="Mark the selected tasks done and move them to Archive" onclick={() => void bulk({ kind: "done" })}>Done</button>
+          <span class="spacer"></span>
+          <button type="button" class="link small" onclick={() => (selectedIds = [])}>Clear selection</button>
+        </div>
+      {/if}
       <div class="table-wrap">
       <table class="data task-list">
         <thead>
           <tr>
+            <th scope="col" class="select-col">
+              <input type="checkbox" aria-label="Select all tasks shown" checked={allSelected} onchange={toggleSelectAll} />
+            </th>
             {#each LIST_COLUMNS as column (column.key)}
               <th scope="col" aria-sort={ariaSort(column.key)}>
                 <button type="button" class="sort-header" class:sorted={sortKey === column.key} onclick={() => sortBy(column.key)}>
@@ -497,7 +675,15 @@
           {#each listRows as row (row.task.id)}
             {@const task = row.task}
             {@const ds = dueState(task, app.today, app.settings.dueSoonDays)}
-            <tr>
+            <tr class:row-selected={selection.includes(task.id)}>
+              <td class="select-col">
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${task.title}`}
+                  checked={selection.includes(task.id)}
+                  onchange={() => toggleSelected(task.id)}
+                />
+              </td>
               <td>
                 <button type="button" class="link cell-link" onclick={() => openTask(task.id)}>{task.title}</button>
                 {#if checklistProgress(task.id)}
@@ -700,19 +886,30 @@
                     {/if}
                   {/if}
                 {/if}
-                <div class="card-footer">
-                  {#if task.employeeId}
-                    <span class="assignee">
-                      <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
-                      <span>{app.employeeName(task.employeeId)}</span>
-                    </span>
-                  {:else}
-                    <span class="muted small">Unassigned</span>
-                  {/if}
-                  {#if task.showOnCard === "checklist" && checklistProgress(task.id)}
-                    <span class="badge checklist-badge" style="margin-left:auto">{checklistProgress(task.id)}</span>
-                  {/if}
-                </div>
+                <!-- An unassigned card says nothing about its assignee: the
+                     absence of a name is the signal, and "Unassigned" on most
+                     cards was noise. The footer appears only when it has content. -->
+                {#if task.employeeId || task.recurrenceTemplateId || (task.showOnCard === "checklist" && checklistProgress(task.id))}
+                  <div class="card-footer">
+                    {#if task.employeeId}
+                      <span class="assignee">
+                        <span class="avatar" aria-hidden="true">{employeeInitials(task.employeeId)}</span>
+                        <span>{app.employeeName(task.employeeId)}</span>
+                      </span>
+                    {/if}
+                    {#if task.recurrenceTemplateId}
+                      <!-- A mark, not a control: where the schedule lives is the Recurring view. -->
+                      <span class="recurring-mark" title={recurringLabel(task)}>
+                        <Icon name="review" size={12} />
+                        <span>Repeats</span>
+                        <span class="sr-only">. {recurringLabel(task)}</span>
+                      </span>
+                    {/if}
+                    {#if task.showOnCard === "checklist" && checklistProgress(task.id)}
+                      <span class="badge checklist-badge" style="margin-left:auto">{checklistProgress(task.id)}</span>
+                    {/if}
+                  </div>
+                {/if}
                 <div class="card-actions">
                   <button
                     type="button"
@@ -734,9 +931,80 @@
       {/each}
     </div>
   {/if}
+  {/if}
 </div>
 
+{#if saveViewOpen}
+  <Dialog title="Save View" onclose={() => (saveViewOpen = false)}>
+    <form
+      onsubmit={(e) => {
+        e.preventDefault();
+        void saveView();
+      }}
+    >
+      <p class="small muted">Saves the search and filters as they are now, so you can come back to them from the Saved views menu.</p>
+      <label for="view-name">Name <span class="req">*</span></label>
+      <input id="view-name" type="text" bind:value={viewName} maxlength="60" style="width:100%" />
+      {#if viewError}<div class="field-error" role="alert">{viewError}</div>{/if}
+      <div class="view-dialog-actions">
+        <button type="button" onclick={() => (saveViewOpen = false)}>Cancel</button>
+        <button type="submit" class="primary">Save view</button>
+      </div>
+    </form>
+  </Dialog>
+{/if}
+
+{#if pendingViewDelete}
+  <ConfirmDialog
+    title="Delete saved view"
+    message={`Delete the saved view "${pendingViewDelete.name}"? Only the saved filters are removed; no tasks change.`}
+    confirmLabel="Delete view"
+    danger
+    onconfirm={() => void deleteView(pendingViewDelete!)}
+    oncancel={() => (pendingViewDelete = undefined)}
+  />
+{/if}
+
 <style>
+  .saved-views {
+    display: flex;
+    align-items: center;
+    gap: .4rem;
+    margin-left: auto;
+  }
+  .view-dialog-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: .5rem;
+    margin-top: 1rem;
+  }
+  .bulk-bar {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .5rem;
+    margin-bottom: .6rem;
+    padding: .55rem .8rem;
+    border: 1px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--accent-soft);
+  }
+  .bulk-bar .spacer {
+    flex: 1;
+  }
+  .bulk-due {
+    display: inline-flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: .35rem;
+  }
+  .task-list .select-col {
+    width: 2.2rem;
+    text-align: center;
+  }
+  .task-list tr.row-selected td {
+    background: color-mix(in srgb, var(--accent-soft) 55%, transparent);
+  }
   /* The board fills the space under the top bar exactly: header and toolbar
      take their natural height and the column row absorbs the rest, so columns
      always end at the window edge and cards scroll inside their lane. This
@@ -1068,6 +1336,15 @@
   }
   .checklist-badge::before {
     content: "☑ ";
+  }
+  .recurring-mark {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: .25rem;
+    color: var(--text-muted);
+    font-size: .72rem;
+    font-weight: 600;
   }
   .card-footer {
     display: flex;

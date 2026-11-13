@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { AwardRecord } from "../../src/domain/models";
-import { awardTypeOptions, filterAwards } from "../../src/domain/rules/awards";
+import { AWARD_STATUSES } from "../../src/domain/models";
+import { AWARD_PIPELINE, awardTypeOptions, filterAwards, nextAwardStatus } from "../../src/domain/rules/awards";
 import { richTextFromPlainText } from "../../src/utils/richTextDoc";
 
 const NAMES: Record<string, string> = { e1: "Avery Brooks", e2: "Riley Chen" };
@@ -82,5 +83,24 @@ describe("awardTypeOptions", () => {
 
   it("returns nothing when no record carries a type", () => {
     expect(awardTypeOptions([award({ awardType: undefined })])).toEqual([]);
+  });
+});
+
+describe("nextAwardStatus", () => {
+  it("moves one working stage at a time up to Submitted", () => {
+    expect(nextAwardStatus("Idea")).toBe("Gathering input");
+    expect(nextAwardStatus("Gathering input")).toBe("Drafting");
+    expect(nextAwardStatus("Drafting")).toBe("Ready for review");
+    expect(nextAwardStatus("Ready for review")).toBe("Submitted");
+  });
+
+  it("offers nothing once submitted, decided, closed, or unrecognized", () => {
+    for (const status of ["Submitted", "Approved", "Not selected", "Complete", "Cancelled", "Something else", ""]) {
+      expect(nextAwardStatus(status)).toBeUndefined();
+    }
+  });
+
+  it("only names stages the status list offers", () => {
+    for (const stage of AWARD_PIPELINE) expect(AWARD_STATUSES).toContain(stage);
   });
 });

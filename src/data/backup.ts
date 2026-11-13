@@ -17,7 +17,7 @@ export const BACKUP_FORMAT = "SupervisorAssistantBackup";
 // v4: quick-note workbench records were added.
 // v5: rich text is a versioned document rather than RADAR's own notation.
 // Older backups are migrated on import.
-export const BACKUP_FORMAT_VERSION = 6;
+export const BACKUP_FORMAT_VERSION = 7;
 export const APPLICATION_VERSION = "0.1.0";
 
 /** Hard ceiling on accepted backup file size (characters of JSON text). */
@@ -112,6 +112,7 @@ const REQUIRED_STRING_FIELDS: Partial<Record<CollectionName, string[]>> = {
   boardColumns: ["id", "label"],
   taskNotes: ["id", "taskId"],
   checklistItems: ["id", "taskId", "title"],
+  recurringTasks: ["id", "title", "priority", "unit", "firstDueDate"],
   performanceElements: ["id", "name"],
   evaluationCycles: ["id", "name", "startDate", "endDate"],
   performanceInputs: ["id", "employeeId", "inputDate"],
@@ -159,6 +160,7 @@ const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = 
   employees: ["tags"],
   projects: ["tags"],
   tasks: ["tags"],
+  recurringTasks: ["tags"],
   performanceInputs: ["tags"],
   awardRecords: ["relatedPerformanceInputIds"],
   meetingNotes: ["attendeeEmployeeIds"]
@@ -166,6 +168,7 @@ const REQUIRED_STRING_ARRAY_FIELDS: Partial<Record<CollectionName, string[]>> = 
 
 const DATE_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["startDate", "dueDate", "reminderDate", "completedDate", "lastVerifiedDate"],
+  recurringTasks: ["firstDueDate", "lastGeneratedDueDate"],
   employees: ["startDate", "lastCheckInDate", "teleworkAgreementValidThrough", "passportExpiration"],
   projects: ["startDate", "targetEndDate", "lastVerifiedDate"],
   evaluationCycles: ["startDate", "endDate", "midyearDate"],
@@ -189,6 +192,7 @@ const TIMESTAMP_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["createdAt", "updatedAt"],
   boardColumns: ["createdAt", "updatedAt"],
   taskNotes: ["createdAt", "updatedAt"],
+  recurringTasks: ["createdAt", "updatedAt"],
   performanceInputs: ["createdAt", "updatedAt"],
   trainingRequirements: ["createdAt", "updatedAt"],
   employeeTrainingRecords: ["createdAt", "updatedAt"],
@@ -222,6 +226,10 @@ const ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readonly string
   tasks: {
     status: ["open", "waiting", "complete", "cancelled", "inbox", "planned", "in_progress", "needs_review"],
     priority: ["low", "normal", "high", "critical"]
+  },
+  recurringTasks: {
+    priority: ["low", "normal", "high", "critical"],
+    unit: ["days", "weeks", "months"]
   },
   quickNotes: {
     purpose: ["scratch", "decision", "reference", "idea", "follow_up", "observation"]
@@ -277,6 +285,7 @@ const OPTIONAL_ENUM_FIELDS: Partial<Record<CollectionName, Record<string, readon
 // Required finite-number fields.
 const NUMBER_FIELDS: Partial<Record<CollectionName, string[]>> = {
   tasks: ["boardOrder"],
+  recurringTasks: ["interval", "advanceCreateDays"],
   boardColumns: ["sortOrder"],
   checklistItems: ["order"]
 };
@@ -292,6 +301,7 @@ const BOOLEAN_FIELDS: Partial<Record<CollectionName, string[]>> = {
   employees: ["isArchived"],
   projects: ["isArchived"],
   tasks: ["performanceInputCreated", "isArchived"],
+  recurringTasks: ["active"],
   checklistItems: ["isComplete"],
   performanceElements: ["active"],
   evaluationCycles: ["active"],
@@ -388,6 +398,13 @@ function migrateV5toV6(data: Record<string, unknown>, warnings: string[]): void 
   warnings.push(`${describeMigrationReport(report)} (format v5 migration).`);
 }
 
+function migrateV6toV7(data: Record<string, unknown>, warnings: string[]): void {
+  if (data.recurringTasks === undefined) {
+    data.recurringTasks = [];
+    warnings.push('Collection "recurringTasks" missing; treated as empty (format v6 migration).');
+  }
+}
+
 /** Upgrade the parsed package in place to the current format version. */
 function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
   let version = pkg.formatVersion as number;
@@ -414,6 +431,11 @@ function migrateBackup(pkg: Record<string, unknown>, warnings: string[]): void {
     migrateV5toV6(pkg.data as Record<string, unknown>, warnings);
     version = 6;
     warnings.push("Backup migrated from format version 5 to 6.");
+  }
+  if (version === 6) {
+    migrateV6toV7(pkg.data as Record<string, unknown>, warnings);
+    version = 7;
+    warnings.push("Backup migrated from format version 6 to 7.");
   }
   pkg.formatVersion = version;
 }
@@ -723,6 +745,7 @@ const SETTING_NUMBER_FIELDS: (keyof AppSettings)[] = [
   "completedVisibleDays",
   "backupReminderDays",
   "backupChangeThreshold",
+  "autoBackupKeepDays",
   "trainingWarningDays",
   "leaveLookaheadDays",
   "teleworkLookbackDays",
@@ -767,6 +790,15 @@ function validateSettings(raw: unknown, errors: string[]): void {
   }
   if (settings.look !== undefined && !["standard", "glass", "glass_strong"].includes(String(settings.look))) {
     errors.push("settings.look is not recognized.");
+  }
+  if (settings.savedBoardViews !== undefined) {
+    const views = settings.savedBoardViews;
+    if (!Array.isArray(views) || views.length > 200 || views.some((v) => typeof v !== "object" || v === null || Array.isArray(v))) {
+      errors.push("settings.savedBoardViews must be a list of at most 200 saved views.");
+    }
+  }
+  if (settings.autoBackupEnabled !== undefined && typeof settings.autoBackupEnabled !== "boolean") {
+    errors.push("settings.autoBackupEnabled must be true or false.");
   }
   if (settings.enableSingleKeyShortcuts !== undefined && typeof settings.enableSingleKeyShortcuts !== "boolean") {
     errors.push("settings.enableSingleKeyShortcuts must be true or false.");
