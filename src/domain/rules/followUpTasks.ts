@@ -2,9 +2,10 @@
 // prefill for the new-task editor, so the user confirms and adjusts the card
 // before it exists; nothing is created automatically.
 
-import type { AwardRecord, IsoDate, Task, TrainingRequirement, TravelRecord } from "../models";
+import type { AwardRecord, IsoDate, RichTextField, Task, TrainingRequirement, TravelRecord } from "../models";
 import { compareDates, formatDate } from "../../utils/dates";
 import { isTripCancelled, isVoucherSettled, travelPhase } from "./travel";
+import { richTextDocToPlainText } from "../../utils/richTextDoc";
 
 export type TaskPrefill = Pick<Task, "title"> & Partial<Pick<Task, "dueDate" | "employeeId" | "projectId" | "tags">>;
 
@@ -59,4 +60,24 @@ export function trainingFollowUpTask(requirement: TrainingRequirement, overdueCo
     dueDate: due,
     tags: ["training"]
   };
+}
+
+// ---------------------------------------------------------------------------
+// Meeting action items → one task each.
+
+export const ACTION_ITEM_TITLE_MAX = 200;
+
+const ITEM_PREFIX = /^\s*(?:[•*\-–]\s+|\d+[.)]\s+|\[[ xX]?\]\s+)+/;
+
+/**
+ * The separate action items in a meeting note, one per list item or line, with
+ * bullets, numbering, and checkbox marks removed. Blank lines are skipped and
+ * an over-long item is cut to a task title's length.
+ */
+export function splitActionItems(value: RichTextField | undefined): string[] {
+  return richTextDocToPlainText(value)
+    .split("\n")
+    .map((line) => line.replace(ITEM_PREFIX, "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .map((line) => (line.length > ACTION_ITEM_TITLE_MAX ? `${line.slice(0, ACTION_ITEM_TITLE_MAX - 1).trimEnd()}…` : line));
 }

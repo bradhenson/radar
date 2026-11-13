@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+### Leave groups, award stages, nominations from inputs, meeting action items, project progress, and trip purpose
+
+- **Leave list grouped.** Leave is grouped the way Travel is: Awaiting approval, Out now, Upcoming, then Past and Cancelled when past leave is shown. Status moved next to the name, with Approve under a requested status, so it stays in view in a narrow window. The Leave calendar shows how many people are out on each day ("2 out"), counting each person once.
+- **Award stage tracker.** Each award has a tracker like Travel's: Idea, Input, Draft, Review, Submit. The next stage can be clicked, or reached with Tab and Enter, to move the award forward, with Undo, replacing the Move to button. The current stage turns red once the nomination is past due, and submitted or decided awards show every stage done.
+- **Performance inputs in a nomination.** The award dialog lists the nominee's performance inputs (within the accomplishment period when the award has one, with a switch to show the rest). Ticking inputs links them to the award. "Add selected to citation draft" adds one line per input, with its result, to the end of a new Citation draft field. Text already in the draft is never replaced.
+- **Meeting action items become tasks.** When a meeting's action items hold more than one item, "Create tasks from N action items" opens a preview with one row per item: the title (editable), an owner (attendees listed first, or no owner), an optional due date, and a box to leave it out. Create makes all of them at once, linked to the meeting's project, and one Undo removes them all. A single action item keeps the existing Create follow-up task button. Two sample meetings now have several action items.
+- **Project progress.** Each project row shows a progress bar with "7 of 12 done" and the next due date beside the Open and Overdue counts. Completed tasks still count after Done archives them; cancelled tasks do not.
+- **Trip purpose and project.** A trip can record its purpose and the project it supports, both optional. They show in the expanded trip and are searchable. Deleting a project keeps its trips and unlinks them, and the confirmation says how many. Backups carry both fields and check that a trip's project exists.
+
 ### Employee Overview, for 1:1 prep
 
 - **Employee pages open on Overview.** A new first tab shows what is current for the person: open tasks (overdue first, up to five, each opening the task), time away in the leave lookahead window (leave, situational telework, and travel, marked Now or Pending), training that needs action, nominations still being worked, and the last performance input, marked "Due for one" once it is older than the performance input reminder.

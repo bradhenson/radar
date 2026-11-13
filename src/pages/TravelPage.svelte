@@ -64,6 +64,8 @@
   let fVoucherStatus = $state<TravelVoucherStatus>("not_submitted");
   let fVoucherSubmitted = $state("");
   let fNotes = $state("");
+  let fPurpose = $state("");
+  let fProject = $state("");
   let fError = $state("");
   // When true the user has typed their own voucher date, so we stop
   // auto-filling it from the return date.
@@ -144,7 +146,7 @@
   function formSnapshot(): string {
     return JSON.stringify([
       fEmployee, fDestination, fStart, fEnd, fIpt, fDtsStatus, fDtsId,
-      voucherManual ? fVoucher : "", fVoucherStatus, fVoucherSubmitted, fNotes
+      voucherManual ? fVoucher : "", fVoucherStatus, fVoucherSubmitted, fNotes, fPurpose, fProject
     ]);
   }
 
@@ -161,6 +163,8 @@
     fVoucherStatus = t ? voucherStatusOf(t) : "not_submitted";
     fVoucherSubmitted = t?.voucherSubmittedDate ?? "";
     fNotes = t?.notes ?? "";
+    fPurpose = t?.purpose ?? "";
+    fProject = t?.projectId ?? "";
     voucherManual = Boolean(t?.voucherDueDate);
     fError = "";
     openedSnapshot = formSnapshot();
@@ -221,7 +225,9 @@
         voucherDueDate: fVoucher || travelVoucherDueDate(fEnd),
         voucherStatus: fVoucherStatus,
         voucherSubmittedDate: fVoucherSubmitted,
-        notes: fNotes
+        notes: fNotes,
+        purpose: fPurpose,
+        projectId: fProject
       },
       { id: newId(), now: nowTimestamp() }
     );
@@ -235,7 +241,7 @@
   // The employee filter sets the working set; the quick-filter pills narrow it
   // without changing their own counts underneath the user (as on the board).
   let scopedTrips = $derived(app.travelRecords.filter((t) => !filterEmployee || t.employeeId === filterEmployee)
-      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.destination} ${t.startDate} ${t.endDate}`.toLowerCase().includes(searchTerm)));
+      .filter((t) => !searchTerm || `${app.employeeName(t.employeeId)} ${t.destination} ${t.purpose ?? ""} ${app.projectName(t.projectId)} ${app.projects.find((p) => p.id === t.projectId)?.name ?? ""} ${t.startDate} ${t.endDate}`.toLowerCase().includes(searchTerm)));
 
   /** Trips the list would show with no quick filter selected. */
   let inScopeCount = $derived(scopedTrips.filter((t) => showPast || !isPast(t)).length);
@@ -583,6 +589,8 @@
                   <td colspan="6">
                     <div class="detail" aria-label={`Travel details for ${app.employeeName(t.employeeId)}`}>
                       <dl class="detail-grid">
+                        {#if t.purpose}<div><dt>Purpose</dt><dd>{t.purpose}</dd></div>{/if}
+                        {#if t.projectId && app.projects.some((p) => p.id === t.projectId)}<div><dt>Project</dt><dd>{app.projects.find((p) => p.id === t.projectId)!.name}</dd></div>{/if}
                         <div><dt>Trip status</dt><dd>{tripStatusDetail(t)}</dd></div>
                         <div><dt>IPT concurrence</dt><dd>{iptLabel(t.iptConcurrence)}</dd></div>
                         <div><dt>DTS authorization</dt><dd>{dtsLabel(t.dtsAuthorizationStatus)}</dd></div>
@@ -708,6 +716,22 @@
       </select>
       <label for="tv-dest">Destination <span class="req">*</span></label>
       <input id="tv-dest" type="text" bind:value={fDestination} maxlength="200" placeholder="City, ST" style="width:100%" />
+      <div class="form-grid">
+        <div>
+          <label for="tv-purpose">Purpose</label>
+          <input id="tv-purpose" type="text" bind:value={fPurpose} maxlength="200" placeholder="Program review, test event support" style="width:100%" />
+        </div>
+        <div>
+          <label for="tv-project">Project</label>
+          <select id="tv-project" bind:value={fProject} style="width:100%">
+            <option value="">(none)</option>
+            {#each app.activeProjects as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
+            {#if fProject && !app.activeProjects.some((p) => p.id === fProject)}
+              <option value={fProject}>{app.projectName(fProject) || "(deleted project)"}</option>
+            {/if}
+          </select>
+        </div>
+      </div>
       {#if fError}<div class="field-error" role="alert">{fError}</div>{/if}
       <div class="form-grid">
         <div>

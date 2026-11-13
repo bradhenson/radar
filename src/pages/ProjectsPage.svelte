@@ -11,6 +11,7 @@
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import RichTextView from "../components/common/RichTextView.svelte";
   import { compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
+  import { projectProgress } from "../domain/rules/projectProgress";
   import { newId } from "../utils/ids";
   import { mergeProjectEdit } from "../domain/rules/editMerge";
   import { emptyRichText, isRichTextEmpty, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
@@ -93,11 +94,8 @@
     app.projects
       .filter((p) => !p.isArchived && (showClosed || ["proposed", "active", "on_hold"].includes(p.status)))
       .map((p) => {
-        const open = app.tasks.filter(
-          (t) => t.projectId === p.id && !t.isArchived && t.status !== "complete" && t.status !== "cancelled"
-        );
-        const overdue = open.filter((t) => t.dueDate && compareDates(t.dueDate, app.today) < 0);
-        return { p, openCount: open.length, overdueCount: overdue.length };
+        const progress = projectProgress(app.tasks, p.id, app.today);
+        return { p, progress, openCount: progress.open, overdueCount: progress.overdue };
       })
       .sort((a, b) => a.p.name.localeCompare(b.p.name))
   );
@@ -141,7 +139,8 @@
       [counts.meetingNotes, "meeting note(s)"],
       [counts.quickNotes, "general note(s)"],
       [counts.performanceInputs, "performance input(s)"],
-      [counts.recurringSchedules, "recurring task schedule(s)"]
+      [counts.recurringSchedules, "recurring task schedule(s)"],
+      [counts.travelRecords, "trip(s)"]
     ];
     const parts = linked.filter(([n]) => n > 0).map(([n, label]) => `${n} ${label}`);
     let message = `Permanently delete project "${p.name}"?`;
@@ -182,7 +181,7 @@
     <div class="table-scroll" role="region" aria-label="Projects" tabindex="0">
     <table class="data">
       <thead>
-        <tr><th>Project</th><th>Status</th><th>Start</th><th>Target end</th><th>Lead</th><th>Open</th><th>Overdue</th><th></th></tr>
+        <tr><th>Project</th><th>Status</th><th>Start</th><th>Target end</th><th>Lead</th><th>Progress</th><th>Next due</th><th>Open</th><th>Overdue</th><th></th></tr>
       </thead>
       <tbody>
         {#each rows as r (r.p.id)}
@@ -217,6 +216,15 @@
             <td class="date-cell">{formatDate(r.p.startDate)}</td>
             <td class="date-cell">{formatDate(r.p.targetEndDate)}</td>
             <td>{app.employeeName(r.p.leadEmployeeId)}</td>
+            <td class="progress-cell">
+              {#if r.progress.total > 0}
+                <progress max={r.progress.total} value={r.progress.done} aria-label={`${r.p.name}: ${r.progress.done} of ${r.progress.total} tasks done`}></progress>
+                <span class="small">{r.progress.done} of {r.progress.total} done</span>
+              {:else}
+                <span class="muted small">No tasks</span>
+              {/if}
+            </td>
+            <td class="date-cell">{formatDate(r.progress.nextDue)}</td>
             <td>{r.openCount}</td>
             <td>{#if r.overdueCount}<span class="badge overdue">{r.overdueCount}</span>{:else}0{/if}</td>
             <td style="white-space:nowrap">
@@ -243,7 +251,7 @@
           </tr>
           {#if expandedId === r.p.id}
             <tr class="detail-row">
-              <td colspan="8">
+              <td colspan="10">
                 {#if !isRichTextEmpty(r.p.description)}<RichTextView value={r.p.description} compact />{/if}
                 {#if projectTasks(r.p.id).length === 0}
                   <p class="muted">No tasks in this project.</p>
@@ -270,6 +278,14 @@
 </div>
 
 <style>
+  .progress-cell { white-space: nowrap; }
+  .progress-cell progress {
+    width: 4.5rem;
+    height: .45rem;
+    margin-right: .4rem;
+    vertical-align: middle;
+    accent-color: var(--accent);
+  }
   .row-actions {
     display: flex;
     align-items: center;

@@ -449,7 +449,9 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       projectId: project?.id,
       attendeeEmployeeIds: indexes.map((i) => employees[i]!.id),
       notes: "Reviewed current status, upcoming constraints, and decisions needed before the next checkpoint.",
-      actionItems: "Capture follow-up actions in RADAR and confirm owner/date before the next meeting.",
+      actionItems: project
+        ? `- Send the updated ${project.shortName ?? project.name} schedule to the team\n- Confirm test lab availability\n- Draft the risk summary for the next checkpoint`
+        : "Capture follow-up actions in RADAR and confirm owner/date before the next meeting.",
       isArchived: false,
       ...stamp
     };
@@ -670,6 +672,8 @@ export function createSampleSnapshot(): DatabaseSnapshot {
       tripStatus: "scheduled",
       voucherStatus: "not_submitted",
       notes: i % 4 === 0 ? "Conference travel; coordinate coverage during the trip." : undefined,
+      purpose: i % 4 === 0 ? "Conference" : i % 4 === 1 ? "Customer site visit" : undefined,
+      projectId: i % 4 === 1 ? projects.harbor.id : undefined,
       ...stamp
     });
   }
@@ -691,6 +695,8 @@ export function createSampleSnapshot(): DatabaseSnapshot {
     voucherStatus: "submitted",
     voucherSubmittedDate: addDays(settledEnd, 3),
     notes: "Test event support; voucher closed out.",
+    purpose: "Test event support",
+    projectId: projects.lighthouse.id,
     ...stamp
   });
   c.travelRecords.push({

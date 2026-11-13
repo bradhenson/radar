@@ -1,21 +1,22 @@
-<script lang="ts">
-  // Trip progress: IPT → DTS → Trip → Voucher. Every state has its own mark
+<script lang="ts" generics="S extends { key: string; label: string; state: string; detail: string; action?: string }">
+  // Step tracker. Travel uses it for IPT → DTS → Trip → Voucher and Awards for
+  // the nomination stages. Every state has its own mark
   // (check, dot, empty ring, exclamation, dash) as well as its own color, and
   // each step carries its words for screen readers and the tooltip. A step
   // that has a next move (`step.action`) is a button when `onadvance` is
   // given: one click or Enter moves it forward. Clicks stop here so a
   // clickable table row underneath does not also react.
   import Icon from "../common/Icon.svelte";
-  import type { TravelStep } from "../../domain/rules/travel";
 
   let {
     steps,
     who = "",
+    label = "Trip progress",
     onadvance
-  }: { steps: TravelStep[]; who?: string; onadvance?: (key: TravelStep["key"]) => void } = $props();
+  }: { steps: S[]; who?: string; label?: string; onadvance?: (key: S["key"]) => void } = $props();
 </script>
 
-<ol class="steps" aria-label="Trip progress">
+<ol class="steps" aria-label={label}>
   {#each steps as step (step.key)}
     {#if step.action && onadvance}
       <li class="step {step.state}">
@@ -41,7 +42,7 @@
   {/each}
 </ol>
 
-{#snippet mark(step: TravelStep)}
+{#snippet mark(step: S)}
   <span class="marker" aria-hidden="true">
     {#if step.state === "done"}<Icon name="check" size={10} />{:else if step.state === "late"}!{:else if step.state === "skipped"}–{/if}
   </span>

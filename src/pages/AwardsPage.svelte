@@ -13,11 +13,12 @@
   import RichTextEditor from "../components/common/RichTextEditor.svelte";
   import type { AwardRecord } from "../domain/models";
   import { AWARD_STATUSES } from "../domain/models";
-  import { awardTypeOptions, filterAwards, nextAwardStatus } from "../domain/rules/awards";
+  import { appendToDraft, awardSteps, awardTypeOptions, citationLines, filterAwards, nextAwardStatus } from "../domain/rules/awards";
+  import TravelSteps from "../components/cues/TravelSteps.svelte";
   import { mergeAwardEdit } from "../domain/rules/editMerge";
   import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { newId } from "../utils/ids";
-  import { emptyRichText, normalizeRichText, serializeRichText } from "../utils/richTextDoc";
+  import { emptyRichText, normalizeRichText, richTextDocToPlainText, serializeRichText } from "../utils/richTextDoc";
 
   let search = $state("");
   let filterEmployee = $state("");
@@ -31,6 +32,8 @@
   let fStatus = $state("Idea");
   let fDue = $state("");
   let fNotes = $state(emptyRichText());
+  let fCitation = $state("");
+  let fInputIds = $state<string[]>([]);
   let fError = $state("");
   let pendingDelete = $state<AwardRecord | undefined>(undefined);
 
@@ -47,7 +50,7 @@
   // Snapshot of the values the form opened with, for the unsaved-changes guard.
   let openedSnapshot = $state("");
   function formSnapshot(): string {
-    return JSON.stringify([fEmployee, fTitle, fType, fStatus, fDue, serializeRichText(fNotes)]);
+    return JSON.stringify([fEmployee, fTitle, fType, fStatus, fDue, serializeRichText(fNotes), fCitation, [...fInputIds].sort()]);
   }
 
   function openForm(a?: AwardRecord) {
@@ -58,6 +61,8 @@
     fStatus = a?.status ?? "Idea";
     fDue = a?.nominationDueDate ?? "";
     fNotes = normalizeRichText(a?.supportingNotes);
+    fCitation = a?.citationDraft ?? "";
+    fInputIds = [...(a?.relatedPerformanceInputIds ?? [])];
     fError = "";
     openedSnapshot = formSnapshot();
     formOpen = true;
@@ -83,7 +88,10 @@
         awardType: fType,
         status: fStatus,
         nominationDueDate: fDue,
-        supportingNotes: fNotes
+        supportingNotes: fNotes,
+        citationDraft: fCitation,
+        // Links only make sense for the person being nominated.
+        relatedPerformanceInputIds: fInputIds.filter((id) => employeeInputs.some((p) => p.id === id))
       },
       { id: newId(), now: nowTimestamp() }
     );
@@ -118,6 +126,32 @@
         { actionType: "updated", summary: `Moved award "${a.title}" for ${who} back to ${before.status}` }
       );
     });
+  }
+
+  // The nominee's performance inputs, newest first. When the award has an
+  // accomplishment period, the list starts limited to it.
+  let showAllInputs = $state(false);
+  let employeeInputs = $derived(
+    app.performanceInputs
+      .filter((p) => p.employeeId === fEmployee && !p.isArchived)
+      .sort((x, y) => (x.inputDate < y.inputDate ? 1 : -1))
+  );
+  let period = $derived({ start: editing?.accomplishmentPeriodStart, end: editing?.accomplishmentPeriodEnd });
+  let shownInputs = $derived(
+    showAllInputs || (!period.start && !period.end)
+      ? employeeInputs
+      : employeeInputs.filter(
+          (p) => fInputIds.includes(p.id) || ((!period.start || p.inputDate >= period.start) && (!period.end || p.inputDate <= period.end))
+        )
+  );
+
+  function toggleInput(id: string) {
+    fInputIds = fInputIds.includes(id) ? fInputIds.filter((x) => x !== id) : [...fInputIds, id];
+  }
+
+  function addSelectedToCitation() {
+    const selected = employeeInputs.filter((p) => fInputIds.includes(p.id));
+    fCitation = appendToDraft(fCitation, citationLines(selected));
   }
 
   // Start a board card for the nomination from the open award. The dialog
@@ -203,7 +237,7 @@
     <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
     <div class="table-scroll" role="region" aria-label="Award records" tabindex="0">
     <table class="data">
-      <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Nomination due</th><th class="row-action-cell" aria-label="Next stage"></th></tr></thead>
+      <thead><tr><th>Title</th><th>Employee</th><th>Type</th><th>Status</th><th>Progress</th><th>Nomination due</th></tr></thead>
       <tbody>
         {#each rows as a (a.id)}
           <!-- Row click is a mouse convenience; the title button is the keyboard path. -->
@@ -222,18 +256,17 @@
             <td>{app.employeeName(a.employeeId)}</td>
             <td>{a.awardType ?? ""}</td>
             <td><span class="badge" class:success={a.status === "Approved" || a.status === "Complete"}>{a.status}</span></td>
-            <td class="date-cell">{formatDate(a.nominationDueDate)}</td>
-            <td class="row-action-cell">
-              {#if nextAwardStatus(a.status)}
-                <button
-                  type="button"
-                  aria-label={`Move award ${a.title} to ${nextAwardStatus(a.status)}`}
-                  onclick={(ev) => {
-                    ev.stopPropagation();
-                    void advance(a);
-                  }}>Move to {nextAwardStatus(a.status)}</button>
+            <td class="progress-cell">
+              {#if awardSteps(a.status, a.nominationDueDate, app.today).length}
+                <TravelSteps
+                  steps={awardSteps(a.status, a.nominationDueDate, app.today)}
+                  who={`${a.title}, ${app.employeeName(a.employeeId)}`}
+                  label="Nomination progress"
+                  onadvance={() => void advance(a)}
+                />
               {/if}
             </td>
+            <td class="date-cell">{formatDate(a.nominationDueDate)}</td>
           </tr>
         {/each}
       </tbody>
@@ -280,6 +313,41 @@
       </div>
       <label for="aw-notes">Supporting notes</label>
       <RichTextEditor id="aw-notes" bind:value={fNotes} rows={3} maxlength={10000} ariaLabel="Supporting notes" />
+
+      <fieldset class="award-inputs">
+        <legend>Performance inputs for this nomination</legend>
+        {#if !fEmployee}
+          <p class="small muted">Choose the employee to see their performance inputs.</p>
+        {:else if employeeInputs.length === 0}
+          <p class="small muted">{app.employeeName(fEmployee)} has no performance inputs yet.</p>
+        {:else}
+          {#if period.start || period.end}
+            <label class="inline-check">
+              <input type="checkbox" bind:checked={showAllInputs} />
+              Show inputs outside the accomplishment period
+            </label>
+          {/if}
+          <ul class="input-list">
+            {#each shownInputs as p (p.id)}
+              <li>
+                <label class="input-pick">
+                  <input type="checkbox" checked={fInputIds.includes(p.id)} onchange={() => toggleInput(p.id)} />
+                  <span class="small muted">{formatDate(p.inputDate)}</span>
+                  <span class="input-pick-text">{richTextDocToPlainText(p.actionOrAccomplishment)}</span>
+                </label>
+              </li>
+            {/each}
+          </ul>
+          <div class="input-actions">
+            <span class="small muted">{fInputIds.length} selected</span>
+            <button type="button" disabled={fInputIds.length === 0} onclick={addSelectedToCitation}>Add selected to citation draft</button>
+          </div>
+        {/if}
+      </fieldset>
+
+      <label for="aw-citation">Citation draft</label>
+      <textarea id="aw-citation" bind:value={fCitation} rows="5" maxlength="10000" style="width:100%"></textarea>
+      <div class="field-hint">Adding inputs appends to the end; nothing already here is replaced.</div>
       <div class="dialog-actions">
         {#if editing}
           <button type="button" class="icon-btn danger delete-action" aria-label="Delete award" title="Delete" onclick={() => requestDelete(editing!)}><Icon name="trash" size={17} /></button>
@@ -305,6 +373,24 @@
 {/if}
 
 <style>
+  .progress-cell { white-space: nowrap; }
+  .award-inputs {
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    margin: .9rem 0 0;
+    padding: .5rem .75rem .65rem;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .award-inputs legend { padding: 0 .3rem; font-weight: 600; font-size: .85rem; }
+  .inline-check { display: flex; align-items: center; gap: .4rem; margin: .1rem 0 .4rem; font-weight: 400; }
+  .input-list { list-style: none; margin: 0; padding: 0; max-height: 12rem; overflow-y: auto; display: grid; gap: .15rem; }
+  .input-pick { display: flex; align-items: baseline; gap: .45rem; margin: 0; font-weight: 400; cursor: pointer; }
+  .input-pick input { flex-shrink: 0; align-self: center; }
+  .input-pick .small { flex-shrink: 0; }
+  .input-pick-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .input-actions { display: flex; align-items: center; justify-content: space-between; gap: .5rem; margin-top: .5rem; }
   .dialog-actions {
     display: flex;
     align-items: center;

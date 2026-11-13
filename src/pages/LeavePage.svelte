@@ -13,6 +13,7 @@
   import { mergeLeaveEdit } from "../domain/rules/editMerge";
   import { monthGrid, monthOf } from "../domain/rules/calendar";
   import { addMonths, compareDates, formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
+  import { groupLeave, LEAVE_PHASE_LABELS, peopleOutOn } from "../domain/rules/leave";
   import { newId } from "../utils/ids";
 
   const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -153,6 +154,9 @@
       .sort((a, b) => compareDates(a.startDate, b.startDate));
   });
 
+  // List view groups rows by phase (domain/rules/leave.ts), like Travel.
+  let groups = $derived(groupLeave(rows, app.today));
+
   let calendarTitle = $derived(monthLabel(calendarMonth));
   // Shared month grid (domain/rules/calendar.ts), same as Travel/Telework.
   let calendarWeeks = $derived.by(() => {
@@ -163,7 +167,8 @@
         day: Number(cell.date.slice(8, 10)),
         inMonth: cell.inMonth,
         isToday: cell.date === app.today,
-        events: rows.filter((l) => leaveCoversDate(l, cell.date))
+        events: rows.filter((l) => leaveCoversDate(l, cell.date)),
+        out: peopleOutOn(rows, cell.date)
       }))
     );
   });
@@ -246,9 +251,13 @@
       <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
       <div class="table-scroll" role="region" aria-label="Leave records" tabindex="0">
       <table class="data leave-table">
-        <thead><tr><th>Employee</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th><th>Status</th><th class="row-action-cell" aria-label="Decision"></th></tr></thead>
+        <thead><tr><th>Employee</th><th>Status</th><th>Start</th><th>End</th><th>Type</th><th>Hours</th></tr></thead>
         <tbody>
-          {#each rows as l (l.id)}
+          {#each groups as group (group.phase)}
+            <tr class="group-row">
+              <td colspan="6">{LEAVE_PHASE_LABELS[group.phase]} <span>({group.records.length})</span></td>
+            </tr>
+          {#each group.records as l (l.id)}
             <!-- Row click is a mouse convenience; the employee button is the keyboard path. -->
             <!-- svelte-ignore a11y_click_events_have_key_events a11y_no_noninteractive_element_interactions -->
             <tr class="row-clickable" id={"leave-row-" + l.id} onclick={() => openForm(l)}>
@@ -262,11 +271,7 @@
                   }}>{app.employeeName(l.employeeId)}</button
                 >
               </td>
-              <td class="date-cell">{formatDate(l.startDate)}</td>
-              <td class="date-cell">{formatDate(l.endDate)}</td>
-              <td>{l.leaveType ?? ""}</td>
-              <td>{l.hours ?? ""}</td>
-              <td>
+              <td class="status-cell">
                 <!-- Approved is the normal state, so it stays plain text; only the
                      statuses that differ carry a badge. -->
                 {#if l.status === "approved"}
@@ -274,19 +279,25 @@
                 {:else}
                   <span class="badge leave-status" class:warning={l.status === "requested"}>{l.status}</span>
                 {/if}
-              </td>
-              <td class="row-action-cell">
+                <!-- Beside the status it changes, so it stays in view when a narrow window scrolls the table. -->
                 {#if l.status === "requested"}
-                  <button
-                    type="button"
-                    aria-label={`Approve leave for ${app.employeeName(l.employeeId)}`}
-                    onclick={(ev) => {
-                      ev.stopPropagation();
-                      void approve(l);
-                    }}>Approve</button>
+                  <div class="decision">
+                    <button
+                      type="button"
+                      aria-label={`Approve leave for ${app.employeeName(l.employeeId)}`}
+                      onclick={(ev) => {
+                        ev.stopPropagation();
+                        void approve(l);
+                      }}>Approve</button>
+                  </div>
                 {/if}
               </td>
+              <td class="date-cell">{formatDate(l.startDate)}</td>
+              <td class="date-cell">{formatDate(l.endDate)}</td>
+              <td>{l.leaveType ?? ""}</td>
+              <td>{l.hours ?? ""}</td>
             </tr>
+          {/each}
           {/each}
         </tbody>
       </table>
@@ -323,6 +334,7 @@
               >
                 <div class="day-head">
                   <span class="day-number" class:today-number={day.isToday}>{day.day}</span>
+                  {#if day.out > 0}<span class="day-out" title={`${day.out} ${day.out === 1 ? "person" : "people"} out`}>{day.out} out</span>{/if}
                   <button
                     type="button"
                     class="day-add"
@@ -424,6 +436,28 @@
 
 <style>
   .leave-status { text-transform: capitalize; }
+  .group-row td {
+    color: var(--text-muted);
+    font-weight: 650;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .group-row td span { font-weight: 500; }
+  .leave-table tbody .group-row:hover td:first-child { box-shadow: none; }
+  .status-cell { white-space: nowrap; }
+  .decision { margin-top: .35rem; }
+  .decision button { font-size: .78rem; padding: .1rem .55rem; min-height: 1.7rem; }
+  .day-out {
+    margin-left: .35rem;
+    margin-right: auto;
+    padding: 0 .35rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .68rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
   /* List view uses the default page width (matching Training/Awards); only the
      calendar spans full width. */
   .leave-page.wide {

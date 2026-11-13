@@ -350,6 +350,10 @@ export interface TravelRecord {
   id: Id;
   employeeId: Id;
   destination: string;
+  /** Why the trip is happening, in a phrase ("Program review", "Test event support"). */
+  purpose?: string;
+  /** The project the trip supports, when there is one. */
+  projectId?: Id;
   startDate: IsoDate;
   endDate: IsoDate;
   iptConcurrence: TravelIptConcurrence;

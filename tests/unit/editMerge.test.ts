@@ -102,6 +102,19 @@ describe("mergeAwardEdit", () => {
     supportingNotes: normalizeRichText(a.supportingNotes)
   });
 
+  it("sets the citation draft and linked inputs from the form, and clears an emptied draft", () => {
+    const merged = mergeAwardEdit(full, { ...formFields(full), citationDraft: "New text", relatedPerformanceInputIds: ["pi3"] }, ctx);
+    expect(merged.citationDraft).toBe("New text");
+    expect(merged.relatedPerformanceInputIds).toEqual(["pi3"]);
+    expect(mergeAwardEdit(full, { ...formFields(full), citationDraft: "   " }, ctx).citationDraft).toBeUndefined();
+  });
+
+  it("keeps the citation draft and linked inputs when a caller does not edit them", () => {
+    const merged = mergeAwardEdit(full, formFields(full), ctx);
+    expect(merged.citationDraft).toBe("Citation text");
+    expect(merged.relatedPerformanceInputIds).toEqual(["pi1", "pi2"]);
+  });
+
   it("round-trips a fully populated record without loss", () => {
     const merged = mergeAwardEdit(full, formFields(full), ctx);
     expect(merged).toEqual({ ...full, updatedAt: ctx.now });
@@ -280,5 +293,21 @@ describe("mergeTravelEdit", () => {
     );
     expect(merged.voucherStatus).toBe("not_submitted");
     expect(merged.voucherSubmittedDate).toBeUndefined();
+  });
+
+  it("sets, trims, and clears purpose and project from the form", () => {
+    const set = mergeTravelEdit(full, { ...formFields(full), purpose: "  Program review ", projectId: "p1" }, ctx);
+    expect(set.purpose).toBe("Program review");
+    expect(set.projectId).toBe("p1");
+    const cleared = mergeTravelEdit(set, { ...formFields(set), purpose: "", projectId: "" }, ctx);
+    expect(cleared.purpose).toBeUndefined();
+    expect(cleared.projectId).toBeUndefined();
+  });
+
+  it("keeps purpose and project when a caller does not edit them", () => {
+    const withPurpose: TravelRecord = { ...full, purpose: "Test event", projectId: "p1" };
+    const merged = mergeTravelEdit(withPurpose, formFields(full), ctx);
+    expect(merged.purpose).toBe("Test event");
+    expect(merged.projectId).toBe("p1");
   });
 });

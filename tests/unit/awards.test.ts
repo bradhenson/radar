@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { AwardRecord } from "../../src/domain/models";
 import { AWARD_STATUSES } from "../../src/domain/models";
 import { AWARD_PIPELINE, awardTypeOptions, filterAwards, nextAwardStatus } from "../../src/domain/rules/awards";
+import { appendToDraft, awardSteps, citationLines } from "../../src/domain/rules/awards";
 import { richTextFromPlainText } from "../../src/utils/richTextDoc";
 
 const NAMES: Record<string, string> = { e1: "Avery Brooks", e2: "Riley Chen" };
@@ -102,5 +103,54 @@ describe("nextAwardStatus", () => {
 
   it("only names stages the status list offers", () => {
     for (const stage of AWARD_PIPELINE) expect(AWARD_STATUSES).toContain(stage);
+  });
+});
+
+describe("awardSteps", () => {
+  const states = (status: string, due?: string) => awardSteps(status, due, "2026-11-13").map((s) => s.state);
+
+  it("marks earlier stages done, the current one current, and the rest to do", () => {
+    expect(states("Drafting")).toEqual(["done", "done", "current", "todo", "todo"]);
+    expect(states("Idea")).toEqual(["current", "todo", "todo", "todo", "todo"]);
+  });
+
+  it("offers the next stage, and only that one, as the click", () => {
+    const steps = awardSteps("Drafting", undefined, "2026-11-13");
+    expect(steps.filter((s) => s.action).map((s) => [s.key, s.action])).toEqual([["Ready for review", "Move to Ready for review"]]);
+  });
+
+  it("marks the current stage late once the nomination is past due", () => {
+    expect(states("Gathering input", "2026-11-01")).toEqual(["done", "late", "todo", "todo", "todo"]);
+    expect(states("Gathering input", "2026-11-13")).toEqual(["done", "current", "todo", "todo", "todo"]);
+  });
+
+  it("shows submitted and decided awards as complete with nothing to click", () => {
+    for (const status of ["Submitted", "Approved", "Not selected", "Complete"]) {
+      const steps = awardSteps(status, "2026-01-01", "2026-11-13");
+      expect(steps.every((s) => s.state === "done")).toBe(true);
+      expect(steps.some((s) => s.action)).toBe(false);
+    }
+  });
+
+  it("has no tracker for a cancelled or unknown status", () => {
+    expect(awardSteps("Cancelled", undefined, "2026-11-13")).toEqual([]);
+    expect(awardSteps("Something else", undefined, "2026-11-13")).toEqual([]);
+  });
+});
+
+describe("citationLines and appendToDraft", () => {
+  it("writes one line per input, oldest first, with the result when there is one", () => {
+    const text = citationLines([
+      { inputDate: "2026-09-01", actionOrAccomplishment: "Led the  migration", result: "Cut outages in half" },
+      { inputDate: "2026-06-01", actionOrAccomplishment: "Trained three new hires" },
+      { inputDate: "2026-07-01", actionOrAccomplishment: "" }
+    ]);
+    expect(text).toBe("- Trained three new hires\n- Led the migration Result: Cut outages in half");
+  });
+
+  it("appends after existing text and never replaces it", () => {
+    expect(appendToDraft("Opening line.\n", "- One")).toBe("Opening line.\n\n- One");
+    expect(appendToDraft(undefined, "- One")).toBe("- One");
+    expect(appendToDraft("Keep me", "  ")).toBe("Keep me");
   });
 });

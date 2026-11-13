@@ -1,3 +1,5 @@
+import { splitActionItems } from "../../src/domain/rules/followUpTasks";
+import { emptyRichText, richTextFromPlainText } from "../../src/utils/richTextDoc";
 import { describe, expect, it } from "vitest";
 import type { AwardRecord, TrainingRequirement, TravelRecord } from "../../src/domain/models";
 import { awardFollowUpTask, trainingFollowUpTask, travelFollowUpTask } from "../../src/domain/rules/followUpTasks";
@@ -104,5 +106,36 @@ describe("trainingFollowUpTask", () => {
     expect(trainingFollowUpTask({ ...requirement, dueDate: undefined }, 0, TODAY).title).toBe(
       "Training: Annual Cybersecurity Awareness (follow up)"
     );
+  });
+});
+
+describe("splitActionItems", () => {
+  it("returns one item per bullet, number, checkbox, or line, with the marks removed", () => {
+    const doc = {
+      type: "doc",
+      content: [
+        { type: "bulletList", content: [
+          { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Send the risk register" }] }] },
+          { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Book the lab" }] }] }
+        ] },
+        { type: "orderedList", content: [
+          { type: "listItem", content: [{ type: "paragraph", content: [{ type: "text", text: "Draft the agenda" }] }] }
+        ] },
+        { type: "paragraph", content: [{ type: "text", text: "[ ] Confirm   the date" }] }
+      ]
+    };
+    expect(splitActionItems({ schemaVersion: emptyRichText().schemaVersion, doc } as never)).toEqual(["Send the risk register", "Book the lab", "Draft the agenda", "Confirm the date"]);
+  });
+
+  it("splits plain text on lines and skips blank ones", () => {
+    expect(splitActionItems(richTextFromPlainText("- First\n\n2) Second\n   "))).toEqual(["First", "Second"]);
+    expect(splitActionItems(undefined)).toEqual([]);
+  });
+
+  it("keeps a single sentence as one item and shortens an over-long one", () => {
+    expect(splitActionItems(richTextFromPlainText("Capture follow-up actions."))).toEqual(["Capture follow-up actions."]);
+    const [long] = splitActionItems(richTextFromPlainText("x".repeat(500)));
+    expect(long!.length).toBe(200);
+    expect(long!.endsWith("…")).toBe(true);
   });
 });

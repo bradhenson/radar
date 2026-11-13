@@ -61,6 +61,9 @@ export interface AwardEditFields {
   status: string;
   nominationDueDate: string;
   supportingNotes: RichTextValue;
+  /** Left out by callers that do not edit them, which keeps what the award already has. */
+  citationDraft?: string;
+  relatedPerformanceInputIds?: string[];
 }
 
 export function mergeAwardEdit(existing: AwardRecord | undefined, f: AwardEditFields, ctx: EditContext): AwardRecord {
@@ -73,7 +76,8 @@ export function mergeAwardEdit(existing: AwardRecord | undefined, f: AwardEditFi
     status: f.status,
     nominationDueDate: f.nominationDueDate || undefined,
     supportingNotes: isRichTextEmpty(f.supportingNotes) ? undefined : f.supportingNotes,
-    relatedPerformanceInputIds: existing?.relatedPerformanceInputIds ?? [],
+    citationDraft: f.citationDraft === undefined ? existing?.citationDraft : f.citationDraft.trim() ? f.citationDraft : undefined,
+    relatedPerformanceInputIds: f.relatedPerformanceInputIds ?? existing?.relatedPerformanceInputIds ?? [],
     createdAt: existing?.createdAt ?? ctx.now,
     updatedAt: ctx.now
   };
@@ -150,6 +154,9 @@ export interface TravelEditFields {
   voucherStatus: TravelVoucherStatus;
   voucherSubmittedDate: string;
   notes: string;
+  /** Left out by callers that do not edit them, which keeps what the trip already has. */
+  purpose?: string;
+  projectId?: string;
 }
 
 /**
@@ -173,6 +180,8 @@ export function mergeTravelEdit(existing: TravelRecord | undefined, f: TravelEdi
     // Only a submitted voucher carries a submission date.
     voucherSubmittedDate: submitted ? f.voucherSubmittedDate || undefined : undefined,
     notes: f.notes.trim() || undefined,
+    purpose: f.purpose === undefined ? existing?.purpose : f.purpose.trim() || undefined,
+    projectId: f.projectId === undefined ? existing?.projectId : f.projectId || undefined,
     createdAt: existing?.createdAt ?? ctx.now,
     updatedAt: ctx.now
   };

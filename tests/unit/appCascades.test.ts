@@ -138,6 +138,9 @@ function baseSnapshot(): DatabaseSnapshot {
   collections.leaveRecords = [makeLeave("l1", "e1", { relatedTaskId: "t1" })];
   collections.quickNotes = [makeQuickNote("qn1", { employeeId: "e1", projectId: "p1", taskId: "t1" })];
   collections.recurringTasks = [makeRecurring("r1", { employeeId: "e1", projectId: "p1" }), makeRecurring("r2")];
+  collections.travelRecords = [
+    { id: "tv1", employeeId: "e1", destination: "Norfolk, VA", purpose: "Site visit", projectId: "p1", startDate: "2026-02-01", endDate: "2026-02-02", iptConcurrence: "concurred", dtsAuthorizationStatus: "approved", createdAt: NOW, updatedAt: NOW }
+  ];
   return {
     collections,
     settings: { ...DEFAULT_SETTINGS },
@@ -253,6 +256,9 @@ describe("deleteProject cascade", () => {
     expect(r1.projectId).toBeUndefined();
     expect(r1.employeeId).toBe("e1");
     expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.projectId).toBeUndefined();
+    expect(app.travelRecords[0]!.projectId).toBeUndefined();
+    expect(app.travelRecords[0]!.purpose).toBe("Site visit");
+    expect((await store.getAll("travelRecords"))[0]!.projectId).toBeUndefined();
     expect(await store.getAll("projects")).toHaveLength(0);
   });
 
@@ -269,6 +275,7 @@ describe("deleteProject cascade", () => {
     expect(app.recurringTasks.find((r) => r.id === "r1")!.projectId).toBe("p1");
     expect(await store.getAll("projects")).toHaveLength(1);
     expect((await store.getAll("recurringTasks")).find((r) => r.id === "r1")!.projectId).toBe("p1");
+    expect(app.travelRecords[0]!.projectId).toBe("p1");
   });
 });
 
