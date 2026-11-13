@@ -4,7 +4,7 @@
 // recorded before a cycle was defined are placed correctly once it is.
 
 import type { EvaluationCycle, IsoDate, PerformanceInput } from "../models";
-import { compareDates, formatDate, isValidIsoDate } from "../../utils/dates";
+import { compareDates, formatDate, formatDateRange, isValidIsoDate } from "../../utils/dates";
 
 type CycleRange = Pick<EvaluationCycle, "startDate" | "endDate">;
 
@@ -28,7 +28,7 @@ export function inputsInCycle<T extends Pick<PerformanceInput, "inputDate">>(inp
 
 /** "FY2026 (Oct 1, 2025 – Sep 30, 2026)". */
 export function cycleLabel(cycle: EvaluationCycle): string {
-  return `${cycle.name} (${formatDate(cycle.startDate)} – ${formatDate(cycle.endDate)})`;
+  return `${cycle.name} (${formatDateRange(cycle.startDate, cycle.endDate)})`;
 }
 
 /**

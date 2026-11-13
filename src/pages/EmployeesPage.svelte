@@ -7,7 +7,7 @@
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
-  import { compareDates, daysBetween, formatDate } from "../utils/dates";
+  import { compareDates, daysBetween, formatDate, formatDateRange } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { downloadText, backupFilename } from "../utils/download";
   import type { Employee } from "../domain/models";
@@ -351,7 +351,7 @@
                   <span class="badge warning">On leave</span>
                   <span class="small muted">until {formatDate(r.upcomingLeave.endDate)}</span>
                 {:else}
-                  {formatDate(r.upcomingLeave.startDate)} – {formatDate(r.upcomingLeave.endDate)}
+                  {formatDateRange(r.upcomingLeave.startDate, r.upcomingLeave.endDate)}
                 {/if}
               {:else}
                 <span class="muted">—</span>
@@ -363,7 +363,7 @@
                   <span class="badge warning">On travel</span>
                   <span class="small muted">until {formatDate(r.upcomingTravel.endDate)}</span>
                 {:else}
-                  {formatDate(r.upcomingTravel.startDate)} – {formatDate(r.upcomingTravel.endDate)}
+                  {formatDateRange(r.upcomingTravel.startDate, r.upcomingTravel.endDate)}
                 {/if}
               {:else}
                 <span class="muted">—</span>

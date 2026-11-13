@@ -33,12 +33,12 @@ try {
     await page.evaluate(() => new Promise((resolveFrame) => requestAnimationFrame(() => requestAnimationFrame(resolveFrame))));
   }
 
-  await go("Tasks", "Kanban Board");
+  await go("Tasks", "Tasks");
   await page.setViewportSize({ width: 1100, height: 900 });
   await page.locator(".column:last-child .card-open").first().click();
   await page.getByRole("heading", { name: "Task", exact: true }).waitFor();
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("heading", { name: "Kanban Board", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Tasks", exact: true }).waitFor();
   await settled();
   assert.ok(await page.locator(".columns").evaluate((el) => el.scrollLeft > 0), "Opening a card must preserve horizontal board position");
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -48,13 +48,14 @@ try {
   await page.locator(".card-open").first().click();
   await page.getByRole("heading", { name: "Task", exact: true }).waitFor();
   await page.getByRole("button", { name: "Close", exact: true }).click();
-  await page.getByRole("heading", { name: "Kanban Board", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Tasks", exact: true }).waitFor();
   assert.equal(await page.getByRole("searchbox", { name: "Search tasks" }).inputValue(), "telework");
   assert.equal(await page.getByRole("button", { name: "✓ Compact cards", exact: true }).getAttribute("aria-pressed"), "true");
   await page.getByRole("group", { name: "Task view" }).getByRole("button", { name: "List", exact: true }).click();
-  await page.getByRole("heading", { name: "Task List", exact: true }).waitFor();
+  await page.getByRole("group", { name: "Task view" }).getByRole("button", { name: "List", pressed: true }).waitFor();
   await go("Travel");
-  await go("Tasks", "Task List");
+  await go("Tasks", "Tasks");
+  await page.getByRole("group", { name: "Task view" }).getByRole("button", { name: "List", pressed: true }).waitFor();
   assert.equal(await page.getByRole("searchbox", { name: "Search tasks" }).inputValue(), "telework");
   await page.getByRole("button", { name: "Clear filters", exact: true }).click();
   await page.getByRole("group", { name: "Task view" }).getByRole("button", { name: "Board", exact: true }).click();
@@ -91,7 +92,7 @@ try {
   // A desktop and a narrow layout must contain overflow in the board/tables.
   for (const width of [1280, 700, 390]) {
     await page.setViewportSize({ width, height: 900 });
-    for (const [name, title] of [["Tasks", "Kanban Board"], ["Telework", "Telework"], ["Travel", "Travel"], ["Leave", "Leave and Availability"]]) {
+    for (const [name, title] of [["Tasks", "Tasks"], ["Telework", "Telework"], ["Travel", "Travel"], ["Leave", "Leave and Availability"]]) {
       await go(name, title);
       await settled();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), `${name} spills out of viewport at ${width}px`);
@@ -104,7 +105,7 @@ try {
     for (const theme of ["dark", "light"]) {
       await go("Settings");
       await page.locator("#set-theme").selectOption(theme);
-      for (const [name, title] of [["Tasks", "Kanban Board"], ["Telework", "Telework"], ["Travel", "Travel"], ["Leave", "Leave and Availability"]]) {
+      for (const [name, title] of [["Tasks", "Tasks"], ["Telework", "Telework"], ["Travel", "Travel"], ["Leave", "Leave and Availability"]]) {
         await go(name, title);
         await page.mouse.move(0, 0);
         await settled();

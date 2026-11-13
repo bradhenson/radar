@@ -47,7 +47,7 @@ try {
   await page.getByRole("button", { name: "Load sample data" }).click();
   await page.getByRole("dialog", { name: "Load sample data" }).getByRole("button", { name: "Load sample data" }).click();
   await page.getByRole("link", { name: "Tasks", exact: true }).first().click();
-  await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
+  await page.getByRole("heading", { name: "Tasks" }).waitFor();
 
   const navCount = await page.locator("nav a").count();
   if (navCount !== 17) throw new Error(`Expected 17 navigation destinations, found ${navCount}.`);
@@ -60,7 +60,7 @@ try {
 
   // A reload must retain the same writer identity and persist the new task.
   await page.reload();
-  await page.getByRole("heading", { name: "Kanban Board" }).waitFor();
+  await page.getByRole("heading", { name: "Tasks" }).waitFor();
   await page.getByText(title, { exact: true }).waitFor();
 
   // Performance inputs use the same full-page editing surface as tasks and

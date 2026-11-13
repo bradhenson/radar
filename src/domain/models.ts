@@ -137,6 +137,8 @@ export interface Task {
   lastVerifiedDate?: IsoDate;
   verificationStatus?: VerificationStatus;
   waitingSince?: IsoTimestamp;
+  /** When the card last landed in its current board column; absent on tasks saved before this was recorded. */
+  columnEnteredAt?: IsoTimestamp;
   recurrenceTemplateId?: Id;
   recurrenceInstanceKey?: string;
   performanceInputCreated: boolean;
@@ -348,6 +350,10 @@ export interface TravelRecord {
   id: Id;
   employeeId: Id;
   destination: string;
+  /** Why the trip is happening, in a phrase ("Program review", "Test event support"). */
+  purpose?: string;
+  /** The project the trip supports, when there is one. */
+  projectId?: Id;
   startDate: IsoDate;
   endDate: IsoDate;
   iptConcurrence: TravelIptConcurrence;
@@ -481,6 +487,8 @@ export interface SavedBoardView {
   project: string;
   priority: string;
   summary: "" | "due_soon" | "overdue" | "waiting" | "priority";
+  /** Project or competency work; "" (and views saved before this existed) means both. */
+  workType: "" | "project" | "competency";
 }
 
 export interface AppSettings {
@@ -517,6 +525,8 @@ export interface AppSettings {
   colorTheme: ColorTheme;
   /** Visual style: classic solid panels, or translucent glass over an ambient backdrop. */
   look: AppLook;
+  /** Spacing: the default comfortable layout, or tighter rows, cards, and toolbars. */
+  density: AppDensity;
   /** Unmodified N/P/Q/T/B/E/M shortcuts; can be disabled for accessibility. */
   enableSingleKeyShortcuts: boolean;
   employeeProfileSections: EmployeeProfileSection[];
@@ -560,6 +570,14 @@ export interface EmployeeProfileField {
 export type ColorTheme = "default" | "ocean" | "forest" | "violet" | "sunset" | "graphite";
 
 export type AppLook = "standard" | "glass" | "glass_strong";
+
+export type AppDensity = "comfortable" | "compact";
+
+/** Selectable spacing; applied via the data-density attribute (base.css). */
+export const APP_DENSITIES: { value: AppDensity; label: string; hint: string }[] = [
+  { value: "comfortable", label: "Comfortable", hint: "Roomier rows and cards" },
+  { value: "compact", label: "Compact", hint: "Tighter rows and cards, so more fits on screen" }
+];
 
 /** Selectable visual styles; applied via the data-look attribute (base.css). */
 export const APP_LOOKS: { value: AppLook; label: string; hint: string }[] = [
@@ -613,6 +631,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
   theme: "dark",
   colorTheme: "default",
   look: "glass",
+  density: "comfortable",
   enableSingleKeyShortcuts: true,
   savedBoardViews: [],
   employeeProfileSections: [
@@ -835,6 +854,7 @@ export function normalizeAppSettings(raw: unknown): AppSettings {
   out.employeeProfileSections = normalizeProfileSections(src.employeeProfileSections);
   out.employeeProfileFields = normalizeProfileFields(src.employeeProfileFields, out.employeeProfileSections);
   out.savedBoardViews = normalizeSavedBoardViews(src.savedBoardViews);
+  if (!APP_DENSITIES.some((d) => d.value === out.density)) out.density = DEFAULT_SETTINGS.density;
 
   if (LEGACY_DEFAULT_APPLICATION_NAMES.has(out.applicationName)) {
     out.applicationName = DEFAULT_SETTINGS.applicationName;

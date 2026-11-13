@@ -72,7 +72,7 @@ try {
 
   // The J shortcut only fires when focus is outside a text surface.
   await page.goto(`${url}#/board`);
-  await page.getByRole("heading", { name: "Board" }).first().waitFor();
+  await page.getByRole("heading", { name: "Tasks", exact: true }).first().waitFor();
   await page.keyboard.press("j");
   await checkEditor("Quick note dialog", "qn-body");
   await page.keyboard.press("Escape");

@@ -3,6 +3,7 @@ import {
   addDays,
   addMonths,
   compareDates,
+  formatDateRange,
   daysBetween,
   describeDueDistance,
   formatDate,
@@ -94,5 +95,35 @@ describe("formatLongDate", () => {
     expect(formatLongDate("2026-01-04")).toBe("Sunday, January 4, 2026");
     expect(formatLongDate("")).toBe("");
     expect(formatLongDate("not-a-date")).toBe("not-a-date");
+  });
+});
+
+describe("formatDateRange", () => {
+  it("shows a single day once", () => {
+    expect(formatDateRange("2026-11-21", "2026-11-21")).toBe("Nov 21, 2026");
+    expect(formatDateRange("2026-11-21", undefined)).toBe("Nov 21, 2026");
+  });
+
+  it("shares the month and year within one month", () => {
+    expect(formatDateRange("2026-11-21", "2026-11-23")).toBe("Nov 21–23, 2026");
+  });
+
+  it("shares the year across months", () => {
+    expect(formatDateRange("2026-11-28", "2026-12-02")).toBe("Nov 28 – Dec 2, 2026");
+  });
+
+  it("spells out both dates across years", () => {
+    expect(formatDateRange("2026-12-28", "2027-01-03")).toBe("Dec 28, 2026 – Jan 3, 2027");
+  });
+
+  it("drops the shared year when asked", () => {
+    expect(formatDateRange("2026-11-21", "2026-11-23", { withYear: false })).toBe("Nov 21–23");
+    expect(formatDateRange("2026-11-28", "2026-12-02", { withYear: false })).toBe("Nov 28 – Dec 2");
+    expect(formatDateRange("2026-11-21", "2026-11-21", { withYear: false })).toBe("Nov 21");
+  });
+
+  it("shows the start alone when the end is earlier or invalid", () => {
+    expect(formatDateRange("2026-11-21", "2026-11-20")).toBe("Nov 21, 2026");
+    expect(formatDateRange("2026-11-21", "not-a-date")).toBe("Nov 21, 2026");
   });
 });

@@ -678,6 +678,7 @@ const RELATIONSHIPS: { from: CollectionName; field: string; to: CollectionName; 
   { from: "leaveRecords", field: "employeeId", to: "employees", describe: "leave record(s) reference an employee" },
   { from: "teleworkRecords", field: "employeeId", to: "employees", describe: "telework record(s) reference an employee" },
   { from: "travelRecords", field: "employeeId", to: "employees", describe: "travel record(s) reference an employee" },
+  { from: "travelRecords", field: "projectId", to: "projects", describe: "travel record(s) reference a project" },
   { from: "awardRecords", field: "employeeId", to: "employees", describe: "award record(s) reference an employee" },
   { from: "employeeInteractions", field: "employeeId", to: "employees", describe: "interaction(s) reference an employee" },
   { from: "employeeNotes", field: "employeeId", to: "employees", describe: "employee note(s) reference an employee" },

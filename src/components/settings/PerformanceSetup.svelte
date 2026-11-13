@@ -147,6 +147,8 @@
   {#if cycles.length === 0}
     <p class="small muted">No evaluation cycles yet.</p>
   {:else}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Evaluation cycles" tabindex="0">
     <table class="data settings-table">
       <thead>
         <tr><th>Cycle</th><th>Start</th><th>Mid-year</th><th>End</th><th>Inputs</th><th>Now</th><th aria-label="Actions"></th></tr>
@@ -173,6 +175,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
   <p><button type="button" onclick={() => openCycleForm()}>Add evaluation cycle</button></p>
 
@@ -195,6 +198,8 @@
   {#if elements.length === 0}
     <p class="small muted">No performance elements yet.</p>
   {:else}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Performance elements" tabindex="0">
     <table class="data settings-table">
       <thead><tr><th>Element</th><th>Inputs</th><th>Status</th><th aria-label="Actions"></th></tr></thead>
       <tbody>
@@ -232,6 +237,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
   {/if}
 </section>
 

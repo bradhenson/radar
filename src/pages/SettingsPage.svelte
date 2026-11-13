@@ -12,7 +12,7 @@
     parseAndValidateBackup,
     type BackupValidationResult
   } from "../data/backup";
-  import { APP_LOOKS, COLOR_THEMES, DEFAULT_SETTINGS, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
+  import { APP_DENSITIES, APP_LOOKS, COLOR_THEMES, DEFAULT_SETTINGS, EMPLOYEE_PROFILE_FIELD_TYPES, type EmployeeProfileField, type EmployeeProfileFieldType, type EmployeeProfileSection } from "../domain/models";
   import { backupFilename, downloadJson } from "../utils/download";
   import { payPeriodFor, payPeriodLabel } from "../domain/rules/telework";
   import { formatTimestamp, isValidIsoDate } from "../utils/dates";
@@ -371,10 +371,71 @@
     return `${formatBytes(status.usageBytes)} used of ${formatBytes(status.quotaBytes)} available`;
   });
 
+  // Section list for the sidebar, in page order.
+  const SETTINGS_SECTIONS: [string, string][] = [
+    ["settings-backup", "Backup"],
+    ["settings-attention", "Reminders"],
+    ["settings-telework", "Telework"],
+    ["settings-appearance", "Appearance"],
+    ["employee-profile-fields", "Profile fields"],
+    ["settings-competencies", "Competencies"],
+    ["settings-performance", "Performance"],
+    ["settings-board", "Board columns"],
+    ["settings-health", "Database health"],
+    ["settings-maintenance", "Maintenance"],
+    ["settings-about", "About"]
+  ];
+
+  // The sidebar marks the section being read: the last one whose top has
+  // passed a line near the top of the window. A section chosen from the sidebar
+  // stays marked while it is on screen, even when it is too short to reach the
+  // top (the last few sections, at the bottom of the page).
+  let currentSection = $state(SETTINGS_SECTIONS[0]![0]);
+  let chosenSection: string | undefined;
+  let chosenAt = 0;
+  let jumpScrolling = false;
+  function updateCurrentSection() {
+    const line = Math.min(120, window.innerHeight * 0.3);
+    if (chosenSection) {
+      // Hold the choice while the smooth scroll to it is still under way
+      // (until it ends, or 1.5s when no scroll was needed).
+      if (jumpScrolling && Date.now() - chosenAt < 1500) return;
+      const top = document.getElementById(chosenSection)?.getBoundingClientRect().top;
+      const scroller = document.scrollingElement;
+      const atBottom = scroller ? scroller.scrollTop + window.innerHeight >= scroller.scrollHeight - 2 : false;
+      if (top !== undefined && ((top >= -8 && top <= line) || (atBottom && top < window.innerHeight))) return;
+      chosenSection = undefined;
+    }
+    let current = SETTINGS_SECTIONS[0]![0];
+    for (const [id] of SETTINGS_SECTIONS) {
+      const top = document.getElementById(id)?.getBoundingClientRect().top;
+      if (top !== undefined && top <= line) current = id;
+    }
+    currentSection = current;
+  }
+  $effect(() => {
+    // Capture phase: the window or the app's main element may be the one scrolling.
+    const onScrollEnd = () => {
+      jumpScrolling = false;
+      updateCurrentSection();
+    };
+    window.addEventListener("scroll", updateCurrentSection, { capture: true, passive: true });
+    window.addEventListener("scrollend", onScrollEnd, { capture: true, passive: true });
+    updateCurrentSection();
+    return () => {
+      window.removeEventListener("scroll", updateCurrentSection, { capture: true });
+      window.removeEventListener("scrollend", onScrollEnd, { capture: true });
+    };
+  });
+
   // Hash routing owns location.hash, so section links scroll instead of navigating.
   function jumpTo(id: string) {
     const target = document.getElementById(id);
     if (!target) return;
+    currentSection = id;
+    chosenSection = id;
+    chosenAt = Date.now();
+    jumpScrolling = true;
     target.scrollIntoView({ behavior: "smooth", block: "start" });
     const heading = target.querySelector("h2");
     if (heading instanceof HTMLElement) {
@@ -386,20 +447,14 @@
 
 <div class="page">
   <WorkspaceHeader title="Settings" section="System" />
+  <div class="settings-layout">
   <nav class="settings-jump" aria-label="Settings sections">
-    <span class="jump-label">Jump to</span>
-      <button type="button" class="link" onclick={() => jumpTo("settings-backup")}>Backup</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-attention")}>Reminders</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-telework")}>Telework</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-appearance")}>Appearance</button>
-      <button type="button" class="link" onclick={() => jumpTo("employee-profile-fields")}>Profile fields</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-competencies")}>Competencies</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-performance")}>Performance</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-board")}>Board columns</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-health")}>Database health</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-maintenance")}>Maintenance</button>
-      <button type="button" class="link" onclick={() => jumpTo("settings-about")}>About</button>
+    <span class="jump-label">Sections</span>
+    {#each SETTINGS_SECTIONS as [id, label] (id)}
+      <button type="button" class="link" class:current={currentSection === id} aria-current={currentSection === id ? "true" : undefined} onclick={() => jumpTo(id)}>{label}</button>
+    {/each}
   </nav>
+  <div class="settings-body">
 
   <section class="card settings-section" id="settings-backup">
     <h2>Backup and restore</h2>
@@ -608,6 +663,24 @@
     </div>
     <p class="field-hint" style="margin:.3rem 0 0">Glass renders panels as translucent, frosted layers over a soft color backdrop.</p>
 
+    <div class="palette-label" id="set-density">Density</div>
+    <div class="palette-row" role="group" aria-labelledby="set-density">
+      {#each APP_DENSITIES as d (d.value)}
+        <button
+          type="button"
+          class="palette-btn"
+          class:selected={(app.settings.density ?? DEFAULT_SETTINGS.density) === d.value}
+          aria-pressed={(app.settings.density ?? DEFAULT_SETTINGS.density) === d.value}
+          title={d.hint}
+          onclick={() => void updateSetting("density", d.value)}
+        >
+          {d.label}
+          {#if (app.settings.density ?? DEFAULT_SETTINGS.density) === d.value}<span aria-hidden="true">✓</span>{/if}
+        </button>
+      {/each}
+    </div>
+    <p class="field-hint" style="margin:.3rem 0 0">Compact tightens table rows, cards, and toolbars everywhere. The board's Compact cards button separately hides card previews.</p>
+
     <div class="palette-label" id="set-color-theme">Color theme</div>
     <div class="palette-row" role="group" aria-labelledby="set-color-theme">
       {#each COLOR_THEMES as t (t.value)}
@@ -770,6 +843,8 @@
     {#if app.competencyList.length === 0}
       <p class="small muted">No competencies are configured yet. Add one before creating employees.</p>
     {:else}
+      <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+      <div class="table-scroll" role="region" aria-label="Competencies" tabindex="0">
       <table class="data settings-table competency-table">
         <thead>
           <tr><th>Code</th><th>Name</th><th>Employees</th><th>Status</th><th></th></tr>
@@ -814,6 +889,7 @@
           {/each}
         </tbody>
       </table>
+      </div>
     {/if}
   </section>
 
@@ -843,6 +919,8 @@
       <button type="submit" class="primary">Add column</button>
     </form>
     {#if boardColumnError}<div class="field-error" role="alert">{boardColumnError}</div>{/if}
+    <!-- svelte-ignore a11y_no_noninteractive_tabindex -->
+    <div class="table-scroll" role="region" aria-label="Board columns" tabindex="0">
     <table class="data settings-table">
       <thead>
         <tr><th>Name</th><th>Marks tasks as</th><th>Tasks</th><th>Order</th><th></th></tr>
@@ -892,6 +970,7 @@
         {/each}
       </tbody>
     </table>
+    </div>
   </section>
 
   <section class="card settings-section" id="settings-health">
@@ -945,6 +1024,8 @@
       telemetry, no network access. All data stays in this browser and in backups you export.
     </p>
   </section>
+  </div>
+  </div>
 </div>
 
 {#if importResult}
@@ -1060,6 +1141,11 @@
   .settings-jump button.link {
     font-size: .82rem;
   }
+  .settings-jump button.link.current {
+    color: var(--text);
+    text-decoration: underline;
+    text-underline-offset: .2em;
+  }
   .jump-label {
     color: var(--text-muted);
     font-size: .72rem;
@@ -1068,9 +1154,47 @@
     letter-spacing: .06em;
     margin-right: .35rem;
   }
+  /* Wide windows: the section list becomes a sticky sidebar beside the cards.
+     The app's main element guards against wide content with overflow-x: auto,
+     which would make it the sticky container even though the window scrolls.
+     Settings has no wide content at these widths, so it clips instead. */
+  @media (min-width: 1100px) {
+    :global(html body main:has(.settings-layout)) { overflow-x: clip; }
+    .settings-layout {
+      display: grid;
+      grid-template-columns: 10.5rem minmax(0, 1fr);
+      gap: 1.25rem;
+      align-items: start;
+    }
+    .settings-jump {
+      position: sticky;
+      /* Below the app's sticky top bar. */
+      top: calc(var(--topbar-h) + 1rem);
+      flex-direction: column;
+      flex-wrap: nowrap;
+      align-items: stretch;
+      gap: .1rem;
+      margin: 0;
+      padding: .6rem .45rem;
+    }
+    .jump-label { margin: 0 .45rem .3rem; }
+    .settings-jump button.link {
+      text-align: left;
+      padding: .3rem .55rem;
+      border-radius: var(--radius);
+      color: var(--text-muted);
+    }
+    .settings-jump button.link:hover { background: var(--surface-2); color: var(--text); text-decoration: none; }
+    .settings-jump button.link.current {
+      background: var(--accent-soft);
+      color: var(--accent);
+      text-decoration: none;
+      box-shadow: inset 3px 0 0 var(--accent);
+    }
+  }
   .settings-section {
     margin-bottom: 1rem;
-    scroll-margin-top: .75rem;
+    scroll-margin-top: calc(var(--topbar-h) + .75rem);
   }
   .settings-section > h2 {
     margin-bottom: .75rem;

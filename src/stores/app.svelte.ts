@@ -65,6 +65,7 @@ import { newId } from "../utils/ids";
 import { formatDate, nowTimestamp, todayIso } from "../utils/dates";
 import { orderForAppend } from "../domain/rules/boardOrder";
 import { planRecurringTasks, recurrenceInstanceKey } from "../domain/rules/recurrence";
+import { withColumnEntry } from "../domain/rules/columnAge";
 import { applyBulkTaskChange, bulkChangeAction, bulkChangePhrase, type BulkTaskChange } from "../domain/rules/bulkTasks";
 import { priorityLabel } from "../domain/models";
 import { richTextFromPlainText } from "../utils/richTextDoc";
@@ -908,7 +909,7 @@ export class AppStore {
   ): Promise<void> {
     this.saveStatus = "saving";
     try {
-      const persisted = this.plainRecord(record);
+      const persisted = name === "tasks" ? this.stampColumnEntry(this.plainRecord(record) as Task) as CollectionTypes[K] : this.plainRecord(record);
       const entry = activity
         ? this.buildActivityEntry(activity.entityType ?? name, persisted.id, activity.actionType, activity.summary)
         : undefined;
@@ -1325,6 +1326,7 @@ export class AppStore {
       id: newId(),
       status,
       boardColumnId,
+      columnEnteredAt: now,
       priority: "normal",
       performanceInputCreated: false,
       tags: [],
@@ -1409,10 +1411,67 @@ export class AppStore {
     return n;
   }
 
+  /**
+   * Create several tasks at once (meeting action items): every task, its
+   * activity entry, and the backup counter commit in one batch, cards land at
+   * the bottom of their column in the order given, and one Undo removes them all.
+   */
+  async createTasks(partials: (Partial<Task> & { title: string })[], summary: (task: Task) => string): Promise<Task[]> {
+    if (partials.length === 0) return [];
+    const created: Task[] = [];
+    for (const partial of partials) {
+      const task = this.createTask(partial);
+      const columnId = this.taskBoardColumnId(task);
+      task.boardOrder = orderForAppend([
+        ...this.tasks.filter((t) => !t.isArchived && this.taskBoardColumnId(t) === columnId).map((t) => t.boardOrder),
+        ...created.filter((t) => this.taskBoardColumnId(t) === columnId).map((t) => t.boardOrder)
+      ]);
+      created.push(task);
+    }
+    await this.putTaskBatch(created.map((task) => ({ task, actionType: "created", summary: summary(task) })));
+    const n = created.length;
+    this.toast(`Created ${n} task${n === 1 ? "" : "s"}`, "success", async () => {
+      // Undo of a creation the user just made: remove exactly those tasks.
+      this.saveStatus = "saving";
+      try {
+        const ids = new Set(created.map((t) => t.id));
+        const entries = created.map((t) => this.buildActivityEntry("tasks", t.id, "deleted", `Undid creating task "${t.title}"`));
+        const nextMeta = this.bumpedMeta("deleted");
+        const ops: MutationOp[] = [
+          ...created.map((t) => deleteOp("tasks", t.id)),
+          ...entries.map((entry) => putOp("activityEntries", entry))
+        ];
+        if (nextMeta) ops.push({ kind: "saveMeta", meta: nextMeta });
+        await this.store.mutate(ops);
+        this.tasks = this.tasks.filter((t) => !ids.has(t.id));
+        this.activityEntries.push(...entries);
+        if (nextMeta) this.meta = nextMeta;
+        this.saveStatus = "saved";
+      } catch (e) {
+        this.saveStatus = "error";
+        this.toast(`Undo failed: ${e instanceof Error ? e.message : String(e)}`, "error");
+      }
+    });
+    return created;
+  }
+
+  /** Stamps `columnEnteredAt` when a task is new or changes board column (rule in domain/rules/columnAge.ts). */
+  private stampColumnEntry(task: Task): Task {
+    const previous = this.tasks.find((t) => t.id === task.id);
+    return withColumnEntry(
+      previous,
+      previous ? this.taskBoardColumnId(previous) : undefined,
+      task,
+      this.taskBoardColumnId(task),
+      nowTimestamp()
+    );
+  }
+
   /** Writes several tasks with their activity entries and one backup-counter bump, atomically. */
   private async putTaskBatch(items: { task: Task; actionType: string; summary: string }[]): Promise<void> {
     this.saveStatus = "saving";
     try {
+      items = items.map((item) => ({ ...item, task: this.stampColumnEntry(this.plainRecord(item.task)) }));
       const entries = items.map((item) => this.buildActivityEntry("tasks", item.task.id, item.actionType, item.summary));
       const nextMeta = this.bumpedMeta("updated");
       const ops: MutationOp[] = [
@@ -1778,13 +1837,14 @@ export class AppStore {
       meetingNotes: this.meetingNotes.filter((n) => n.projectId === projectId).length,
       quickNotes: this.quickNotes.filter((n) => n.projectId === projectId).length,
       performanceInputs: this.performanceInputs.filter((p) => p.projectId === projectId).length,
-      recurringSchedules: this.recurringTasks.filter((r) => r.projectId === projectId).length
+      recurringSchedules: this.recurringTasks.filter((r) => r.projectId === projectId).length,
+      travelRecords: this.travelRecords.filter((t) => t.projectId === projectId).length
     };
   }
 
   /**
-   * Permanently delete a project. Tasks, meeting notes, performance inputs, and
-   * recurring task schedules that referenced it survive but are unlinked (their projectId is cleared),
+   * Permanently delete a project. Tasks, meeting notes, performance inputs,
+   * recurring task schedules, and trips that referenced it survive but are unlinked (their projectId is cleared),
    * so nothing is left pointing at a project that no longer exists.
    */
   async deleteProject(projectOrId: Project | string): Promise<void> {
@@ -1814,6 +1874,10 @@ export class AppStore {
         .filter((r) => r.projectId === id)
         .map((r) => ({ ...r, projectId: undefined, updatedAt }));
 
+      const updatedTravel = this.travelRecords
+        .filter((t) => t.projectId === id)
+        .map((t) => ({ ...t, projectId: undefined, updatedAt }));
+
       const entry = this.buildActivityEntry("projects", id, "deleted", `Deleted project ${name}`);
       const nextMeta = this.bumpedMeta("deleted");
       const ops: MutationOp[] = [
@@ -1822,6 +1886,7 @@ export class AppStore {
         ...updatedInputs.map((p) => putOp("performanceInputs", this.plainRecord(p))),
         ...updatedQuickNotes.map((n) => putOp("quickNotes", this.plainRecord(n))),
         ...updatedRecurring.map((r) => putOp("recurringTasks", this.plainRecord(r))),
+        ...updatedTravel.map((t) => putOp("travelRecords", this.plainRecord(t))),
         deleteOp("projects", id),
         putOp("activityEntries", entry)
       ];
@@ -1833,6 +1898,7 @@ export class AppStore {
       this.performanceInputs = this.performanceInputs.map((p) => updatedInputs.find((u) => u.id === p.id) ?? p);
       this.quickNotes = this.quickNotes.map((n) => updatedQuickNotes.find((u) => u.id === n.id) ?? n);
       this.recurringTasks = this.recurringTasks.map((r) => updatedRecurring.find((u) => u.id === r.id) ?? r);
+      this.travelRecords = this.travelRecords.map((t) => updatedTravel.find((u) => u.id === t.id) ?? t);
       this.projects = this.projects.filter((p) => p.id !== id);
 
       this.activityEntries.push(entry);

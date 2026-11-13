@@ -2,6 +2,35 @@
 
 ## Unreleased
 
+### Leave groups, award stages, nominations from inputs, meeting action items, project progress, and trip purpose
+
+- **Leave list grouped.** Leave is grouped the way Travel is: Awaiting approval, Out now, Upcoming, then Past and Cancelled when past leave is shown. Status moved next to the name, with Approve under a requested status, so it stays in view in a narrow window. The Leave calendar shows how many people are out on each day ("2 out"), counting each person once.
+- **Award stage tracker.** Each award has a tracker like Travel's: Idea, Input, Draft, Review, Submit. The next stage can be clicked, or reached with Tab and Enter, to move the award forward, with Undo, replacing the Move to button. The current stage turns red once the nomination is past due, and submitted or decided awards show every stage done.
+- **Performance inputs in a nomination.** The award dialog lists the nominee's performance inputs (within the accomplishment period when the award has one, with a switch to show the rest). Ticking inputs links them to the award. "Add selected to citation draft" adds one line per input, with its result, to the end of a new Citation draft field. Text already in the draft is never replaced.
+- **Meeting action items become tasks.** When a meeting's action items hold more than one item, "Create tasks from N action items" opens a preview with one row per item: the title (editable), an owner (attendees listed first, or no owner), an optional due date, and a box to leave it out. Create makes all of them at once, linked to the meeting's project, and one Undo removes them all. A single action item keeps the existing Create follow-up task button. Two sample meetings now have several action items.
+- **Project progress.** Each project row shows a progress bar with "7 of 12 done" and the next due date beside the Open and Overdue counts. Completed tasks still count after Done archives them; cancelled tasks do not.
+- **Trip purpose and project.** A trip can record its purpose and the project it supports, both optional. They show in the expanded trip and are searchable. Deleting a project keeps its trips and unlinks them, and the confirmation says how many. Backups carry both fields and check that a trip's project exists.
+
+### Employee Overview, for 1:1 prep
+
+- **Employee pages open on Overview.** A new first tab shows what is current for the person: open tasks (overdue first, up to five, each opening the task), time away in the leave lookahead window (leave, situational telework, and travel, marked Now or Pending), training that needs action, nominations still being worked, and the last performance input, marked "Due for one" once it is older than the performance input reminder.
+- **Since last check-in.** Below that is everything since the last check-in: tasks completed and added, performance inputs, meetings they attended, and notes, plus the summary of the last check-in when it asked for a follow-up. Record Check-in sits beside it, so you can prepare for and record the conversation in one place. The starting point is the later of the last recorded check-in and the last check-in date on the employee record. Records dated in the future are not counted.
+- **Profile hides empty fields.** The Profile tab lists only the fields that hold something, and a single line ("20 fields are not filled in and hidden here. Edit profile") replaces the rows of dashes. Sections with nothing in them are left out. Editing is unchanged.
+
+### Look and feel: density, lighter type, short date ranges, and a Settings sidebar
+
+- **Density.** Settings → Appearance has a Density choice. Comfortable is the layout you have now. Compact tightens table rows, cards, board cards, toolbars, headers, tabs, and controls throughout, so a table row is about 20% shorter and more fits on screen. The board's own Compact cards button still separately hides card previews. Density is a setting, so it travels with backups.
+- **Lighter type.** Buttons, field labels, and table headers use a medium weight instead of semibold, and board card titles are lighter. Names in the first column of a table, page and section headings, the main button on a page, and status badges keep their weight, so each row has one thing that stands out. On the board, text at semibold or heavier fell from about 70% to about 27%.
+- **Short date ranges.** Where a start and end date are written together, they are shortened: "Nov 21–23, 2026" or "Nov 28 – Dec 2, 2026" instead of the two dates in full. This covers the Employees list's upcoming leave and travel, telework ranges on an employee page, calendar tooltips and day details, attention items, and evaluation cycle names. Pages with separate Start and End columns are unchanged.
+- **Settings sidebar.** In a window at least 1100px wide, the list of Settings sections sits in a sidebar beside the cards and stays in view while you scroll. The section you are reading is highlighted (with a bar and background, not color alone), and choosing one scrolls to it and moves keyboard focus to its heading. Narrower windows keep the row of section links at the top. The Competencies, Board columns, Evaluation cycles, and Performance elements tables now scroll sideways on their own when the window is too narrow for them, instead of widening the page.
+
+### Tasks board: project or competency work, tags, and time in a column
+
+- **Project or competency work.** The Tasks page has an All · Project · Competency switch at the start of the filters. Project shows tasks linked to a project; Competency shows the rest. It works with the other filters, on both the board and the list, and saved views remember it. Picking a project in the project filter switches to Project, and choosing Competency clears the project filter. Views saved before this show both, as they did.
+- **Tags on cards.** A card shows up to three of its tags, with "+2" and the rest on hover when there are more.
+- **Time in a column.** A card that has sat in the same column for the stale-task threshold (Settings → Attention rule thresholds, 30 days by default) shows "In column 34d". Cards in a Done column never show it. RADAR starts recording this now, so existing cards show nothing until they next move; it never estimates an age it did not record. Undoing a move restores the earlier time.
+- The page is titled **Tasks**, matching the navigation, for the Board, List, and Recurring views alike.
+
 ### Saved views, bulk actions, calendar file export, and faster entry
 
 - **Saved views (Tasks).** When the Tasks page has a search or filters set, Save view keeps that combination under a name. A Saved views menu then appears beside the filters; picking a view applies it, and the menu shows a view as selected only while the filters still match it. Delete view removes the saved filters and never changes a task. Views are part of your settings, so they travel with backups. If a view names a person, competency, or project that no longer exists, that part is dropped and the rest still applies.

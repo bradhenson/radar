@@ -45,7 +45,7 @@
   });
 
   // Theme handling: light / dark / system via data-theme attribute,
-  // accent palette via data-palette, visual style via data-look.
+  // accent palette via data-palette, visual style via data-look, spacing via data-density.
   $effect(() => {
     const apply = () => {
       const pref = app.settings.theme;
@@ -54,6 +54,7 @@
       document.documentElement.dataset.theme = dark ? "dark" : "light";
       document.documentElement.dataset.palette = app.settings.colorTheme ?? "default";
       document.documentElement.dataset.look = app.settings.look ?? DEFAULT_SETTINGS.look;
+      document.documentElement.dataset.density = app.settings.density ?? DEFAULT_SETTINGS.density;
     };
     apply();
     const mq = window.matchMedia("(prefers-color-scheme: dark)");

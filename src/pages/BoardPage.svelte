@@ -25,9 +25,10 @@
     type Task,
     type TaskPriority
   } from "../domain/models";
-  import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../domain/rules/boardFilters";
+  import { matchesBoardSummaryFilter, matchesWorkType, type BoardSummaryFilter, type WorkTypeFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
+  import { staleColumnDays } from "../domain/rules/columnAge";
   import { sortTaskListRows, type SortDirection, type TaskListRow, type TaskListSortKey } from "../domain/rules/taskListSort";
   import { daysSinceTimestamp, formatDate } from "../utils/dates";
   import { richTextDocToPlainText } from "../utils/richTextDoc";
@@ -39,6 +40,7 @@
   let filterCompetency = $state(ui.boardView.competency);
   let filterProject = $state(ui.boardView.project);
   let filterPriority = $state(ui.boardView.priority);
+  let workType = $state<WorkTypeFilter>(ui.boardView.workType);
   let summaryFilter = $state<BoardSummaryFilter>(ui.boardView.summary);
   let compact = $state(ui.boardView.compact);
   let columnStrip: HTMLDivElement | undefined = $state();
@@ -48,7 +50,7 @@
   $effect(() => { if (columnStrip) columnStrip.scrollLeft = horizontalPosition; });
   onDestroy(() => {
     ui.boardView = { view, search, employee: filterEmployee, competency: filterCompetency,
-      project: filterProject, priority: filterPriority, summary: summaryFilter,
+      project: filterProject, priority: filterPriority, summary: summaryFilter, workType,
       sortKey, sortDirection, compact, scrollLeft: horizontalPosition };
   });
 
@@ -78,6 +80,7 @@
       if (filterEmployee && t.employeeId !== filterEmployee) return false;
       if (filterCompetency && t.competencyId !== filterCompetency) return false;
       if (filterProject && t.projectId !== filterProject) return false;
+      if (!matchesWorkType(t, workType)) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -340,6 +343,13 @@
     filterProject = "";
     filterPriority = "";
     summaryFilter = "";
+    workType = "";
+  }
+
+  // A specific project is project work; competency work has no project.
+  function setWorkType(next: WorkTypeFilter) {
+    workType = next;
+    if (next === "competency") filterProject = "";
   }
 
   function cancelTransientState() {
@@ -408,6 +418,7 @@
   }
 
   const CARD_CHECKLIST_LIMIT = 4;
+  const CARD_TAG_LIMIT = 3;
 
   function cardChecklist(taskId: string) {
     return app.checklistItems.filter((c) => c.taskId === taskId).sort((a, b) => a.order - b.order);
@@ -436,7 +447,7 @@
   }
 
   let anyFilter = $derived(
-    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter)
+    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter || workType)
   );
 
   // --- saved views -----------------------------------------------------------
@@ -448,7 +459,8 @@
     competency: filterCompetency,
     project: filterProject,
     priority: filterPriority,
-    summary: summaryFilter
+    summary: summaryFilter,
+    workType
   });
   let savedViews = $derived(app.settings.savedBoardViews ?? []);
   let activeView = $derived(matchingView(savedViews, currentFilters));
@@ -471,6 +483,7 @@
     filterProject = filters.project;
     filterPriority = filters.priority;
     summaryFilter = filters.summary;
+    workType = filters.workType;
   }
 
   function openSaveView() {
@@ -533,7 +546,7 @@
 <svelte:window onkeydown={(e) => e.key === "Escape" && cancelTransientState()} />
 
 <div class="page board-page" class:list-mode={view !== "board"}>
-  <WorkspaceHeader title={view === "board" ? "Kanban Board" : view === "list" ? "Task List" : "Recurring Tasks"} titleMinWidth="11rem" section="Work">
+  <WorkspaceHeader title="Tasks" section="Work">
     {#snippet meta()}
       <div class="view-toggle" role="group" aria-label="Task view">
         <button type="button" class:active={view === "board"} aria-pressed={view === "board"} onclick={() => (view = "board")}>Board</button>
@@ -570,9 +583,14 @@
     <RecurringTasks bind:this={recurringView} />
   {:else}
   <div class="board-toolbar" aria-label="Board filters">
+    <div class="view-toggle work-type" role="group" aria-label="Project or competency work">
+      <button type="button" class:active={workType === ""} aria-pressed={workType === ""} onclick={() => setWorkType("")}>All</button>
+      <button type="button" class:active={workType === "project"} aria-pressed={workType === "project"} onclick={() => setWorkType("project")}>Project</button>
+      <button type="button" class:active={workType === "competency"} aria-pressed={workType === "competency"} onclick={() => setWorkType("competency")}>Competency</button>
+    </div>
     <div class="search-field">
       <Icon name="search" size={15} />
-      <input type="search" placeholder="Search tasks" bind:value={search} aria-label="Search tasks" />
+      <input type="search" placeholder="Search" bind:value={search} aria-label="Search tasks" />
     </div>
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
@@ -582,7 +600,7 @@
       <option value="">All competencies</option>
       {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
-    <select bind:value={filterProject} aria-label="Filter by project">
+    <select bind:value={filterProject} aria-label="Filter by project" onchange={() => { if (filterProject) workType = "project"; }}>
       <option value="">All projects</option>
       {#each app.activeProjects as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
     </select>
@@ -811,6 +829,7 @@
               {/if}
               {@const ds = dueState(task, app.today, app.settings.dueSoonDays)}
               {@const statusDiverges = col.column.mapsToStatus && col.column.mapsToStatus !== task.status}
+              {@const columnDays = col.column.mapsToStatus === "complete" ? undefined : staleColumnDays(task, app.today, app.settings.taskStaleDays)}
               <article
                 class="task-card"
                 class:dragging={draggingId === task.id}
@@ -833,10 +852,16 @@
                   {#if task.projectId}
                     <span class="card-context">{app.projectName(task.projectId)}</span>
                   {/if}
+                  {#if task.tags.length}
+                    <span class="card-tags">
+                      {#each task.tags.slice(0, CARD_TAG_LIMIT) as tag (tag)}<span class="card-tag">{tag}</span>{/each}
+                      {#if task.tags.length > CARD_TAG_LIMIT}<span class="card-tag more" title={task.tags.slice(CARD_TAG_LIMIT).join(", ")}>+{task.tags.length - CARD_TAG_LIMIT}</span>{/if}
+                    </span>
+                  {/if}
                   {#if !compact && task.showOnCard === "description" && task.description}
                     <div class="card-preview"><RichTextView value={task.description} compact /></div>
                   {/if}
-                  {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || task.status === "complete" || statusDiverges || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
+                  {#if task.priority === "high" || task.priority === "critical" || ds === "overdue" || ds === "due_today" || ds === "due_soon" || (task.dueDate && task.status !== "complete") || task.status === "waiting" || task.status === "complete" || statusDiverges || columnDays !== undefined || (checklistProgress(task.id) && task.showOnCard !== "checklist")}
                     <span class="card-meta">
                       {#if task.priority === "high" || task.priority === "critical"}
                         <span class="badge priority-{task.priority}">{task.priority === "critical" ? "Critical" : "High"}</span>
@@ -853,6 +878,9 @@
                       {/if}
                       {#if task.status === "complete"}
                         <span class="badge success">Complete{task.completedDate ? ` ${formatDate(task.completedDate)}` : ""}</span>
+                      {/if}
+                      {#if columnDays !== undefined}
+                        <span class="badge column-age" title={`In ${col.column.label} for ${columnDays} days`}>In column {columnDays}d</span>
                       {/if}
                       {#if statusDiverges && task.status !== "waiting" && task.status !== "complete"}
                         <span class="badge" title="Task status differs from what this column implies">{statusLabel(task.status)}</span>
@@ -1069,7 +1097,7 @@
   }
   .board-toolbar {
     display: grid;
-    grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(7rem, 1fr)) auto;
+    grid-template-columns: auto minmax(7rem, .8fr) repeat(4, minmax(7rem, 1fr)) auto;
     gap: .45rem;
     align-items: center;
     padding: .65rem;
@@ -1273,12 +1301,38 @@
   }
   .card-title {
     display: block;
-    font-weight: 650;
+    font-weight: 550;
     line-height: 1.45;
     margin-bottom: .45rem;
     padding-right: 2.8rem;
     overflow-wrap: anywhere;
   }
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: .25rem;
+    margin: -.15rem 0 .45rem;
+  }
+  .card-tag {
+    padding: 0 .4rem;
+    border-radius: 999px;
+    background: var(--surface-2);
+    color: var(--text-muted);
+    font-size: .7rem;
+    line-height: 1.35rem;
+    max-width: 9rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .card-tag.more { background: transparent; border: 1px dashed var(--border-strong); }
+  .work-type { justify-self: start; }
+  :global(:root[data-density="compact"]) .task-card { padding: .45rem .55rem .4rem; margin-bottom: .35rem; }
+  :global(:root[data-density="compact"]) .card-context { margin-bottom: .25rem; }
+  :global(:root[data-density="compact"]) .card-tags { margin-bottom: .25rem; }
+  :global(:root[data-density="compact"]) .board-toolbar { padding: .45rem; margin-bottom: .55rem; }
+  .saved-views select { width: 8.5rem; }
+  .work-type button { white-space: nowrap; }
   .card-context {
     display: block;
     color: var(--text-muted);
@@ -1416,10 +1470,10 @@
   }
   @media (max-width: 1200px) {
     .board-toolbar {
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
     }
     .search-field {
-      grid-column: 1 / -1;
+      grid-column: 2 / -1;
     }
   }
   @media (max-width: 760px) {

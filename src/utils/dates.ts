@@ -92,6 +92,24 @@ export function daysSinceTimestamp(ts: IsoTimestamp, today: IsoDate): number {
   return daysBetween(timestampToLocalDate(ts), today);
 }
 
+/**
+ * A start and end date as one short phrase, date-only:
+ * "Nov 21, 2026", "Nov 21–23, 2026", "Nov 28 – Dec 2, 2026", or both dates in
+ * full when the years differ. `withYear: false` drops the shared year
+ * ("Nov 21–23"), for lists where the year is obvious. A missing, invalid, or
+ * earlier end date shows the start date alone.
+ */
+export function formatDateRange(start: IsoDate, end: IsoDate | undefined, options: { withYear?: boolean } = {}): string {
+  const withYear = options.withYear ?? true;
+  if (!isValidIsoDate(start)) return formatDate(start);
+  const short = (date: IsoDate) => formatDate(date).replace(/, \d{4}$/, "");
+  const year = withYear ? `, ${start.slice(0, 4)}` : "";
+  if (!end || !isValidIsoDate(end) || end <= start) return withYear ? formatDate(start) : short(start);
+  if (start.slice(0, 4) !== end.slice(0, 4)) return `${formatDate(start)} – ${formatDate(end)}`;
+  if (start.slice(0, 7) === end.slice(0, 7)) return `${short(start)}–${Number(end.slice(8, 10))}${year}`;
+  return `${short(start)} – ${short(end)}${year}`;
+}
+
 /** Display formatting, e.g. "Jul 4, 2026". Falls back to raw value if invalid. */
 export function formatDate(date: IsoDate | undefined): string {
   if (!date) return "";

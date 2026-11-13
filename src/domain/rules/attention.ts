@@ -17,7 +17,7 @@ import type {
   TrainingRequirement,
   TravelRecord
 } from "../models";
-import { compareDates, daysBetween, daysSinceTimestamp, describeDueDistance, formatDate } from "../../utils/dates";
+import { compareDates, daysBetween, daysSinceTimestamp, describeDueDistance, formatDate, formatDateRange } from "../../utils/dates";
 import { AWARD_FINAL_STATUSES } from "./calendar";
 import { requirementAppliesTo, trainingStatus } from "./training";
 import { isTripCancelled, isVoucherSettled } from "./travel";
@@ -359,7 +359,7 @@ export function leaveAttention(
       items.push({
         entityType: "leave",
         entityId: leave.id,
-        title: `${emp.displayName} leave ${formatDate(leave.startDate)} – ${formatDate(leave.endDate)}`,
+        title: `${emp.displayName} leave ${formatDateRange(leave.startDate, leave.endDate)}`,
         employeeId: emp.id,
         dueDate: leave.startDate,
         reasonCode: "leave_begins_soon",
@@ -509,7 +509,7 @@ export function travelAttention(
         reasonText:
           untilStart === 0
             ? "Travel begins today"
-            : `Travel begins in ${untilStart} day${untilStart === 1 ? "" : "s"} (${formatDate(trip.startDate)} – ${formatDate(trip.endDate)})`,
+            : `Travel begins in ${untilStart} day${untilStart === 1 ? "" : "s"} (${formatDateRange(trip.startDate, trip.endDate)})`,
         severity: "info",
         sortScore: SEVERITY_SCORE.info + (settings.leaveLookaheadDays - untilStart),
         suggestedAction: "Check coverage while this employee is on travel",

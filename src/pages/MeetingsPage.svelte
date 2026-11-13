@@ -3,6 +3,8 @@
   import { ui } from "../stores/ui.svelte";
   import { router } from "../app/router.svelte";
   import ConfirmDialog from "../components/common/ConfirmDialog.svelte";
+  import Dialog from "../components/common/Dialog.svelte";
+  import { splitActionItems } from "../domain/rules/followUpTasks";
   import EmptyState from "../components/common/EmptyState.svelte";
   import Icon from "../components/common/Icon.svelte";
   import WorkspaceHeader from "../components/common/WorkspaceHeader.svelte";
@@ -15,10 +17,10 @@
     resolveDateRange,
     type DateRangePreset
   } from "../domain/rules/dateRange";
-  import { formatDate, nowTimestamp } from "../utils/dates";
+  import { formatDate, isValidIsoDate, nowTimestamp } from "../utils/dates";
   import { toCsv } from "../utils/csv";
   import { backupFilename, downloadText } from "../utils/download";
-  import { isRichTextEmpty, normalizeRichText, richTextDocToPlainText } from "../utils/richTextDoc";
+  import { isRichTextEmpty, normalizeRichText, richTextDocToPlainText, richTextFromPlainText } from "../utils/richTextDoc";
 
   let search = $state("");
   let filterType = $state("");
@@ -150,6 +152,62 @@
     if (editing?.id === note.id) editing = undefined;
     pendingDelete = undefined;
     app.toast("Meeting note deleted", "success");
+  }
+
+  // --- action items → tasks --------------------------------------------------
+  // One action item keeps the single prefilled follow-up card. Several open a
+  // preview with one row each; nothing is created until Create tasks.
+  type ActionRow = { title: string; employeeId: string; dueDate: string; include: boolean };
+  let actionNote = $state<MeetingNote | undefined>(undefined);
+  let actionRows = $state<ActionRow[]>([]);
+  let actionError = $state("");
+
+  function startActionTasks(note: MeetingNote) {
+    const items = splitActionItems(note.actionItems);
+    if (items.length <= 1) {
+      createFollowUpTask(note);
+      return;
+    }
+    actionNote = note;
+    actionRows = items.map((title) => ({ title, employeeId: "", dueDate: "", include: true }));
+    actionError = "";
+  }
+
+  /** Attendees first, then everyone else, so the likely owners are at the top. */
+  function ownerOptions(note: MeetingNote) {
+    const attendees = note.attendeeEmployeeIds
+      .map((id) => app.activeEmployees.find((e) => e.id === id))
+      .filter((e): e is NonNullable<typeof e> => Boolean(e));
+    const others = app.activeEmployees.filter((e) => !note.attendeeEmployeeIds.includes(e.id));
+    return { attendees, others };
+  }
+
+  let includedCount = $derived(actionRows.filter((r) => r.include && r.title.trim()).length);
+
+  async function createActionTasks() {
+    const note = actionNote;
+    if (!note) return;
+    const rows = actionRows.filter((r) => r.include && r.title.trim());
+    if (rows.some((r) => r.dueDate && !isValidIsoDate(r.dueDate))) {
+      actionError = "One of the due dates is not valid.";
+      return;
+    }
+    if (rows.length === 0) {
+      actionError = "Include at least one action item.";
+      return;
+    }
+    const origin = `From the meeting "${note.title}" on ${formatDate(note.meetingDate)}.`;
+    await app.createTasks(
+      rows.map((r) => ({
+        title: r.title.trim(),
+        employeeId: r.employeeId || undefined,
+        dueDate: r.dueDate || undefined,
+        projectId: note.projectId,
+        description: richTextFromPlainText(origin)
+      })),
+      (task) => `Created task "${task.title}" from meeting "${note.title}"`
+    );
+    actionNote = undefined;
   }
 
   function createFollowUpTask(note: MeetingNote) {
@@ -307,7 +365,10 @@
                       <button type="button" class="icon-btn danger" aria-label="Delete meeting note" title="Delete" onclick={() => requestDelete(note)}><Icon name="trash" size={16} /></button>
                       <span class="spacer"></span>
                       {#if note.actionItems}
-                        <button type="button" class="primary" onclick={() => createFollowUpTask(note)}>Create follow-up task</button>
+                        {@const itemCount = splitActionItems(note.actionItems).length}
+                        <button type="button" class="primary" onclick={() => startActionTasks(note)}>
+                          {itemCount > 1 ? `Create tasks from ${itemCount} action items` : "Create follow-up task"}
+                        </button>
                       {/if}
                     </div>
                   </div>
@@ -333,7 +394,56 @@
   />
 {/if}
 
+{#if actionNote}
+  {@const owners = ownerOptions(actionNote)}
+  <Dialog title="Create tasks from action items" wide onclose={() => (actionNote = undefined)}>
+    <p class="small muted" style="margin-top:0">
+      One task per action item from "{actionNote.title}" ({formatDate(actionNote.meetingDate)}){actionNote.projectId ? `, linked to ${app.projectName(actionNote.projectId)}` : ""}. Untick any you do not want.
+    </p>
+    <ol class="action-rows">
+      {#each actionRows as row, i (i)}
+        <li class:excluded={!row.include}>
+          <input type="checkbox" bind:checked={row.include} aria-label={`Create a task for action item ${i + 1}`} />
+          <input type="text" bind:value={row.title} maxlength="200" aria-label={`Task title for action item ${i + 1}`} disabled={!row.include} />
+          <select bind:value={row.employeeId} aria-label={`Owner for action item ${i + 1}`} disabled={!row.include}>
+            <option value="">No owner</option>
+            {#if owners.attendees.length}
+              <optgroup label="Attendees">
+                {#each owners.attendees as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+              </optgroup>
+            {/if}
+            <optgroup label="Everyone else">
+              {#each owners.others as e (e.id)}<option value={e.id}>{e.displayName}</option>{/each}
+            </optgroup>
+          </select>
+          <input type="date" bind:value={row.dueDate} aria-label={`Due date for action item ${i + 1}`} disabled={!row.include} />
+        </li>
+      {/each}
+    </ol>
+    {#if actionError}<div class="field-error" role="alert">{actionError}</div>{/if}
+    <div class="dialog-actions">
+      <button type="button" onclick={() => (actionNote = undefined)}>Cancel</button>
+      <button type="button" class="primary" disabled={includedCount === 0} onclick={() => void createActionTasks()}>
+        Create {includedCount} task{includedCount === 1 ? "" : "s"}
+      </button>
+    </div>
+  </Dialog>
+{/if}
+
 <style>
+  .action-rows { list-style: none; margin: .4rem 0 .6rem; padding: 0; display: grid; gap: .4rem; }
+  .action-rows li {
+    display: grid;
+    grid-template-columns: auto minmax(10rem, 1fr) minmax(8rem, 11rem) 9.5rem;
+    gap: .4rem;
+    align-items: center;
+  }
+  .action-rows li.excluded input[type="text"] { text-decoration: line-through; }
+  .action-rows input[type="text"], .action-rows select, .action-rows input[type="date"] { width: 100%; min-width: 0; }
+  @media (max-width: 640px) {
+    .action-rows li { grid-template-columns: auto 1fr; }
+    .action-rows select, .action-rows input[type="date"] { grid-column: 2; }
+  }
   .date-range {
     display: inline-flex;
     align-items: center;

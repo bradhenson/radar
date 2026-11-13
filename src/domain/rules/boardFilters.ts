@@ -3,6 +3,20 @@ import { dueState } from "./dueState";
 
 export type BoardSummaryFilter = "" | "due_soon" | "overdue" | "waiting" | "priority";
 
+/** The board's quick split of the supervisor's own work: project work or competency work. */
+export type WorkTypeFilter = "" | "project" | "competency";
+export const WORK_TYPE_FILTERS: readonly WorkTypeFilter[] = ["", "project", "competency"];
+
+/**
+ * Project work is any task linked to a project; competency work is everything
+ * else (a task's competency is optional, so "no project" is the dividing line).
+ */
+export function matchesWorkType(task: Pick<Task, "projectId">, filter: WorkTypeFilter): boolean {
+  if (filter === "project") return Boolean(task.projectId);
+  if (filter === "competency") return !task.projectId;
+  return true;
+}
+
 /**
  * Match the quick-filter summaries shown above the board. These filters are
  * intentionally single-choice, but continue to compose with the board's
