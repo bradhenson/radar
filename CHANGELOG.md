@@ -30,6 +30,7 @@
 
 ### Fixed
 
+- Deleting an employee or a project now unlinks it from recurring task schedules, the same way it unlinks tasks. The schedule keeps running, unassigned or without a project, and the delete confirmation counts how many schedules will be unlinked. Before, the schedule kept pointing at the deleted record. Cards it created were already made without the link, but the schedule itself still named someone who no longer existed.
 - A new task opened already filled in (from a meeting note's follow-up button, and now from Travel, Training, and Awards) was not created if you chose Create task without changing anything; the editor closed as though it had saved. Create task now always creates the task.
 
 ### Decisions from the list, and counts in the sidebar
