@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../src/domain/models";
 import { matchesBoardSummaryFilter, type BoardSummaryFilter } from "../../src/domain/rules/boardFilters";
-import { matchesWorkType } from "../../src/domain/rules/boardFilters";
+import { ANY_PROJECT, matchesProjectFilter, NO_PROJECT } from "../../src/domain/rules/boardFilters";
 
 const TODAY = "2026-07-20";
 const DUE_SOON_DAYS = 7;
@@ -48,20 +48,25 @@ describe("board summary filters", () => {
   });
 });
 
-describe("matchesWorkType", () => {
-  it("treats any task with a project as project work", () => {
-    expect(matchesWorkType({ projectId: "p1" }, "project")).toBe(true);
-    expect(matchesWorkType({ projectId: "p1" }, "competency")).toBe(false);
+describe("matchesProjectFilter", () => {
+  it("matches every task when no project filter is set", () => {
+    expect(matchesProjectFilter({}, "")).toBe(true);
+    expect(matchesProjectFilter({ projectId: "p1" }, "")).toBe(true);
   });
 
-  it("treats a task without a project as competency work", () => {
-    expect(matchesWorkType({}, "competency")).toBe(true);
-    expect(matchesWorkType({ projectId: "" }, "competency")).toBe(true);
-    expect(matchesWorkType({}, "project")).toBe(false);
+  it("keeps any task with a project for Any project", () => {
+    expect(matchesProjectFilter({ projectId: "p1" }, ANY_PROJECT)).toBe(true);
+    expect(matchesProjectFilter({}, ANY_PROJECT)).toBe(false);
   });
 
-  it("matches everything when the filter is empty", () => {
-    expect(matchesWorkType({}, "")).toBe(true);
-    expect(matchesWorkType({ projectId: "p1" }, "")).toBe(true);
+  it("keeps tasks without a project for No project", () => {
+    expect(matchesProjectFilter({}, NO_PROJECT)).toBe(true);
+    expect(matchesProjectFilter({ projectId: "" }, NO_PROJECT)).toBe(true);
+    expect(matchesProjectFilter({ projectId: "p1" }, NO_PROJECT)).toBe(false);
+  });
+
+  it("matches one project by id", () => {
+    expect(matchesProjectFilter({ projectId: "p1" }, "p1")).toBe(true);
+    expect(matchesProjectFilter({ projectId: "p2" }, "p1")).toBe(false);
   });
 });

@@ -2,7 +2,7 @@
 // anywhere in the application.
 
 import type { PerformanceInput, Task } from "../domain/models";
-import type { BoardSummaryFilter, WorkTypeFilter } from "../domain/rules/boardFilters";
+import type { BoardSummaryFilter } from "../domain/rules/boardFilters";
 import type { SortDirection, TaskListSortKey } from "../domain/rules/taskListSort";
 
 class UiState {
@@ -12,7 +12,6 @@ class UiState {
     view: "board" as "board" | "list" | "recurring",
     search: "", employee: "", competency: "", project: "", priority: "",
     summary: "" as BoardSummaryFilter,
-    workType: "" as WorkTypeFilter,
     sortKey: "column" as TaskListSortKey,
     sortDirection: "asc" as SortDirection,
     compact: false,

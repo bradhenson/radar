@@ -26,7 +26,7 @@
 
 ### Tasks board: project or competency work, tags, and time in a column
 
-- **Project or competency work.** The Tasks page has an All · Project · Competency switch at the start of the filters. Project shows tasks linked to a project; Competency shows the rest. It works with the other filters, on both the board and the list, and saved views remember it. Picking a project in the project filter switches to Project, and choosing Competency clears the project filter. Views saved before this show both, as they did.
+- **Project or competency work.** The project filter on the Tasks page has two more choices: Any project (every task linked to a project) and No project (competency work, everything else). They work with the other filters, on both the board and the list, and saved views remember them. A view saved with the brief All · Project · Competency switch that came before this opens with the matching choice.
 - **Tags on cards.** A card shows up to three of its tags, with "+2" and the rest on hover when there are more.
 - **Time in a column.** A card that has sat in the same column for the stale-task threshold (Settings → Attention rule thresholds, 30 days by default) shows "In column 34d". Cards in a Done column never show it. RADAR starts recording this now, so existing cards show nothing until they next move; it never estimates an age it did not record. Undoing a move restores the earlier time.
 - The page is titled **Tasks**, matching the navigation, for the Board, List, and Recurring views alike.

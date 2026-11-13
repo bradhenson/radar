@@ -13,6 +13,7 @@ import {
   sameFilters,
   savedViewNameError
 } from "../../src/domain/rules/savedViews";
+import { ANY_PROJECT, NO_PROJECT } from "../../src/domain/rules/boardFilters";
 
 const view = (overrides: Partial<SavedBoardView> = {}): SavedBoardView => ({
   id: "v1",
@@ -28,14 +29,13 @@ describe("normalizeSavedBoardViews", () => {
     expect(normalizeSavedBoardViews([view()])).toEqual([view()]);
   });
 
-  it("reads a view saved before the work-type filter existed as covering both", () => {
-    const { workType: _omitted, ...legacy } = view();
-    expect(normalizeSavedBoardViews([legacy])[0]!.workType).toBe("");
-  });
-
-  it("keeps a valid work type and drops an unknown one", () => {
-    expect(normalizeSavedBoardViews([view({ workType: "competency" })])[0]!.workType).toBe("competency");
-    expect(normalizeSavedBoardViews([{ ...view(), workType: "personal" }])[0]!.workType).toBe("");
+  it("turns a view saved with the old Project/Competency switch into the matching project filter", () => {
+    expect(normalizeSavedBoardViews([{ ...view(), workType: "competency" }])[0]!.project).toBe(NO_PROJECT);
+    expect(normalizeSavedBoardViews([{ ...view(), workType: "project" }])[0]!.project).toBe(ANY_PROJECT);
+    // A specific project already chosen wins, and an unknown value is ignored.
+    expect(normalizeSavedBoardViews([{ ...view({ project: "p1" }), workType: "competency" }])[0]!.project).toBe("p1");
+    expect(normalizeSavedBoardViews([{ ...view(), workType: "personal" }])[0]!.project).toBe("");
+    expect("workType" in normalizeSavedBoardViews([{ ...view(), workType: "project" }])[0]!).toBe(false);
   });
 
   it("returns an empty list for anything that is not a list", () => {
@@ -61,7 +61,7 @@ describe("normalizeSavedBoardViews", () => {
     const [result] = normalizeSavedBoardViews([
       { id: "v1", name: "Odd", search: 42, employee: null, priority: "urgent", summary: "everything", project: "p1" }
     ]);
-    expect(result).toEqual({ id: "v1", name: "Odd", search: "", employee: "", competency: "", project: "p1", priority: "", summary: "", workType: "" });
+    expect(result).toEqual({ id: "v1", name: "Odd", search: "", employee: "", competency: "", project: "p1", priority: "", summary: "" });
   });
 
   it("trims over-long text and caps the number of views", () => {
@@ -110,12 +110,20 @@ describe("savedViewNameError", () => {
   });
 });
 
+describe("filtersForView: Any project and No project", () => {
+  it("keeps the two project choices that are not project ids", () => {
+    const existing = { employees: new Set<string>(), competencies: new Set<string>(), projects: new Set<string>() };
+    expect(filtersForView(view({ employee: "", project: ANY_PROJECT }), existing).project).toBe(ANY_PROJECT);
+    expect(filtersForView(view({ employee: "", project: NO_PROJECT }), existing).project).toBe(NO_PROJECT);
+  });
+});
+
 describe("filtersForView", () => {
   const existing = { employees: new Set(["e1"]), competencies: new Set(["c1"]), projects: new Set(["p1"]) };
 
   it("applies a view as saved when everything it names still exists", () => {
     const saved = view({ competency: "c1", project: "p1", search: "audit", priority: "high" });
-    expect(filtersForView(saved, existing)).toEqual({ search: "audit", employee: "e1", competency: "c1", project: "p1", priority: "high", summary: "overdue", workType: "" });
+    expect(filtersForView(saved, existing)).toEqual({ search: "audit", employee: "e1", competency: "c1", project: "p1", priority: "high", summary: "overdue" });
   });
 
   it("drops a person, competency, or project that is gone, so the board widens instead of emptying", () => {

@@ -25,7 +25,7 @@
     type Task,
     type TaskPriority
   } from "../domain/models";
-  import { matchesBoardSummaryFilter, matchesWorkType, type BoardSummaryFilter, type WorkTypeFilter } from "../domain/rules/boardFilters";
+  import { ANY_PROJECT, matchesBoardSummaryFilter, matchesProjectFilter, NO_PROJECT, type BoardSummaryFilter } from "../domain/rules/boardFilters";
   import { dueState, DUE_STATE_LABELS } from "../domain/rules/dueState";
   import { orderBetween } from "../domain/rules/boardOrder";
   import { staleColumnDays } from "../domain/rules/columnAge";
@@ -40,7 +40,6 @@
   let filterCompetency = $state(ui.boardView.competency);
   let filterProject = $state(ui.boardView.project);
   let filterPriority = $state(ui.boardView.priority);
-  let workType = $state<WorkTypeFilter>(ui.boardView.workType);
   let summaryFilter = $state<BoardSummaryFilter>(ui.boardView.summary);
   let compact = $state(ui.boardView.compact);
   let columnStrip: HTMLDivElement | undefined = $state();
@@ -50,7 +49,7 @@
   $effect(() => { if (columnStrip) columnStrip.scrollLeft = horizontalPosition; });
   onDestroy(() => {
     ui.boardView = { view, search, employee: filterEmployee, competency: filterCompetency,
-      project: filterProject, priority: filterPriority, summary: summaryFilter, workType,
+      project: filterProject, priority: filterPriority, summary: summaryFilter,
       sortKey, sortDirection, compact, scrollLeft: horizontalPosition };
   });
 
@@ -79,8 +78,7 @@
       if (t.status === "cancelled") return false;
       if (filterEmployee && t.employeeId !== filterEmployee) return false;
       if (filterCompetency && t.competencyId !== filterCompetency) return false;
-      if (filterProject && t.projectId !== filterProject) return false;
-      if (!matchesWorkType(t, workType)) return false;
+      if (!matchesProjectFilter(t, filterProject)) return false;
       if (filterPriority && t.priority !== filterPriority) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -343,13 +341,6 @@
     filterProject = "";
     filterPriority = "";
     summaryFilter = "";
-    workType = "";
-  }
-
-  // A specific project is project work; competency work has no project.
-  function setWorkType(next: WorkTypeFilter) {
-    workType = next;
-    if (next === "competency") filterProject = "";
   }
 
   function cancelTransientState() {
@@ -447,7 +438,7 @@
   }
 
   let anyFilter = $derived(
-    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter || workType)
+    Boolean(search || filterEmployee || filterCompetency || filterProject || filterPriority || summaryFilter)
   );
 
   // --- saved views -----------------------------------------------------------
@@ -459,8 +450,7 @@
     competency: filterCompetency,
     project: filterProject,
     priority: filterPriority,
-    summary: summaryFilter,
-    workType
+    summary: summaryFilter
   });
   let savedViews = $derived(app.settings.savedBoardViews ?? []);
   let activeView = $derived(matchingView(savedViews, currentFilters));
@@ -483,7 +473,6 @@
     filterProject = filters.project;
     filterPriority = filters.priority;
     summaryFilter = filters.summary;
-    workType = filters.workType;
   }
 
   function openSaveView() {
@@ -583,14 +572,9 @@
     <RecurringTasks bind:this={recurringView} />
   {:else}
   <div class="board-toolbar" aria-label="Board filters">
-    <div class="view-toggle work-type" role="group" aria-label="Project or competency work">
-      <button type="button" class:active={workType === ""} aria-pressed={workType === ""} onclick={() => setWorkType("")}>All</button>
-      <button type="button" class:active={workType === "project"} aria-pressed={workType === "project"} onclick={() => setWorkType("project")}>Project</button>
-      <button type="button" class:active={workType === "competency"} aria-pressed={workType === "competency"} onclick={() => setWorkType("competency")}>Competency</button>
-    </div>
     <div class="search-field">
       <Icon name="search" size={15} />
-      <input type="search" placeholder="Search" bind:value={search} aria-label="Search tasks" />
+      <input type="search" placeholder="Search tasks" bind:value={search} aria-label="Search tasks" />
     </div>
     <select bind:value={filterEmployee} aria-label="Filter by employee">
       <option value="">All employees</option>
@@ -600,8 +584,10 @@
       <option value="">All competencies</option>
       {#each app.competencyList as c (c.id)}<option value={c.id}>{c.code}</option>{/each}
     </select>
-    <select bind:value={filterProject} aria-label="Filter by project" onchange={() => { if (filterProject) workType = "project"; }}>
+    <select bind:value={filterProject} aria-label="Filter by project">
       <option value="">All projects</option>
+      <option value={ANY_PROJECT}>Any project</option>
+      <option value={NO_PROJECT}>No project (competency work)</option>
       {#each app.activeProjects as p (p.id)}<option value={p.id}>{p.name}</option>{/each}
     </select>
     <select bind:value={filterPriority} aria-label="Filter by priority">
@@ -1097,7 +1083,7 @@
   }
   .board-toolbar {
     display: grid;
-    grid-template-columns: auto minmax(7rem, .8fr) repeat(4, minmax(7rem, 1fr)) auto;
+    grid-template-columns: minmax(12rem, 1.5fr) repeat(4, minmax(7rem, 1fr)) auto;
     gap: .45rem;
     align-items: center;
     padding: .65rem;
@@ -1326,13 +1312,11 @@
     white-space: nowrap;
   }
   .card-tag.more { background: transparent; border: 1px dashed var(--border-strong); }
-  .work-type { justify-self: start; }
+
   :global(:root[data-density="compact"]) .task-card { padding: .45rem .55rem .4rem; margin-bottom: .35rem; }
   :global(:root[data-density="compact"]) .card-context { margin-bottom: .25rem; }
   :global(:root[data-density="compact"]) .card-tags { margin-bottom: .25rem; }
   :global(:root[data-density="compact"]) .board-toolbar { padding: .45rem; margin-bottom: .55rem; }
-  .saved-views select { width: 8.5rem; }
-  .work-type button { white-space: nowrap; }
   .card-context {
     display: block;
     color: var(--text-muted);
@@ -1470,10 +1454,10 @@
   }
   @media (max-width: 1200px) {
     .board-toolbar {
-      grid-template-columns: auto minmax(0, 1fr) minmax(0, 1fr);
+      grid-template-columns: repeat(3, minmax(0, 1fr));
     }
     .search-field {
-      grid-column: 2 / -1;
+      grid-column: 1 / -1;
     }
   }
   @media (max-width: 760px) {
